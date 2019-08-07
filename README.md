@@ -193,7 +193,7 @@ function UpCase(ch: Char): Char
 
 ### Samples
 * `FACTOR.PAS`   - Integer factorization demo.
-* `LINEQ.PAS`    - Linear algebraic equation systems solver. Uses `GAUSS.INC` unit. Requires `EQ.DAT`, `EQERR.DAT`, or similar data file.
+* `LINEQ.PAS`    - Linear algebraic equation systems solver. Uses `GAUSS.INC` unit. Requires `EQ.TXT`, `EQERR.TXT`, or similar data file.
 * `LIFE.PAS`     - The Game of life.
 * `SORT.PAS`     - Array sorting demo.
 * `FFT.PAS`      - Fast Fourier Transform.
