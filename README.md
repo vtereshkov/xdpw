@@ -52,7 +52,7 @@ Block = { [ "const" Ident "=" ConstExpression ";"
           [ "type" Ident "=" Type ";" {Ident "=" Type ";"} ]
           [ "var" IdentList ":" Type ";" {IdentList ":" Type ";"} ]
           [ "procedure" Ident [FormalParam] ";" 
-                        (Block | "forward") ";" ]
+                        (Block | "forward" | "external" StringLiteral) ";" ]
           [ "function"  Ident [FormalParam] [":" TypeIdent] ";" 
                         (Block | "forward" | "external" StringLiteral) ";" ] }
              CompoundStatement .
