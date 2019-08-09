@@ -1,22 +1,18 @@
 # XD Pascal Compiler for Windows
 
 ## Summary
-XD Pascal is a small educational compiler for a subset of the Pascal language. A native x86 machine code generator directly emits Windows executables. The compiler is self-hosting and supports floating-point arithmetic.
+XD Pascal is a small educational self-hosting compiler for a subset of the Pascal language. The software is in the public domain. It comes with absolutely no warranty. Any comments, suggestions, or bug reports are appreciated. Feel free to contact the author on GitHub or by e-mail VTereshkov@mail.ru. Enjoy.
 
 ### Features
 * Fast recursive descent parsing
 * Native x86 code generation (Windows executables)
+* Support for both console and GUI applications.
 * No external assembler or linker needed
 * Source file inclusion facility
 * Single-precision floating-point arithmetic (using the x87 FPU)
-* Compiler source for Delphi, Free Pascal, or XD Pascal itself 
+* Compiler source for Delphi, Free Pascal and XD Pascal itself 
 
 ## Detailed description
-### Preamble
-The software is in the public domain. It comes with absolutely no warranty.
-Any comments, suggestions, or bug reports are appreciated. 
-Feel free to contact me on GitHub or by e-mail VTereshkov@mail.ru. 
-Enjoy.
 
 ### Usage
 Type in the command prompt:
