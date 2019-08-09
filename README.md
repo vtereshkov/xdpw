@@ -28,16 +28,16 @@ XD Pascal is a dialect of Pascal programming language that resembles
 Turbo Pascal v. 3.0 with the following enhancements, differences and limitations:
 * Windows is supported
 * The compiler is self-hosting
-* There are no labels, "goto" and "with" statements. 
+* There are no labels, `goto` and `with` statements. 
 * Unsigned integers, sets, enumerations, and variant records are not supported.
 * Strings are null-terminated arrays of characters (C style). String 
   manipulation routines should be used instead of direct concatenation
   or comparison.
-* The only file type is Text. It can be used for both text and untyped files.
+* The only file type is `Text`. It can be used for both text and untyped files.
 * Structured parameters cannot be passed to subroutines by value.
-* The predefined Result variable can be used instead of function 
+* The predefined `Result` variable can be used instead of function 
   name in assignments (Delphi style).
-* Single-line comments ("//") are supported (Delphi style).  
+* Single-line comments (`//`) are supported (Delphi style).  
 
 #### Formal grammar
 ```
