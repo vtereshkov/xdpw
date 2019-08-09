@@ -133,20 +133,43 @@ var
   Text: TString;
 begin
 ReadChar(ch);
-if UpCase(ch) = 'I' then                              // Include directive found
-  begin
-  Text := '';
-  ReadChar(ch);
-  while (ch <> '}') and not EndOfProgram do
+case UpCase(ch) of
+  'I':                               // Include directive found
     begin
-    if (ch = #0) or (ch > ' ') then 
-      CustomStrAppend(Text, ch);
+    Text := '';
     ReadChar(ch);
+    while (ch <> '}') and not EndOfProgram do
+      begin
+      if (ch = #0) or (ch > ' ') then 
+        CustomStrAppend(Text, ch);
+      ReadChar(ch);
+      end;
+      
+    EnterIncludedFile(Text);
     end;
-  EnterIncludedFile(Text);
-  end
-else
-  Error('Unknown compiler directive', '', -1);
+    
+  'A':                              // Console/GUI application type
+    begin
+    Text := '';
+    ReadChar(ch);
+    while (ch <> '}') and not EndOfProgram do
+      begin
+      if (ch = #0) or (ch > ' ') then 
+        CustomStrAppend(Text, UpCase(ch));
+      ReadChar(ch);
+      end;
+      
+    if CustomStrComp(Text, 'CONSOLE') = 0 then
+      IsConsoleProgram := 1
+    else if CustomStrComp(Text, 'GUI') = 0 then
+      IsConsoleProgram := 0
+    else
+      Error('Unknown application type', '', -1);
+    end      
+      
+  else
+    Error('Unknown compiler directive', '', -1);
+  end; // case  
 end;
 
 

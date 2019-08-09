@@ -10,7 +10,7 @@ const
   SECTIONALIGNMENT  = $1000;
   FILEALIGNMENT     = $200;
   
-  MAXIMPORTS        = 32;
+  MAXIMPORTS        = 64;
   
 
 
@@ -118,9 +118,9 @@ type
 
   
   TImportSection = record
-    DirectoryTable: array [0..1] of TImportDirectoryTableEntry;
-    LibraryName: array [0..15] of Char;
-    LookupTable: array [0..MAXIMPORTS - 1] of LongInt;
+    DirectoryTable: array [0..MAXIMPORTS] of TImportDirectoryTableEntry;
+    LibraryNames: array [0..MAXIMPORTS - 1, 0..15] of Char;
+    LookupTable: array [0..MAXIMPORTS - 1, 0..1] of LongInt;
     NameTable: array [0..MAXIMPORTS - 1] of TImportNameTableEntry;
   end;
   
@@ -196,7 +196,7 @@ Headers.PEHeader.Characteristics                      := $103;                  
 
 // PE optional header  
 Headers.PEOptionalHeader.Magic                        := $10B;                                                // PE32
-Headers.PEOptionalHeader.AddressOfEntryPoint          := Align(SizeOf(Headers), SECTIONALIGNMENT);           // code section must go first
+Headers.PEOptionalHeader.AddressOfEntryPoint          := Align(SizeOf(Headers), SECTIONALIGNMENT);            // code section must go first
 Headers.PEOptionalHeader.ImageBase                    := IMAGEBASE;
 Headers.PEOptionalHeader.SectionAlignment             := SECTIONALIGNMENT;
 Headers.PEOptionalHeader.FileAlignment                := FILEALIGNMENT;
@@ -204,7 +204,7 @@ Headers.PEOptionalHeader.MajorOperatingSystemVersion  := 4;
 Headers.PEOptionalHeader.MajorSubsystemVersion        := 4;
 Headers.PEOptionalHeader.SizeOfImage                  := Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(CodeSize, SECTIONALIGNMENT) + Align(DataSize, SECTIONALIGNMENT) + Align(SizeOf(TImportSection), SECTIONALIGNMENT);
 Headers.PEOptionalHeader.SizeOfHeaders                := Align(SizeOf(Headers), FILEALIGNMENT);
-Headers.PEOptionalHeader.Subsystem                    := 3;                                                   // Win32 console
+Headers.PEOptionalHeader.Subsystem                    := 2 + IsConsoleProgram;                                // Win32 GUI/console
 Headers.PEOptionalHeader.SizeOfStackReserve           := $1000000;
 Headers.PEOptionalHeader.SizeOfStackCommit            := $1000000;
 Headers.PEOptionalHeader.SizeOfHeapReserve            := $1000000;
@@ -257,41 +257,30 @@ end;
 
 
 
-procedure FillImportSection;
+
+function AddImportFunc(const ImportLibName, ImportFuncName: TString): LongInt;
 var
   VirtualAddress: LongInt;
-  LibraryName: TString;
 begin
 VirtualAddress := Headers.ImportSectionHeader.VirtualAddress;
 
-Clear(@ImportSection, SizeOf(ImportSection));
+ImportSection.DirectoryTable[NumImports].Name        := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
+                                                                       + SizeOf(ImportSection.LibraryNames[0]) * NumImports;
+                                                                       
+ImportSection.DirectoryTable[NumImports].FirstThunk  := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
+                                                                       + SizeOf(ImportSection.LibraryNames)
+                                                                       + SizeOf(ImportSection.LookupTable[0]) * NumImports;
 
-ImportSection.DirectoryTable[0].Name        := VirtualAddress + SizeOf(ImportSection.DirectoryTable);
-ImportSection.DirectoryTable[0].FirstThunk  := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
-                                                              + SizeOf(ImportSection.LibraryName);
+CopyMemory(@ImportSection.LibraryNames[NumImports], Pointer(Integer(@ImportLibName) + STRINGFIRSTINDEX), Length(ImportLibName));
 
-LibraryName := 'KERNEL32.DLL';
-CopyMemory(@ImportSection.LibraryName, Pointer(Integer(@LibraryName) + STRINGFIRSTINDEX), Length(LibraryName));
-end;
+ImportSection.LookupTable[NumImports, 0] := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
+                                                           + SizeOf(ImportSection.LibraryNames)
+                                                           + SizeOf(ImportSection.LookupTable)
+                                                           + SizeOf(ImportSection.NameTable[0]) * NumImports;                                              
 
-
-
-function AddImportFunc(const ImportFuncName: TString): LongInt;
-var
-  VirtualAddress: LongInt;
-  i: Integer;
-begin
-VirtualAddress := Headers.ImportSectionHeader.VirtualAddress;
-
-ImportSection.LookupTable[NumImports] := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
-                                                        + SizeOf(ImportSection.LibraryName)
-                                                        + SizeOf(ImportSection.LookupTable)
-                                                        + SizeOf(ImportSection.NameTable[0]) * NumImports;                                              
-//for i := 0 to Length(ImportFuncName) - 1 do
-  //ImportSection.NameTable[NumImports].Name[i] := ImportFuncName[i + 1];
 CopyMemory(@ImportSection.NameTable[NumImports].Name, Pointer(Integer(@ImportFuncName) + STRINGFIRSTINDEX), Length(ImportFuncName));
 
-Result := IMAGEBASE + VirtualAddress + LongInt(@ImportSection.LookupTable[NumImports]) - LongInt(@ImportSection);
+Result := IMAGEBASE + VirtualAddress + LongInt(@ImportSection.LookupTable[NumImports, 0]) - LongInt(@ImportSection);
 Inc(NumImports);
 end;
   

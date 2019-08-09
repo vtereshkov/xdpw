@@ -223,7 +223,23 @@ end;
 
 
 
-procedure SaveStackTop;
+procedure SaveStackTopToEAX;
+begin
+Gen($58);                                                         // pop eax
+end;
+
+
+
+
+procedure RestoreStackTopFromEAX;
+begin
+Gen($50);                                                         // push eax
+end;
+
+
+
+
+procedure SaveStackTopToEDX;
 begin
 Gen($5A);                                                         // pop edx
 end;
@@ -231,10 +247,12 @@ end;
 
 
 
-procedure RestoreStackTop;
+procedure RestoreStackTopFromEDX;
 begin
 Gen($52);                                                         // push edx
 end;
+
+
 
 
 
@@ -616,27 +634,30 @@ end;
 
 
 
-procedure GenerateCall(EntryPoint: LongInt; DeltaNesting: Byte);
+procedure GenerateCall(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer);
 const
   StaticLinkAddr = 2 * 4;
 var
   CodePos: Integer;
   i: Integer;
 begin
-// Push routine static link as the last hidden parameter (needed for nested routines)
-if DeltaNesting = 0 then                       // The caller and the callee's enclosing routine are at the same nesting level
-  begin
-  Gen($55);                                                             // push ebp
-  end
-else                                           // The caller is deeper
-  begin
-  Gen($8B); Gen($75); Gen(StaticLinkAddr);                              // mov esi, [ebp + StaticLinkAddr]
-  for i := 1 to DeltaNesting - 1 do
+if (CallerNesting < 0) or (CalleeNesting < 1) or (CallerNesting - CalleeNesting < -1) then
+  Error('Internal fault: Illegal nesting level', '', -1);
+  
+if CalleeNesting > 1 then                        // If a nested routine is called, push static link as the last hidden parameter
+  if CallerNesting - CalleeNesting = -1 then     // The caller and the callee's enclosing routine are at the same nesting level
     begin
-    Gen($8B); Gen($76); Gen(StaticLinkAddr);                            // mov esi, [esi + StaticLinkAddr]
+    Gen($55);                                                             // push ebp
+    end
+  else                                           // The caller is deeper
+    begin
+    Gen($8B); Gen($75); Gen(StaticLinkAddr);                              // mov esi, [ebp + StaticLinkAddr]
+    for i := 1 to CallerNesting - CalleeNesting do
+      begin
+      Gen($8B); Gen($76); Gen(StaticLinkAddr);                            // mov esi, [esi + StaticLinkAddr]
+      end;
+    Gen($56);                                                             // push esi
     end;
-  Gen($56);                                                             // push esi
-  end;
 
 // Call the routine  
 CodePos := CodeSize;
@@ -657,9 +678,13 @@ end;
 
 
 
-procedure GenerateReturn(TotalParamsSize: Integer);
+procedure GenerateReturn(TotalParamsSize, Nesting: Integer);
 begin
-Gen($C2); GenWord(TotalParamsSize + SizeOf(LongInt));                   // ret TotalParamsSize + 4   ; + 4 is for static link
+Gen($C2);                                                               // ret ... 
+if Nesting = 1 then
+  GenWord(TotalParamsSize)                                              // ... TotalParamsSize
+else  
+  GenWord(TotalParamsSize + 4);                                         // ... TotalParamsSize + 4   ; + 4 is for static link
 end;
 
 

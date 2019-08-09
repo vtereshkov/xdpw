@@ -344,7 +344,7 @@ case proc of
 
           // Call the specific output subroutine. Interface: FileHandle; StreamHandle; var Designator
           if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
-          GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - Ident[LibProcIdentIndex].NestingLevel);
+          GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
           end; // else
 
         IsFirstParam := FALSE;
@@ -373,7 +373,7 @@ case proc of
       PushConst(0);        
 
       if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
-      GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - Ident[LibProcIdentIndex].NestingLevel);
+      GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
       end;
 
     end;// READPROC, READLNPROC
@@ -431,7 +431,7 @@ case proc of
 
           // Call the specific output subroutine. Interface: FileHandle; StreamHandle; Expression
           if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
-          GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - Ident[LibProcIdentIndex].NestingLevel);
+          GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
           end; // else
 
         IsFirstParam := FALSE;
@@ -460,7 +460,7 @@ case proc of
       PushConst(0);         
 
       if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
-      GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - Ident[LibProcIdentIndex].NestingLevel);
+      GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
       end;
 
     end;// WRITEPROC, WRITELNPROC
@@ -480,7 +480,7 @@ case proc of
     PushConst(TypeSize(Types[DesignatorType].BaseType));
     
     if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
-    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - Ident[LibProcIdentIndex].NestingLevel);
+    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
     
     EatTok(CPARTOK);
     end;
@@ -529,7 +529,7 @@ case func of
     else
       begin
       CompileDesignator(ValType);
-      SaveStackTop;                        // Save result to EDX
+      SaveStackTopToEDX;                        // Save result to EDX just to discard it
       PushConst(TypeSize(ValType));
       end;
     ValType := INTEGERTYPEINDEX;
@@ -781,8 +781,8 @@ case Tok.Kind of
         else
           begin  
           if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[IdentIndex].ProcAsBlock);
-          GenerateCall(Ident[IdentIndex].Value, BlockStackTop - Ident[IdentIndex].NestingLevel);
-          RestoreStackTop;
+          GenerateCall(Ident[IdentIndex].Value, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
+          RestoreStackTopFromEAX;
           end;
           
         ValType := Ident[IdentIndex].DataType;
@@ -824,7 +824,17 @@ case Tok.Kind of
   ADDRESSTOK:
     begin
     NextTok;
-    CompileDesignator(ValType);
+    IdentIndex := GetIdent(Tok.Name);
+    
+    if (Ident[IdentIndex].Kind = PROC) or (Ident[IdentIndex].Kind = FUNC) then
+      begin
+      PushConst(CodeSectionOrigin + Ident[IdentIndex].Value);
+      if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[IdentIndex].ProcAsBlock);
+      NextTok;
+      end
+    else  
+      CompileDesignator(ValType);
+      
     ValType := POINTERTYPEINDEX;
     end;
 
@@ -1116,7 +1126,7 @@ case Tok.Kind of
           else  
             begin
             if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[IdentIndex].ProcAsBlock);
-            GenerateCall(Ident[IdentIndex].Value, BlockStackTop - Ident[IdentIndex].NestingLevel);
+            GenerateCall(Ident[IdentIndex].Value, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
             end;
           end// PROC
     else
@@ -1274,9 +1284,9 @@ case Tok.Kind of
     CompileExpression(ExpressionType);
     DummyType := GetCompatibleType(ExpressionType, Ident[IdentIndex].DataType);
 
-    SaveStackTop;                                             // Save final value
+    SaveStackTopToEDX;                                        // Save final value
     GenerateAssignment(Ident[IdentIndex].DataType);           // Assign initial value to the counter
-    RestoreStackTop;                                          // Restore final value
+    RestoreStackTopFromEDX;                                   // Restore final value
 
     Inc(CodePosStackTop);
     CodePosStack[CodePosStackTop] := CodeSize;                // Save return address used by GenerateForEpilog
@@ -1514,11 +1524,12 @@ var
   ExitLoop: Boolean;
   ListPassMethod: Byte;
   VarType, ConstValType: Byte;
+  ImportLibName, ImportFuncName: TString;
 
 
   procedure DeclareId(const Name: TString; Kind: Byte; TotalNumParams: Integer; DataType: Byte; PassMethod: Byte; ConstValue: LongInt; FracConstValue: Single; PredefIndex: Byte);
   var
-    i: Integer;
+    i, AdditionalStackItems: Integer;
     Scope: Byte;
   begin
   if BlockStack[BlockStackTop] = 1 then Scope := GLOBAL else Scope := LOCAL;
@@ -1555,19 +1566,25 @@ var
         case Scope of
           GLOBAL:
             begin
-            Ident[NumIdent].Value := DataSectionOrigin + VarDataOrigin + GlobalDataSize;     // Variable address
+            Ident[NumIdent].Value := DataSectionOrigin + VarDataOrigin + GlobalDataSize;          // Variable address
             GlobalDataSize := GlobalDataSize + TypeSize(DataType);
             end;// else
 
           LOCAL:
             if TotalNumParams > 0 then
               begin
-              ParamDataSize := ParamDataSize + SizeOf(LongInt);                                 // Parameters always occupy 4 bytes each
-              Ident[NumIdent].Value := (3 + TotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from bp (>0); the last (hidden) parameter is the static link
+              ParamDataSize := ParamDataSize + SizeOf(LongInt);                                   // Parameters always occupy 4 bytes each
+              
+              if Ident[NumIdent].NestingLevel = 2 then                                            // Inside a non-nested routine
+                AdditionalStackItems := 2                                                         // Old EBP, return address
+              else                                                                                // Inside a nested routine
+                AdditionalStackItems := 3;                                                        // Old EBP, return address, static link (hidden parameter)  
+
+              Ident[NumIdent].Value := (AdditionalStackItems + TotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from EBP (>0)
               end
             else
               begin
-              Ident[NumIdent].Value := -LocalDataSize - TypeSize(DataType);                     // Local variable offset from bp (<0)
+              Ident[NumIdent].Value := -LocalDataSize - TypeSize(DataType);                       // Local variable offset from EBP (<0)
               LocalDataSize := LocalDataSize + TypeSize(DataType);
               end;
         end// case
@@ -1949,10 +1966,24 @@ while (Tok.Kind = CONSTTOK) or (Tok.Kind = TYPETOK) or (Tok.Kind = VARTOK) or (T
     // Check for an EXTERNAL or FORWARD directive (they are not reserved words)
     if (ForwardIdentIndex = 0) and (Tok.Kind = IDENTTOK) and (CustomStrComp(Tok.Name, 'EXTERNAL') = 0) then  // External declaration
       begin
+      if BlockStackTop <> 1 then
+        Error('External declaration must be global', '', -1);
+        
+      // Read import library name
+      NextTok;      
+      ImportLibName := Tok.Name;
+      EatTok(STRINGLITERALTOK);      
+      
+      // Read import function name
+      if (Tok.Kind <> IDENTTOK) or (CustomStrComp(Tok.Name, 'NAME') <> 0) then
+        Error('Expected NAME but found ', '', Tok.Kind);
       NextTok;
+      ImportFuncName := Tok.Name;
       EatTok(STRINGLITERALTOK);
+
+      // Register import function
       Ident[NumIdent].IsExternal := TRUE;
-      Ident[NumIdent].Value := AddImportFunc(Tok.Name);
+      Ident[NumIdent].Value := AddImportFunc(ImportLibName, ImportFuncName);
       end    
     else if (ForwardIdentIndex = 0) and (Tok.Kind = IDENTTOK) and (CustomStrComp(Tok.Name, 'FORWARD') = 0) then  // Forward declaration
       begin
@@ -1998,19 +2029,19 @@ if BlockStack[BlockStackTop] = 1 then
   // Initialize heap and console I/O
   LibProcIdentIndex := GetIdent('INITSYSTEM');
   if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
-  GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - Ident[LibProcIdentIndex].NestingLevel);  
+  GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);  
   end
 else
   GenerateStackFrameProlog(LocalDataSize);  
 
 CompileCompoundStatement;
 
-// If function, return Result value via the EDX register
+// If function, return Result value via the EAX register
 if (BlockStack[BlockStackTop] <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) then
   begin
   PushVarPtr(Ident[GetIdent('RESULT')].Value, LOCAL, 0);
   DerefPtr(Ident[BlockIdentIndex].DataType);
-  SaveStackTop;
+  SaveStackTopToEAX;
   end;
 
 if BlockStack[BlockStackTop] = 1 then          // Main program
@@ -2022,7 +2053,7 @@ if BlockStack[BlockStackTop] = 1 then          // Main program
 else
   begin
   GenerateStackFrameEpilog;
-  GenerateReturn(Ident[BlockIdentIndex].NumParams * SizeOf(LongInt));
+  GenerateReturn(Ident[BlockIdentIndex].NumParams * SizeOf(LongInt), Ident[BlockIdentIndex].NestingLevel);
   end;
    
 // Delete local identifiers and types from the tables to save space
@@ -2068,7 +2099,7 @@ AssertIdent;
 NextTok;
 CheckTok(SEMICOLONTOK);
 
-EnterIncludedFile('system.pas');
+EnterIncludedFile('system.inc');
 NextTok;
 
 Inc(NumBlocks);

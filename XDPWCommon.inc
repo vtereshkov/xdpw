@@ -7,7 +7,7 @@
 
 const
   VERSIONMAJOR          = 0;
-  VERSIONMINOR          = 8;
+  VERSIONMINOR          = 9;
   
   NUMDELIMITERS         = 22;
   NUMKEYWORDS           = 31;
@@ -273,13 +273,14 @@ var
 
   NumIdent, NumTypes, NumStaticStrChars, VarDataOrigin, NumBlocks, BlockStackTop,
   CodeSize, CodePosStackTop, GlobalDataSize,
-  DataSectionOrigin, 
+  CodeSectionOrigin, DataSectionOrigin, 
   Pass, UnitStackTop, Line: Integer;
+  
+  IsConsoleProgram: Integer;                                              // More convenient than Boolean
   
   InFile: TInFile;
   
-  
-  
+
   
 procedure FillKeywords;
 begin

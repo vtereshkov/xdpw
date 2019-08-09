@@ -52,9 +52,13 @@ Block = { [ "const" Ident "=" ConstExpression ";"
           [ "type" Ident "=" Type ";" {Ident "=" Type ";"} ]
           [ "var" IdentList ":" Type ";" {IdentList ":" Type ";"} ]
           [ "procedure" Ident [FormalParam] ";" 
-                        (Block | "forward" | "external" StringLiteral) ";" ]
+                        (Block | 
+                         "forward" | 
+                         "external" StringLiteral "name" StringLiteral) ";" ]
           [ "function"  Ident [FormalParam] [":" TypeIdent] ";" 
-                        (Block | "forward" | "external" StringLiteral) ";" ] }
+                        (Block | 
+                         "forward" | 
+                         "external" StringLiteral "name" StringLiteral) ";" ] }
              CompoundStatement .
 
 ActualParam = "(" (Expression | Designator) |

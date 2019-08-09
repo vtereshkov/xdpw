@@ -52,8 +52,7 @@ if ParamCount < 1 then
   WriteLn('Usage: xdpw <file.pas>');
   WriteLn;
   Halt(1);
-  end;
-  
+  end;  
   
 CustomParamStr(1, ProgramName);  
 
@@ -61,9 +60,12 @@ FillKeywords;
 
 for BlockIndex := 1 to MAXBLOCKS do
   BlockIsNotDead[BlockIndex] := FALSE;
+  
+IsConsoleProgram := 1;  // Console program by default  
 
 
 // First pass: compile the program and build the call graph
+CodeSectionOrigin := 0;
 DataSectionOrigin := 0;
 VarDataOrigin := 0;
 
@@ -79,6 +81,7 @@ MarkBlockNotDead(1);
 
 
 // Second pass: compile the program and calculate code and data sizes (BlockIsNotDead array is preserved)
+CodeSectionOrigin := 0;
 DataSectionOrigin := 0;
 VarDataOrigin := NumStaticStrChars;
 
@@ -89,10 +92,11 @@ CompileProgram;
 Close(InFile);
 
 FillHeaders(CodeSize, NumStaticStrChars, GlobalDataSize);
-FillImportSection;
+Clear(@ImportSection, SizeOf(ImportSection));
 
 
 // Third pass: compile the program and generate output (BlockIsNotDead array is preserved)
+CodeSectionOrigin := IMAGEBASE + Headers.CodeSectionHeader.VirtualAddress;
 DataSectionOrigin := IMAGEBASE + Headers.DataSectionHeader.VirtualAddress;
 VarDataOrigin := NumStaticStrChars;
 
