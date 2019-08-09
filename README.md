@@ -203,4 +203,5 @@ function UpCase(ch: Char): Char
 * `FFT.PAS`      - Fast Fourier Transform.
 * `INSERR.PAS`   - Inertial navigation system error estimator. Uses `KALMAN.INC` unit.
 * `LIST.PAS`     - Linked list operations demo.
+* `GUI.PAS`      - GUI application demo. Uses `WINDOWS.INC` unit.
 
