@@ -27,6 +27,7 @@ WriteLn('Linked list operations demo');
 WriteLn;
 
 New(Node);
+Node^.Next := nil;
 Head := Node;
 
 

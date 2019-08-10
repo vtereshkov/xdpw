@@ -948,22 +948,6 @@ end;
 
 
 
-procedure GenerateDeclarationProlog;
-begin
-GenerateIfProlog;
-end;
-
-
-
-
-procedure GenerateDeclarationEpilog;
-begin
-GenerateIfElseEpilog;
-end;
-
-
-
-
 procedure GenerateProgramProlog;
 begin
 // Initialize FPU

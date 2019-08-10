@@ -192,11 +192,11 @@ Headers.PEHeader.PE[1]                                := 'E';
 Headers.PEHeader.Machine                              := $14C;                                                // Intel 386
 Headers.PEHeader.NumberOfSections                     := 3;
 Headers.PEHeader.SizeOfOptionalHeader                 := SizeOf(Headers.PEOptionalHeader) + SizeOf(Headers.DataDirectories);
-Headers.PEHeader.Characteristics                      := $103;                                                // no relocations, executable, 32 bit
+Headers.PEHeader.Characteristics                      := $103;                                                // No relocations, executable, 32 bit
 
 // PE optional header  
 Headers.PEOptionalHeader.Magic                        := $10B;                                                // PE32
-Headers.PEOptionalHeader.AddressOfEntryPoint          := Align(SizeOf(Headers), SECTIONALIGNMENT);            // code section must go first
+Headers.PEOptionalHeader.AddressOfEntryPoint          := Align(SizeOf(Headers), SECTIONALIGNMENT) + ProgramEntryPoint;   // Code section goes first
 Headers.PEOptionalHeader.ImageBase                    := IMAGEBASE;
 Headers.PEOptionalHeader.SectionAlignment             := SECTIONALIGNMENT;
 Headers.PEOptionalHeader.FileAlignment                := FILEALIGNMENT;
@@ -225,7 +225,7 @@ Headers.CodeSectionHeader.VirtualSize                 := CodeSize;
 Headers.CodeSectionHeader.VirtualAddress              := Align(SizeOf(Headers), SECTIONALIGNMENT);
 Headers.CodeSectionHeader.SizeOfRawData               := Align(CodeSize, FILEALIGNMENT);
 Headers.CodeSectionHeader.PointerToRawData            := Align(SizeOf(Headers), FILEALIGNMENT);
-Headers.CodeSectionHeader.Characteristics             := LongInt($60000020);                              // code, executable, readable
+Headers.CodeSectionHeader.Characteristics             := LongInt($60000020);                              // Code, executable, readable
 
 // Data section header
 Headers.DataSectionHeader.Name[0]                     := '.';
@@ -237,7 +237,7 @@ Headers.DataSectionHeader.VirtualSize                 := DataSize;
 Headers.DataSectionHeader.VirtualAddress              := Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(CodeSize, SECTIONALIGNMENT);
 Headers.DataSectionHeader.SizeOfRawData               := Align(InitializedDataSize, FILEALIGNMENT);
 Headers.DataSectionHeader.PointerToRawData            := Align(SizeOf(Headers), FILEALIGNMENT) + Align(CodeSize, FILEALIGNMENT);
-Headers.DataSectionHeader.Characteristics             := LongInt($C00000C0);                              // data, readable, writable
+Headers.DataSectionHeader.Characteristics             := LongInt($C00000C0);                              // Data, readable, writable
 
 // Import section header
 Headers.ImportSectionHeader.Name[0]                   := '.';
@@ -250,7 +250,7 @@ Headers.ImportSectionHeader.VirtualSize               := SizeOf(TImportSection);
 Headers.ImportSectionHeader.VirtualAddress            := Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(CodeSize, SECTIONALIGNMENT) + Align(DataSize, SECTIONALIGNMENT);
 Headers.ImportSectionHeader.SizeOfRawData             := Align(SizeOf(TImportSection), FILEALIGNMENT);
 Headers.ImportSectionHeader.PointerToRawData          := Align(SizeOf(Headers), FILEALIGNMENT) + Align(CodeSize, FILEALIGNMENT) + Align(InitializedDataSize, FILEALIGNMENT);
-Headers.ImportSectionHeader.Characteristics           := LongInt($C0000040);                              // data, readable, writable
+Headers.ImportSectionHeader.Characteristics           := LongInt($C0000040);                              // Data, readable, writable
 
 end;
 

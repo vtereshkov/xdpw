@@ -273,7 +273,7 @@ var
 
   NumIdent, NumTypes, NumStaticStrChars, VarDataOrigin, NumBlocks, BlockStackTop,
   CodeSize, CodePosStackTop, GlobalDataSize,
-  CodeSectionOrigin, DataSectionOrigin, 
+  CodeSectionOrigin, DataSectionOrigin, ProgramEntryPoint,
   Pass, UnitStackTop, Line: Integer;
   
   IsConsoleProgram: Integer;                                              // More convenient than Boolean

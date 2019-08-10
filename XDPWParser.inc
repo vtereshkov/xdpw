@@ -1742,9 +1742,8 @@ else
   if Ident[BlockIdentIndex].Kind = FUNC then DeclareId('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].DataType, VALPASSING, 0, 0.0, 0);
   end;// else
 
-GenerateDeclarationProlog;
 
-
+// Local declarations
 while (Tok.Kind = CONSTTOK) or (Tok.Kind = TYPETOK) or (Tok.Kind = VARTOK) or (Tok.Kind = PROCEDURETOK) or (Tok.Kind = FUNCTIONTOK) do
   begin
   if Tok.Kind = CONSTTOK then
@@ -2022,8 +2021,12 @@ while (Tok.Kind = CONSTTOK) or (Tok.Kind = TYPETOK) or (Tok.Kind = VARTOK) or (T
 
   end;// while
 
-GenerateDeclarationEpilog;  // Make jump to block entry point
-
+// Set entry point
+if BlockIdentIndex = 0 then
+  ProgramEntryPoint := CodeSize
+else  
+  Ident[BlockIdentIndex].Value := CodeSize;
+  
 if BlockStack[BlockStackTop] = 1 then
   begin  
   // Initialize heap and console I/O

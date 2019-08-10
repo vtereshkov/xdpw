@@ -27,6 +27,7 @@ begin
 NumIdent := 0; NumTypes := 0; NumImports := 0; NumBlocks := 0; BlockStackTop := 0; CodeSize := 0; CodePosStackTop := 0;
 NumStaticStrChars := 0;
 GlobalDataSize := 0;
+ProgramEntryPoint := 0;
 Clear(@CallGraph, SizeOf(CallGraph));
 end;
 
