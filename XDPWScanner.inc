@@ -520,14 +520,9 @@ end; // NextTok
 
 
 procedure CheckTok(ExpectedTokKind: Byte);
-var
-  ExpectedTok: TToken;
 begin
 if Tok.Kind <> ExpectedTokKind then
-  begin
-  ExpectedTok.Kind := ExpectedTokKind;
-  Error('Expected ', '', ExpectedTok.Kind);
-  end;
+  Error('Expected ', '', ExpectedTokKind);
 end;
 
 

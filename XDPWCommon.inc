@@ -343,10 +343,10 @@ end;
 
 procedure WriteToken(TokKind: Integer);
 begin
-if Tok.Kind = 0 then
+if TokKind = 0 then
   Write('no token')
-else if Tok.Kind <= NUMDELIMITERS then
-  case Tok.Kind of
+else if TokKind <= NUMDELIMITERS then
+  case TokKind of
     OPARTOK:        Write('(');
     CPARTOK:        Write(')');
     MULTOK:         Write('*');
@@ -370,13 +370,13 @@ else if Tok.Kind <= NUMDELIMITERS then
     CBRACKETTOK:    Write(']');
     DEREFERENCETOK: Write('^');
   end // case
-else if Tok.Kind <= NUMDELIMITERS + NUMKEYWORDS then
-  Write(Keyword[Tok.Kind - NUMDELIMITERS])
-else if Tok.Kind = IDENTTOK then
+else if TokKind <= NUMDELIMITERS + NUMKEYWORDS then
+  Write(Keyword[TokKind - NUMDELIMITERS])
+else if TokKind = IDENTTOK then
   Write('identifier')
-else if (Tok.Kind = INTNUMBERTOK) or (Tok.Kind = FRACNUMBERTOK) then
+else if (TokKind = INTNUMBERTOK) or (TokKind = FRACNUMBERTOK) then
   Write('number')
-else if (Tok.Kind = CHARLITERALTOK) or (Tok.Kind = STRINGLITERALTOK) then
+else if (TokKind = CHARLITERALTOK) or (TokKind = STRINGLITERALTOK) then
   Write('literal')
 else
   Write('unknown token');
