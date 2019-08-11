@@ -82,6 +82,16 @@ end;
 
 
 
+procedure SafeStrAppend(var s: TString; ch: Char);
+begin
+if Length(s) >= MAXSTRLENGTH - 1 then
+  Error('String is too long', '', -1);
+CustomStrAppend(s, ch);  
+end;
+
+
+
+
 procedure ReadChar(var ch: Char);
 begin
 if EndOfProgram then
@@ -152,21 +162,21 @@ case UpCase(ch) of
     while (ch <> '}') and not EndOfProgram do
       begin
       if (ch = #0) or (ch > ' ') then 
-        CustomStrAppend(Text, ch);
+        SafeStrAppend(Text, ch);
       ReadChar(ch);
       end;
       
     EnterIncludedFile(Text);
     end;
     
-  'A':                              // Console/GUI application type
+  'A':                              // Console/GUI application type directive found
     begin
     Text := '';
     ReadChar(ch);
     while (ch <> '}') and not EndOfProgram do
       begin
       if (ch = #0) or (ch > ' ') then 
-        CustomStrAppend(Text, UpCase(ch));
+        SafeStrAppend(Text, UpCase(ch));
       ReadChar(ch);
       end;
       
@@ -346,7 +356,7 @@ var
 begin
 Text := '';
 repeat
-  CustomStrAppend(Text, ch);
+  SafeStrAppend(Text, ch);
   ReadValidChar(ch);
 until not (((ch >= 'A') and (ch <= 'Z')) or (ch = '_') or ((ch >= '0') and (ch <= '9')));
 
@@ -374,12 +384,12 @@ EndOfLiteral := FALSE;
 repeat
   ReadLiteralChar(ch);
   if ch <> '''' then
-    CustomStrAppend(Text, ch)
+    SafeStrAppend(Text, ch)
   else
     begin
     CustomReadChar(InFile, ch2);
     if ch2 = '''' then                                                      // Apostrophe character found
-      CustomStrAppend(Text, ch)
+      SafeStrAppend(Text, ch)
     else
       begin
       if not EndOfProgram then Seek(InFile, FilePos(InFile) - 1);           // Discard ch2
