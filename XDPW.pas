@@ -72,9 +72,9 @@ VarDataOrigin := 0;
 
 ZeroAll;
 Pass := CALLDETERMPASS;
-InitScanner;
+InitializeScanner;
 CompileProgram;
-Close(InFile);
+FinalizeScanner;
 
 
 // Visit the call graph nodes and mark all procedures that are called as not dead
@@ -88,9 +88,9 @@ VarDataOrigin := NumStaticStrChars;
 
 ZeroAll;
 Pass := SIZEDETERMPASS;
-InitScanner;
+InitializeScanner;
 CompileProgram;
-Close(InFile);
+FinalizeScanner;
 
 FillHeaders(CodeSize, NumStaticStrChars, GlobalDataSize);
 Clear(@ImportSection, SizeOf(ImportSection));
@@ -103,9 +103,11 @@ VarDataOrigin := NumStaticStrChars;
 
 ZeroAll;
 Pass := CODEGENERATIONPASS;
-InitScanner;
+InitializeScanner;
 CompileProgram;
-Close(InFile);
+FinalizeScanner;
+
+
 
 // Write output file
 CustomChangeExt(ProgramName, 'exe', ExeName);

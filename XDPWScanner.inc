@@ -12,7 +12,7 @@ var
 
 
 
-procedure InitScanner;
+procedure InitializeScanner;
 begin
 EndOfProgram := FALSE;
 UnitStackTop := 1;
@@ -26,6 +26,17 @@ Line := 1;
 
 ch  := ' ';
 ch2 := ' ';
+end;
+
+
+
+
+procedure FinalizeScanner;
+var
+  DummyIOResult: Integer;
+begin
+Close(InFile);
+DummyIOResult := IOResult;
 end;
 
 
