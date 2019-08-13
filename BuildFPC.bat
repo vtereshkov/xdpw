@@ -1,3 +1,6 @@
-copy XDPWCustomDelphi.inc XDPWCustom.inc /Y
+cd source
+copy XDPWCustomDelphi.inc XDPWCustom.inc /y
 fpc -Sd xdpw.pas
-del *.o
+copy xdpw.exe ..\xdpw.exe /y
+del xdpw.exe, XDPWCustom.inc, *.o
+cd ..

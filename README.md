@@ -10,7 +10,7 @@ XD Pascal is a small educational self-hosting compiler for a subset of the Pasca
 * No external assembler or linker needed
 * Source file inclusion facility
 * Single-precision floating-point arithmetic (using the x87 FPU)
-* Compiler source for Delphi, Free Pascal and XD Pascal itself 
+* Compiler source for Delphi 6/7, Free Pascal and XD Pascal itself 
 
 ## Detailed description
 
