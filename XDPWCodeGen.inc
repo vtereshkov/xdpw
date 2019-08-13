@@ -661,16 +661,34 @@ if CalleeNesting > 1 then                        // If a nested routine is calle
 
 // Call the routine  
 CodePos := CodeSize;
-Gen($E8); GenDWord(EntryPoint - (CodePos + 5));                         // call EntryPoint
+Gen($E8); GenDWord(EntryPoint - (CodePos + 5));                           // call EntryPoint
 end;
 
 
 
 
-procedure GenerateExternalCall(EntryPoint: LongInt; ReturnResult: Boolean);
-begin
-Gen($FF); Gen($15); GenDWord(EntryPoint);                               // call ds:[EntryPoint]
 
+procedure InverseStack(Depth: Integer);
+var
+  i: Integer;
+begin
+for i := 0 to Depth div 2 - 1 do
+  begin
+  Gen($8B); Gen($84); Gen($24); GenDWord(SizeOf(LongInt) * i);                        // mov eax, [esp + 4 * i]
+  Gen($8B); Gen($9C); Gen($24); GenDWord(SizeOf(LongInt) * (Depth - i - 1));          // mov ebx, [esp + 4 * (Depth - i - 1)]
+  Gen($89); Gen($84); Gen($24); GenDWord(SizeOf(LongInt) * (Depth - i - 1));          // mov [esp + 4 * (Depth - i - 1)], eax
+  Gen($89); Gen($9C); Gen($24); GenDWord(SizeOf(LongInt) * i);                        // mov [esp + 4 * i], ebx  
+  end;
+end;
+
+
+
+
+
+procedure GenerateExternalCall(EntryPoint: LongInt; NumParams: Integer; ReturnResult: Boolean);
+begin
+InverseStack(NumParams);
+Gen($FF); Gen($15); GenDWord(EntryPoint);                               // call ds:[EntryPoint]
 if ReturnResult then
   Gen($50);                                                             // push eax
 end;

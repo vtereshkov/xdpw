@@ -52,7 +52,7 @@ var
   Buffer: string;
   IOError: Integer;
   LastReadChar: Char;
-  StdInputHandle, StdOutputHandle: Text;
+  StdInputHandle, StdOutputHandle: file;
   
   
   
@@ -62,28 +62,46 @@ function GetCommandLineA: Pointer; external 'KERNEL32.DLL' name 'GetCommandLineA
 
 function GetProcessHeap: LongInt; external 'KERNEL32.DLL' name 'GetProcessHeap';
 
-function HeapAlloc(dwBytes, dwFlags, hHeap: LongInt): Pointer; external 'KERNEL32.DLL' name 'HeapAlloc';
+function HeapAlloc(hHeap,
+                   dwFlags,
+                   dwBytes: LongInt): Pointer; external 'KERNEL32.DLL' name 'HeapAlloc';
 
-procedure HeapFree(lpMem: Pointer; dwFlags, hHeap: LongInt); external 'KERNEL32.DLL' name 'HeapFree';
+procedure HeapFree(hHeap,
+                   dwFlags: LongInt; 
+                   lpMem: Pointer); external 'KERNEL32.DLL' name 'HeapFree';
 
-function GetStdHandle(nStdHandle: Integer): Text; external 'KERNEL32.DLL' name 'GetStdHandle';
+function GetStdHandle(nStdHandle: Integer): file; external 'KERNEL32.DLL' name 'GetStdHandle';
 
-procedure SetConsoleMode(dwMode: LongInt; hConsoleHandle: Text); external 'KERNEL32.DLL' name 'SetConsoleMode';
+procedure SetConsoleMode(hConsoleHandle: file; 
+                         dwMode: LongInt); external 'KERNEL32.DLL' name 'SetConsoleMode';
 
-function CreateFileA(hTemplateFile, dwFlagsAndAttributes, dwCreationDisposition: LongInt; 
-                     lpSecurityAttributes: Pointer; dwShareMode, dwDesiredAccess: LongInt; 
-                     const lpFileName: string): Text; external 'KERNEL32.DLL' name 'CreateFileA';
+function CreateFileA(const lpFileName: string; 
+                     dwDesiredAccess: LongInt;
+                     dwShareMode: LongInt;
+                     lpSecurityAttributes: Pointer; 
+                     dwCreationDisposition, 
+                     dwFlagsAndAttributes, 
+                     hTemplateFile: LongInt): file; external 'KERNEL32.DLL' name 'CreateFileA';
                      
-function SetFilePointer(dwMoveMethod: LongInt; lpDistanceToMoveHigh: Pointer; 
-                        lDistanceToMove: LongInt; hFile: Text): LongInt; external 'KERNEL32.DLL' name 'SetFilePointer';
+function SetFilePointer(hFile: file; 
+                        lDistanceToMove: LongInt; 
+                        pDistanceToMoveHigh: Pointer; 
+                        dwMoveMethod: LongInt): LongInt; external 'KERNEL32.DLL' name 'SetFilePointer';
 
-function GetFileSize(lpFileSizeHigh: Pointer; hFile: Text): LongInt; external 'KERNEL32.DLL' name 'GetFileSize';        
+function GetFileSize(hFile: file; 
+                     lpFileSizeHigh: Pointer): LongInt; external 'KERNEL32.DLL' name 'GetFileSize';        
                      
-procedure WriteFile(lpOverlapped: LongInt; var lpNumberOfBytesWritten: LongInt; nNumberOfBytesToWrite: LongInt; 
-                    lpBuffer: Pointer; hFile: Text); external 'KERNEL32.DLL' name 'WriteFile';
+procedure WriteFile(hFile: file;
+                    lpBuffer: Pointer;
+                    nNumberOfBytesToWrite: LongInt;
+                    var lpNumberOfBytesWritten: LongInt;
+                    lpOverlapped: LongInt); external 'KERNEL32.DLL' name 'WriteFile';
                     
-procedure ReadFile(lpOverlapped: LongInt; var lpNumberOfBytesRead: LongInt; nNumberOfBytesToRead: LongInt; 
-                   lpBuffer: Pointer; hFile: Text); external 'KERNEL32.DLL' name 'ReadFile';
+procedure ReadFile(hFile: file;
+                   lpBuffer: Pointer;
+                   nNumberOfBytesToRead: LongInt;
+                   var lpNumberOfBytesRead: LongInt;
+                   lpOverlapped: LongInt); external 'KERNEL32.DLL' name 'ReadFile';
 
 procedure CloseHandle(hObject: Text); external 'KERNEL32.DLL' name 'CloseHandle';
 
@@ -104,7 +122,7 @@ Heap := GetProcessHeap;
 
 StdInputHandle := Text(GetStdHandle(STD_INPUT_HANDLE));
 StdOutputHandle := Text(GetStdHandle(STD_OUTPUT_HANDLE));
-SetConsoleMode($02F5, StdInputHandle);                      // set all flags except ENABLE_LINE_INPUT and ENABLE_WINDOW_INPUT 
+SetConsoleMode(StdInputHandle, $02F5);                      // set all flags except ENABLE_LINE_INPUT and ENABLE_WINDOW_INPUT 
 IOError := 0;
 end;
 
@@ -126,7 +144,7 @@ end;
 
 procedure GetMem(var P: Pointer; Size: Integer);
 begin
-P := HeapAlloc(Size, 0, Heap);
+P := HeapAlloc(Heap, 0, Size);
 end;
 
 
@@ -134,7 +152,7 @@ end;
 
 procedure FreeMem(var P: Pointer; Size: Integer);
 begin
-HeapFree(P, 0, Heap);
+HeapFree(Heap, 0, P);
 end;
 
 
@@ -200,7 +218,7 @@ procedure WriteConsole(Ch: Char);
 var
   LenWritten: Integer;
 begin
-WriteFile(0, LenWritten, 1, @Ch, StdOutputHandle);
+WriteFile(StdOutputHandle, @Ch, 1, LenWritten, 0);
 end;
 
 
@@ -210,7 +228,7 @@ procedure ReadConsole(var Ch: Char);
 var
   LenRead: Integer;
 begin
-ReadFile(0, LenRead, 1, @Ch, StdInputHandle);
+ReadFile(StdInputHandle, @Ch, 1, LenRead, 0);
 WriteConsole(Ch);
 end;
 
@@ -219,7 +237,7 @@ end;
 
 procedure Rewrite(var F: Text; const Name: string);
 begin
-F := CreateFileA(0, FILE_ATTRIBUTE_NORMAL, CREATE_ALWAYS, nil, 0, GENERIC_WRITE, Name);
+F := CreateFileA(Name, GENERIC_WRITE, 0, nil, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
 if Integer(F) = INVALID_HANDLE_VALUE then IOError := -2;
 end;
 
@@ -228,7 +246,7 @@ end;
 
 procedure Reset(var F: Text; const Name: string);
 begin
-F := CreateFileA(0, FILE_ATTRIBUTE_NORMAL, OPEN_EXISTING, nil, 0, GENERIC_READ, Name);
+F := CreateFileA(Name, GENERIC_READ, 0, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 if Integer(F) = INVALID_HANDLE_VALUE then IOError := -2;
 end;
 
@@ -247,7 +265,7 @@ procedure BlockWrite(F: Text; Buf: Pointer; Len: Integer);
 var
   LenWritten: Integer;
 begin
-WriteFile(0, LenWritten, Len, Buf, F);
+WriteFile(F, Buf, Len, LenWritten, 0);
 end;
 
 
@@ -255,7 +273,7 @@ end;
 
 procedure BlockRead(F: Text; Buf: Pointer; Len: Integer; var LenRead: Integer);
 begin
-ReadFile(0, LenRead, Len, Buf, F);
+ReadFile(F, Buf, Len, LenRead, 0);
 if LenRead < Len then IOError := -1;
 end;
 
@@ -264,7 +282,7 @@ end;
 
 procedure Seek(F: Text; Pos: Integer);
 begin
-Pos := SetFilePointer(FILE_BEGIN, nil, Pos, F);
+Pos := SetFilePointer(F, Pos, nil, FILE_BEGIN);
 end;
 
 
@@ -272,7 +290,7 @@ end;
 
 function FileSize(F: Text): Integer;
 begin
-Result := GetFileSize(nil, F);
+Result := GetFileSize(F, nil);
 end;
 
 
@@ -280,7 +298,7 @@ end;
 
 function FilePos(F: Text): Integer;
 begin
-Result := SetFilePointer(FILE_CURRENT, nil, 0, F);
+Result := SetFilePointer(F, 0, nil, FILE_CURRENT);
 end;
 
 

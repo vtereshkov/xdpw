@@ -145,7 +145,6 @@ const
   // Compiler parameters
              
   MAXSTRLENGTH          = 80;
-  MAXSTDTOKENLENGTH     = 9;
   MAXIDENTS             = 1000;
   MAXTYPES              = 1000;
   MAXBLOCKS             = 1024;    // Must be a multiple of 8

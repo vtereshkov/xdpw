@@ -498,7 +498,7 @@ case proc of
       ErrorCode.Value := 0;
       
     LibProcIdentIndex := GetIdent('EXITPROCESS');
-    GenerateExternalCall(Ident[LibProcIdentIndex].Value, FALSE);
+    GenerateExternalCall(Ident[LibProcIdentIndex].Value, Ident[LibProcIdentIndex].NumParams, FALSE);
     end;
 
 end;// case
@@ -776,7 +776,7 @@ case Tok.Kind of
         
         if Ident[IdentIndex].IsExternal then
           begin
-          GenerateExternalCall(Ident[IdentIndex].Value, TRUE);
+          GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams, TRUE);
           end
         else
           begin  
@@ -1121,7 +1121,7 @@ case Tok.Kind of
           
           if Ident[IdentIndex].IsExternal then
             begin
-            GenerateExternalCall(Ident[IdentIndex].Value, FALSE);
+            GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams, FALSE);
             end
           else  
             begin
@@ -2051,7 +2051,7 @@ if BlockStack[BlockStackTop] = 1 then          // Main program
   begin
   GenerateProgramEpilog;
   LibProcIdentIndex := GetIdent('EXITPROCESS');
-  GenerateExternalCall(Ident[LibProcIdentIndex].Value, FALSE);
+  GenerateExternalCall(Ident[LibProcIdentIndex].Value, Ident[LibProcIdentIndex].NumParams, FALSE);
   end
 else
   begin

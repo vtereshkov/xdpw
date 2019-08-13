@@ -21,6 +21,7 @@ var
   
 
 
+
 procedure Repaint(hWnd: LongInt);
 var
   ps: PAINTSTRUCT;
@@ -28,20 +29,20 @@ var
   i: Integer;
   
 begin
-hdc := BeginPaint(ps, hWnd);
+hdc := BeginPaint(hWnd, ps);
 
-FillRect(COLOR_WINDOW + 1, ps.rcPaint, hdc);
+FillRect(hdc, ps.rcPaint, COLOR_WINDOW + 1);
 for i := 1 to NumPoints do
-  Ellipse(Points[i].y - 2, Points[i].x - 2, Points[i].y + 2, Points[i].x + 2, hdc);
+  Ellipse(hdc, Points[i].x - 2, Points[i].y - 2, Points[i].x + 2, Points[i].y + 2);
  
-EndPaint(ps, hWnd);
+EndPaint(hWnd, ps);
 end;
 
 
  
 
-
-function WindowProc(lParam, wParam, uMsg, hWnd: LongInt): Integer; 
+// Callback function: parameters reversed for compatibiity with 'stdcall'
+function WindowProc(lParam, wParam, uMsg, hWnd: LongInt): Integer;  
 begin
 case uMsg of
   WM_PAINT:
@@ -58,7 +59,7 @@ case uMsg of
         Points[NumPoints].x := lParam and $FFFF;
         Points[NumPoints].y := (lParam shr 16) and $FFFF;
          
-        InvalidateRect(0, nil, hWnd);
+        InvalidateRect(hWnd, nil, 0);
         end;
     Result := 1;
     end;    
@@ -69,7 +70,7 @@ case uMsg of
     Result := 0;
     end
   else  
-    Result := DefWindowProcA(lParam, wParam, uMsg, hWnd);
+    Result := DefWindowProcA(hWnd, uMsg, wParam, lParam);
   end;
 end;  
 
@@ -98,29 +99,29 @@ wc.cbClsExtra    := 0;
 wc.cbWndExtra    := 0;
 wc.hInstance     := hInstance;
 wc.hIcon         := 0;
-wc.hCursor       := LoadCursorA(Pointer(IDC_ARROW), 0);
+wc.hCursor       := LoadCursorA(0, Pointer(IDC_ARROW));
 wc.hbrBackground := 0;
 wc.lpszMenuName  := nil;
 wc.lpszClassName := @ClassName;  
 
 res := RegisterClassA(wc);
 
-hWnd := CreateWindowExA(nil,                   // additional application data
-                       hInstance,              // handle
-                       0,                      // menu
-                       0,                      // parent window
-                       480,                    // height
-                       640,                    // width
-                       100,                    // position Y
-                       100,                    // position X
-                       WS_OVERLAPPEDWINDOW,    // style
-                       'GUI Demo',             // text
-                       ClassName,              // class
-                       0);                     // optional styles
+hWnd := CreateWindowExA(0,                      // optional styles
+                        ClassName,              // class
+                        'GUI Demo',             // text
+                        WS_OVERLAPPEDWINDOW,    // style
+                        100,                    // position X
+                        100,                    // position Y
+                        640,                    // width
+                        480,                    // height
+                        0,                      // parent window
+                        0,                      // menu
+                        hInstance,              // handle
+                        nil);                   // additional application data                       
 
-res := ShowWindow(SW_SHOWDEFAULT, hWnd);
+res := ShowWindow(hWnd, SW_SHOWDEFAULT);
 
-while GetMessageA(0, 0, 0, message) <> 0 do
+while GetMessageA(message, 0, 0, 0) <> 0 do
   begin 
   res := TranslateMessage(message);
   res := DispatchMessageA(message);
