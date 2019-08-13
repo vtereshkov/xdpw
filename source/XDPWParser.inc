@@ -1525,6 +1525,7 @@ var
   ListPassMethod: Byte;
   VarType, ConstValType: Byte;
   ImportLibName, ImportFuncName: TString;
+  NestedProcsFound: Boolean;
 
 
   procedure DeclareId(const Name: TString; Kind: Byte; TotalNumParams: Integer; DataType: Byte; PassMethod: Byte; ConstValue: LongInt; FracConstValue: Single; PredefIndex: Byte);
@@ -1718,12 +1719,12 @@ else
 
 ParamDataSize := 0;
 LocalDataSize := 0;
+NestedProcsFound := FALSE;
 
 if BlockStack[BlockStackTop] = 1 then             // Main program
   begin
   DeclarePredefinedTypes;
   DeclarePredefinedIdents;
-  GenerateProgramProlog;
   end
 else
   begin
@@ -1839,6 +1840,12 @@ while (Tok.Kind = CONSTTOK) or (Tok.Kind = TYPETOK) or (Tok.Kind = VARTOK) or (T
 
   if (Tok.Kind = PROCEDURETOK) or (Tok.Kind = FUNCTIONTOK) then
     begin
+    if (BlockStack[BlockStackTop] <> 1) and not NestedProcsFound then
+      begin
+      NestedProcsFound := TRUE;
+      GenerateNestedProcsProlog;
+      end;
+      
     ProcFuncTok := Tok;
     NextTok;
 
@@ -2021,23 +2028,33 @@ while (Tok.Kind = CONSTTOK) or (Tok.Kind = TYPETOK) or (Tok.Kind = VARTOK) or (T
 
   end;// while
 
-// Set entry point
-if BlockIdentIndex = 0 then
-  ProgramEntryPoint := CodeSize
-else  
-  Ident[BlockIdentIndex].Value := CodeSize;
+
+if BlockStack[BlockStackTop] = 1 then          // Main program
+  begin
+  // Set entry point
+  ProgramEntryPoint := CodeSize;
   
-if BlockStack[BlockStackTop] = 1 then
-  begin  
+  // Initialize FPU
+  GenerateProgramProlog;
+  
   // Initialize heap and console I/O
   LibProcIdentIndex := GetIdent('INITSYSTEM');
   if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
   GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);  
   end
 else
-  GenerateStackFrameProlog(LocalDataSize);  
+  begin
+  // Jump to entry point
+  if NestedProcsFound then
+    GenerateNestedProcsEpilog;
+  
+  // Enter stack frame
+  GenerateStackFrameProlog(LocalDataSize);
+  end; 
+ 
 
 CompileCompoundStatement;
+
 
 // If function, return Result value via the EAX register
 if (BlockStack[BlockStackTop] <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) then

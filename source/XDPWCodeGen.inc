@@ -949,8 +949,6 @@ end;
 
 
 
-
-
 procedure GenerateForEpilog(CounterAddress: Integer; Scope, CounterSize: Byte; Down: Boolean);
 begin
 PushVarPtr(CounterAddress, Scope, 0);
@@ -961,6 +959,22 @@ else
 GenerateWhileEpilog;
 
 Gen($59);                                                      // pop ecx    ; Remove the final value of the counter from the stack
+end;
+
+
+
+
+procedure GenerateNestedProcsProlog;
+begin
+GenerateIfProlog;
+end;
+
+
+
+
+procedure GenerateNestedProcsEpilog;
+begin
+GenerateIfElseEpilog;
 end;
 
 
