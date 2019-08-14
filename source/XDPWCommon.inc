@@ -147,21 +147,16 @@ const
   MAXSTRLENGTH          = 80;
   MAXIDENTS             = 1000;
   MAXTYPES              = 1000;
-  MAXBLOCKS             = 1024;    // Must be a multiple of 8
+  MAXBLOCKS             = 1000;
   MAXNESTING            = 10;
   MAXPARAMS             = 20;
   MAXUNITNESTING        = 5;
   MAXFIELDS             = 100;
+  MAXRELOCS             = 20000;
 
   MAXCODESIZE           = 1024 * 1024;
   MAXDATASIZE           = 32768 * 1024; 
   MAXSTATICSTRDATASIZE  = 128 * 1024;
-
-  // Compilation pass codes
-
-  CALLDETERMPASS        = 1;
-  SIZEDETERMPASS        = 2;
-  CODEGENERATIONPASS    = 3;
 
   // Scope levels
 
@@ -173,6 +168,12 @@ const
   VALPASSING            = 1;
   CONSTPASSING          = 2;
   VARPASSING            = 3;
+  
+  // Relocation types
+  
+  RELOCNONE             = 0;
+  RELOCCODE             = 1;
+  RELOCDATA             = 2;
 
 
 
@@ -253,7 +254,12 @@ type
     IsExternal: Boolean;
   end;
 
-
+  TRelocatable = record
+    RelocType: Byte;
+    Pos: LongInt;
+    Value: LongInt;
+  end;
+  
 
 
 var
@@ -265,15 +271,14 @@ var
   StaticStringData: array [0..MAXSTATICSTRDATASIZE - 1] of Char;
   CodePosStack: array [0..1023] of Integer;
   BlockStack: array [1..MAXNESTING] of Integer;
-  CallGraph: array [0..MAXBLOCKS - 1, 0..MAXBLOCKS div 8 - 1] of Byte;    // Rows are callers, columns are callees
-  BlockIsNotDead: array [1..MAXBLOCKS] of Boolean;
+  Reloc: array [1..MAXRELOCS] of TRelocatable;
 
   Tok: TToken;
 
-  NumIdent, NumTypes, NumStaticStrChars, VarDataOrigin, NumBlocks, BlockStackTop,
+  NumIdent, NumTypes, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs,
   CodeSize, CodePosStackTop, GlobalDataSize,
-  CodeSectionOrigin, DataSectionOrigin, ProgramEntryPoint,
-  Pass, UnitStackTop, Line: Integer;
+  DataSectionOrigin, ProgramEntryPoint,
+  UnitStackTop, Line: Integer;
   
   IsConsoleProgram: Integer;                                              // More convenient than Boolean
   
@@ -609,20 +614,17 @@ begin
 Tok.StrAddress := DataSectionOrigin + NumStaticStrChars;
 Tok.StrLength := Length(StrValue);
 
-if (Pass = CALLDETERMPASS) or BlockIsNotDead[BlockStack[BlockStackTop]] then
+for i := 0 to Length(StrValue) - 1 do
   begin
-  for i := 0 to Length(StrValue) - 1 do
-    begin
-    StaticStringData[NumStaticStrChars] := StrValue[i + STRINGFIRSTINDEX];
-    Inc(NumStaticStrChars);
-    if NumStaticStrChars > MAXSTATICSTRDATASIZE - 1 then
-      Error('Maximum string data size exceeded', '', -1);
-    end;
-
-  // Add string termination character
-  StaticStringData[NumStaticStrChars] := #0;
+  StaticStringData[NumStaticStrChars] := StrValue[i + STRINGFIRSTINDEX];
   Inc(NumStaticStrChars);
+  if NumStaticStrChars > MAXSTATICSTRDATASIZE - 1 then
+    Error('Maximum string data size exceeded', '', -1);
   end;
+
+// Add string termination character
+StaticStringData[NumStaticStrChars] := #0;
+Inc(NumStaticStrChars);
 end;
 
 

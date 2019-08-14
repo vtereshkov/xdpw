@@ -7,21 +7,18 @@
 
 procedure Gen(b: Byte);
 begin
-if (Pass = CALLDETERMPASS) or BlockIsNotDead[BlockStack[BlockStackTop]] then
-  begin
-  if CodeSize >= MAXCODESIZE then
-    Error('Maximum code size exceeded', '', -1);
-  Code[CodeSize] := b;
-  Inc(CodeSize);
-  end;
+if CodeSize >= MAXCODESIZE then
+  Error('Maximum code size exceeded', '', -1);
+Code[CodeSize] := b;
+Inc(CodeSize);
 end;
+
 
 
 
 procedure GenAt(Pos: LongInt; b: Byte);
 begin
-if (Pass = CALLDETERMPASS) or BlockIsNotDead[BlockStack[BlockStackTop]] then
-  Code[Pos] := b;
+Code[Pos] := b;
 end;
 
 
@@ -41,7 +38,6 @@ end;
 
 
 
-
 procedure GenWordAt(Pos: LongInt; w: Integer);
 var
   i: Integer;
@@ -52,7 +48,6 @@ for i := 0 to 1 do
   w := w shr 8;
   end;
 end;
-
 
 
 
@@ -71,7 +66,6 @@ end;
 
 
 
-
 procedure GenDWordAt(Pos: LongInt; dw: LongInt);
 var
   i: Integer;
@@ -86,6 +80,20 @@ end;
 
 
 
+procedure GenRelocDWord(dw: LongInt; RelocType: Byte);
+begin
+Inc(NumRelocs);
+if NumRelocs > MAXRELOCS then
+  Error('Maximum number of relocations exceeded', '', -1);  
+Reloc[NumRelocs].RelocType := RelocType;
+Reloc[NumRelocs].Pos := CodeSize;
+Reloc[NumRelocs].Value := dw;
+
+GenDWord(dw);
+end;
+
+
+
 
 procedure PushConst(Value: LongInt);
 begin
@@ -95,7 +103,35 @@ end;
 
 
 
-procedure PushVarPtr(Addr: Integer; Scope: Byte; DeltaNesting: Byte);
+procedure PushRelocConst(Value: LongInt; RelocType: Byte);
+begin
+Gen($68); GenRelocDWord(Value, RelocType);                        // push Value  ; relocatable
+end;
+
+
+
+
+procedure Relocate(CodeDeltaAddr, DataDeltaAddr: Integer);
+var
+  i, DeltaAddr: Integer;
+begin
+for i := 1 to NumRelocs do
+  begin
+  case Reloc[i].RelocType of
+    RELOCCODE: DeltaAddr := CodeDeltaAddr;
+    RELOCDATA: DeltaAddr := DataDeltaAddr
+  else 
+    DeltaAddr := 0;
+  end;  
+  
+  GenDWordAt(Reloc[i].Pos, Reloc[i].Value + DeltaAddr);
+  end;
+end;  
+
+
+
+
+procedure PushVarPtr(Addr: Integer; Scope: Byte; DeltaNesting: Byte; RelocType: Byte);
 const
   StaticLinkAddr = 2 * 4;
 var
@@ -103,9 +139,7 @@ var
 begin
 case Scope of
   GLOBAL:                                     // Global variable
-    begin
-    Gen($68); GenDWord(Addr);                                   // push Addr
-    end;
+    PushRelocConst(Addr, RelocType);
   LOCAL:
     begin
     if DeltaNesting = 0 then                  // Strictly local variable
@@ -739,6 +773,7 @@ Gen($59);                                                   // pop ecx
 Gen($51);                                                   // push ecx             ; The final value of the counter will be removed from stack by GenerateForEpilog  
 case Scope of
   GLOBAL:
+    begin
     case CounterSize of
       1: begin
          Gen($A0);                                          // mov al, [...]
@@ -750,7 +785,11 @@ case Scope of
          Gen($A1);                                          // mov eax, [...]
          end;
       end;
+    GenRelocDWord(CounterAddress, RELOCDATA);               // ... CounterAddress ...  ; relocatable
+    end; 
+
   LOCAL:
+    begin
     case CounterSize of
       1: begin
          Gen($8A); Gen($85);                                // mov al, [ebp + ...]
@@ -762,10 +801,11 @@ case Scope of
          Gen($8B); Gen($85);                                // mov eax, [ebp + ...]
          end;
       end;
+    GenDWord(CounterAddress);                               // ... CounterAddress ...  
     end;
     
-GenDWord(CounterAddress);                                   // ... CounterAddress ...
-
+  end;  
+    
 if CounterSize < 2 then
   begin
   Gen($66); Gen($98);                                       // cbw
@@ -951,7 +991,7 @@ end;
 
 procedure GenerateForEpilog(CounterAddress: Integer; Scope, CounterSize: Byte; Down: Boolean);
 begin
-PushVarPtr(CounterAddress, Scope, 0);
+PushVarPtr(CounterAddress, Scope, 0, RELOCDATA);
 if Down then
   GenerateIncDec(DECPROC, CounterSize)
 else

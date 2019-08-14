@@ -93,7 +93,7 @@ type
     PEHeader: TPEHeader;
     PEOptionalHeader: TPEOptionalHeader;
     DataDirectories: array [0..15] of TDataDirectory;
-    CodeSectionHeader, DataSectionHeader, ImportSectionHeader: TPESectionHeader;	
+    ImportSectionHeader, DataSectionHeader, CodeSectionHeader: TPESectionHeader;	
   end;
   
   
@@ -196,13 +196,13 @@ Headers.PEHeader.Characteristics                      := $103;                  
 
 // PE optional header  
 Headers.PEOptionalHeader.Magic                        := $10B;                                                // PE32
-Headers.PEOptionalHeader.AddressOfEntryPoint          := Align(SizeOf(Headers), SECTIONALIGNMENT) + ProgramEntryPoint;   // Code section goes first
+Headers.PEOptionalHeader.AddressOfEntryPoint          := Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(SizeOf(TImportSection), SECTIONALIGNMENT) + Align(DataSize, SECTIONALIGNMENT) + ProgramEntryPoint;
 Headers.PEOptionalHeader.ImageBase                    := IMAGEBASE;
 Headers.PEOptionalHeader.SectionAlignment             := SECTIONALIGNMENT;
 Headers.PEOptionalHeader.FileAlignment                := FILEALIGNMENT;
 Headers.PEOptionalHeader.MajorOperatingSystemVersion  := 4;
 Headers.PEOptionalHeader.MajorSubsystemVersion        := 4;
-Headers.PEOptionalHeader.SizeOfImage                  := Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(CodeSize, SECTIONALIGNMENT) + Align(DataSize, SECTIONALIGNMENT) + Align(SizeOf(TImportSection), SECTIONALIGNMENT);
+Headers.PEOptionalHeader.SizeOfImage                  := Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(SizeOf(TImportSection), SECTIONALIGNMENT) + Align(DataSize, SECTIONALIGNMENT) + Align(CodeSize, SECTIONALIGNMENT);
 Headers.PEOptionalHeader.SizeOfHeaders                := Align(SizeOf(Headers), FILEALIGNMENT);
 Headers.PEOptionalHeader.Subsystem                    := 2 + IsConsoleProgram;                                // Win32 GUI/console
 Headers.PEOptionalHeader.SizeOfStackReserve           := $1000000;
@@ -212,32 +212,8 @@ Headers.PEOptionalHeader.SizeOfHeapCommit             := $1000000;
 Headers.PEOptionalHeader.NumberOfRvaAndSizes          := 16;
 
 // Data directories: import
-Headers.DataDirectories[1].VirtualAddress             := Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(CodeSize, SECTIONALIGNMENT) + Align(DataSize, SECTIONALIGNMENT);
+Headers.DataDirectories[1].VirtualAddress             := Align(SizeOf(Headers), SECTIONALIGNMENT);
 Headers.DataDirectories[1].Size                       := SizeOf(TImportSection);
-
-// Code section header
-Headers.CodeSectionHeader.Name[0]                     := '.';
-Headers.CodeSectionHeader.Name[1]                     := 't';
-Headers.CodeSectionHeader.Name[2]                     := 'e';
-Headers.CodeSectionHeader.Name[3]                     := 'x';
-Headers.CodeSectionHeader.Name[4]                     := 't';
-Headers.CodeSectionHeader.VirtualSize                 := CodeSize;
-Headers.CodeSectionHeader.VirtualAddress              := Align(SizeOf(Headers), SECTIONALIGNMENT);
-Headers.CodeSectionHeader.SizeOfRawData               := Align(CodeSize, FILEALIGNMENT);
-Headers.CodeSectionHeader.PointerToRawData            := Align(SizeOf(Headers), FILEALIGNMENT);
-Headers.CodeSectionHeader.Characteristics             := LongInt($60000020);                              // Code, executable, readable
-
-// Data section header
-Headers.DataSectionHeader.Name[0]                     := '.';
-Headers.DataSectionHeader.Name[1]                     := 'd';
-Headers.DataSectionHeader.Name[2]                     := 'a';
-Headers.DataSectionHeader.Name[3]                     := 't';
-Headers.DataSectionHeader.Name[4]                     := 'a';
-Headers.DataSectionHeader.VirtualSize                 := DataSize;
-Headers.DataSectionHeader.VirtualAddress              := Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(CodeSize, SECTIONALIGNMENT);
-Headers.DataSectionHeader.SizeOfRawData               := Align(InitializedDataSize, FILEALIGNMENT);
-Headers.DataSectionHeader.PointerToRawData            := Align(SizeOf(Headers), FILEALIGNMENT) + Align(CodeSize, FILEALIGNMENT);
-Headers.DataSectionHeader.Characteristics             := LongInt($C00000C0);                              // Data, readable, writable
 
 // Import section header
 Headers.ImportSectionHeader.Name[0]                   := '.';
@@ -247,11 +223,34 @@ Headers.ImportSectionHeader.Name[3]                   := 'a';
 Headers.ImportSectionHeader.Name[4]                   := 't';
 Headers.ImportSectionHeader.Name[5]                   := 'a';
 Headers.ImportSectionHeader.VirtualSize               := SizeOf(TImportSection);
-Headers.ImportSectionHeader.VirtualAddress            := Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(CodeSize, SECTIONALIGNMENT) + Align(DataSize, SECTIONALIGNMENT);
+Headers.ImportSectionHeader.VirtualAddress            := Align(SizeOf(Headers), SECTIONALIGNMENT);
 Headers.ImportSectionHeader.SizeOfRawData             := Align(SizeOf(TImportSection), FILEALIGNMENT);
-Headers.ImportSectionHeader.PointerToRawData          := Align(SizeOf(Headers), FILEALIGNMENT) + Align(CodeSize, FILEALIGNMENT) + Align(InitializedDataSize, FILEALIGNMENT);
+Headers.ImportSectionHeader.PointerToRawData          := Align(SizeOf(Headers), FILEALIGNMENT);
 Headers.ImportSectionHeader.Characteristics           := LongInt($C0000040);                              // Data, readable, writable
 
+// Data section header
+Headers.DataSectionHeader.Name[0]                     := '.';
+Headers.DataSectionHeader.Name[1]                     := 'd';
+Headers.DataSectionHeader.Name[2]                     := 'a';
+Headers.DataSectionHeader.Name[3]                     := 't';
+Headers.DataSectionHeader.Name[4]                     := 'a';
+Headers.DataSectionHeader.VirtualSize                 := DataSize;
+Headers.DataSectionHeader.VirtualAddress              := Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(SizeOf(TImportSection), SECTIONALIGNMENT);
+Headers.DataSectionHeader.SizeOfRawData               := Align(InitializedDataSize, FILEALIGNMENT);
+Headers.DataSectionHeader.PointerToRawData            := Align(SizeOf(Headers), FILEALIGNMENT) + Align(SizeOf(TImportSection), FILEALIGNMENT);
+Headers.DataSectionHeader.Characteristics             := LongInt($C00000C0);                              // Data, readable, writable
+
+// Code section header
+Headers.CodeSectionHeader.Name[0]                     := '.';
+Headers.CodeSectionHeader.Name[1]                     := 't';
+Headers.CodeSectionHeader.Name[2]                     := 'e';
+Headers.CodeSectionHeader.Name[3]                     := 'x';
+Headers.CodeSectionHeader.Name[4]                     := 't';
+Headers.CodeSectionHeader.VirtualSize                 := CodeSize;
+Headers.CodeSectionHeader.VirtualAddress              := Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(SizeOf(TImportSection), SECTIONALIGNMENT) + Align(DataSize, SECTIONALIGNMENT);
+Headers.CodeSectionHeader.SizeOfRawData               := Align(CodeSize, FILEALIGNMENT);
+Headers.CodeSectionHeader.PointerToRawData            := Align(SizeOf(Headers), FILEALIGNMENT) + Align(SizeOf(TImportSection), FILEALIGNMENT) + Align(InitializedDataSize, FILEALIGNMENT);
+Headers.CodeSectionHeader.Characteristics             := LongInt($60000020);                              // Code, executable, readable
 end;
 
 
@@ -262,7 +261,7 @@ function AddImportFunc(const ImportLibName, ImportFuncName: TString): LongInt;
 var
   VirtualAddress: LongInt;
 begin
-VirtualAddress := Headers.ImportSectionHeader.VirtualAddress;
+VirtualAddress := Align(SizeOf(Headers), SECTIONALIGNMENT);
 
 ImportSection.DirectoryTable[NumImports].Name        := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
                                                                        + SizeOf(ImportSection.LibraryNames[0]) * NumImports;

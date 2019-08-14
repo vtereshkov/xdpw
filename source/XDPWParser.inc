@@ -343,7 +343,6 @@ case proc of
             Error('Incompatible types', '', -1);
 
           // Call the specific output subroutine. Interface: FileHandle; StreamHandle; var Designator
-          if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
           GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
           end; // else
 
@@ -372,7 +371,6 @@ case proc of
       // 2nd argument - stream handle
       PushConst(0);        
 
-      if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
       GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
       end;
 
@@ -430,7 +428,6 @@ case proc of
             Error('Incompatible types', '', -1);
 
           // Call the specific output subroutine. Interface: FileHandle; StreamHandle; Expression
-          if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
           GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
           end; // else
 
@@ -459,7 +456,6 @@ case proc of
       // 2nd argument - stream handle
       PushConst(0);         
 
-      if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
       GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
       end;
 
@@ -479,7 +475,6 @@ case proc of
       
     PushConst(TypeSize(Types[DesignatorType].BaseType));
     
-    if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
     GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
     
     EatTok(CPARTOK);
@@ -624,7 +619,7 @@ IdentIndex := GetIdent(Tok.Name);
 if Ident[IdentIndex].Kind <> VARIABLE then
   Error('Expected variable but found ', '', Tok.Kind);
 
-PushVarPtr(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, BlockStackTop - Ident[IdentIndex].NestingLevel);
+PushVarPtr(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, BlockStackTop - Ident[IdentIndex].NestingLevel, RELOCDATA);
 ValType := Ident[IdentIndex].DataType;
 
 
@@ -715,7 +710,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
 
     if TreatCharAsString then
       begin                                     // Special case
-      PushVarPtr(Tok.StrAddress, GLOBAL, 0);
+      PushVarPtr(Tok.StrAddress, GLOBAL, 0, RELOCNONE);
       ActualParamType := STRINGTYPEINDEX;
       NextTok;
       end
@@ -780,7 +775,6 @@ case Tok.Kind of
           end
         else
           begin  
-          if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[IdentIndex].ProcAsBlock);
           GenerateCall(Ident[IdentIndex].Value, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
           RestoreStackTopFromEAX;
           end;
@@ -828,8 +822,7 @@ case Tok.Kind of
     
     if (Ident[IdentIndex].Kind = PROC) or (Ident[IdentIndex].Kind = FUNC) then
       begin
-      PushConst(CodeSectionOrigin + Ident[IdentIndex].Value);
-      if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[IdentIndex].ProcAsBlock);
+      PushRelocConst(Ident[IdentIndex].Value, RELOCCODE); // To be resolved later when code section origin is known
       NextTok;
       end
     else  
@@ -866,7 +859,7 @@ case Tok.Kind of
 
   STRINGLITERALTOK:
     begin
-    PushVarPtr(Tok.StrAddress, GLOBAL, 0);
+    PushVarPtr(Tok.StrAddress, GLOBAL, 0, RELOCNONE);
     ValType := STRINGTYPEINDEX;
     NextTok;
     end;
@@ -1078,7 +1071,7 @@ case Tok.Kind of
             Error('Expected current function name but found ', Ident[IdentIndex].Name, -1);
 
           ResultIdentIndex := GetIdent('RESULT');
-          PushVarPtr(Ident[ResultIdentIndex].Value, LOCAL, 0);
+          PushVarPtr(Ident[ResultIdentIndex].Value, LOCAL, 0, RELOCDATA);
           DesignatorType := Ident[ResultIdentIndex].DataType;
 
           NextTok;
@@ -1089,7 +1082,7 @@ case Tok.Kind of
         TreatCharAsString := (Tok.Kind = CHARLITERALTOK) and (DesignatorType = STRINGTYPEINDEX);
         if TreatCharAsString then
           begin                                                       // Special case
-          PushVarPtr(Tok.StrAddress, GLOBAL, 0);
+          PushVarPtr(Tok.StrAddress, GLOBAL, 0, RELOCNONE);
           ExpressionType := STRINGTYPEINDEX;
           NextTok;
           end
@@ -1120,14 +1113,9 @@ case Tok.Kind of
           CompileActualParameters(IdentIndex);
           
           if Ident[IdentIndex].IsExternal then
-            begin
-            GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams, FALSE);
-            end
+            GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams, FALSE)
           else  
-            begin
-            if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[IdentIndex].ProcAsBlock);
             GenerateCall(Ident[IdentIndex].Value, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
-            end;
           end// PROC
     else
       Error('Expected statement but found ', Ident[IdentIndex].Name, -1);
@@ -1268,7 +1256,7 @@ case Tok.Kind of
     if not IsOrdinalType(Types[Ident[IdentIndex].DataType]) then
       Error('Ordinal variable expected as FOR loop counter', '', -1);
 
-    PushVarPtr(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, 0);
+    PushVarPtr(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, 0, RELOCDATA);
 
     NextTok;
     EatTok(ASSIGNTOK);
@@ -1563,34 +1551,32 @@ var
         Ident[NumIdent].PredefIndex := PredefIndex;                       // Predefined routine index
 
     VARIABLE:
-      if (Pass = CALLDETERMPASS) or BlockIsNotDead[BlockStack[BlockStackTop]] then
-        case Scope of
-          GLOBAL:
-            begin
-            Ident[NumIdent].Value := DataSectionOrigin + VarDataOrigin + GlobalDataSize;          // Variable address
-            GlobalDataSize := GlobalDataSize + TypeSize(DataType);
-            end;// else
+      case Scope of
+       GLOBAL:
+         begin
+         Ident[NumIdent].Value := GlobalDataSize;                                              // Variable address (relocatable)
+         GlobalDataSize := GlobalDataSize + TypeSize(DataType);
+         end;// else
 
-          LOCAL:
-            if TotalNumParams > 0 then
-              begin
-              ParamDataSize := ParamDataSize + SizeOf(LongInt);                                   // Parameters always occupy 4 bytes each
-              
-              if Ident[NumIdent].NestingLevel = 2 then                                            // Inside a non-nested routine
-                AdditionalStackItems := 2                                                         // Old EBP, return address
-              else                                                                                // Inside a nested routine
-                AdditionalStackItems := 3;                                                        // Old EBP, return address, static link (hidden parameter)  
+       LOCAL:
+         if TotalNumParams > 0 then
+           begin
+           ParamDataSize := ParamDataSize + SizeOf(LongInt);                                   // Parameters always occupy 4 bytes each
+           
+           if Ident[NumIdent].NestingLevel = 2 then                                            // Inside a non-nested routine
+             AdditionalStackItems := 2                                                         // Old EBP, return address
+           else                                                                                // Inside a nested routine
+             AdditionalStackItems := 3;                                                        // Old EBP, return address, static link (hidden parameter)  
 
-              Ident[NumIdent].Value := (AdditionalStackItems + TotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from EBP (>0)
-              end
-            else
-              begin
-              Ident[NumIdent].Value := -LocalDataSize - TypeSize(DataType);                       // Local variable offset from EBP (<0)
-              LocalDataSize := LocalDataSize + TypeSize(DataType);
-              end;
-        end// case
-      else
-        Ident[NumIdent].Value := 0;
+           Ident[NumIdent].Value := (AdditionalStackItems + TotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from EBP (>0)
+           end
+         else
+           begin
+           Ident[NumIdent].Value := -LocalDataSize - TypeSize(DataType);                       // Local variable offset from EBP (<0)
+           LocalDataSize := LocalDataSize + TypeSize(DataType);
+           end;
+      end; // case
+
 
     CONSTANT:
       if Types[DataType].TypeKind = REALTYPE then
@@ -1601,7 +1587,7 @@ var
   end;// case
 
 
-  if VarDataOrigin + GlobalDataSize >= MAXDATASIZE then
+  if GlobalDataSize + MAXSTATICSTRDATASIZE >= MAXDATASIZE then
     Error('Maximum global data size exceeded', '', -1);
 
   if LocalDataSize >= MAXDATASIZE then
@@ -1994,7 +1980,7 @@ while (Tok.Kind = CONSTTOK) or (Tok.Kind = TYPETOK) or (Tok.Kind = VARTOK) or (T
     else if (ForwardIdentIndex = 0) and (Tok.Kind = IDENTTOK) and (CustomStrComp(Tok.Name, 'FORWARD') = 0) then  // Forward declaration
       begin
       Inc(NumBlocks);
-      if NumTypes > MAXBLOCKS then
+      if NumBlocks > MAXBLOCKS then
         Error('Maximum number of blocks exceeded', '', -1);
         
       Ident[NumIdent].ProcAsBlock := NumBlocks;
@@ -2039,7 +2025,6 @@ if BlockStack[BlockStackTop] = 1 then          // Main program
   
   // Initialize heap and console I/O
   LibProcIdentIndex := GetIdent('INITSYSTEM');
-  if Pass = CALLDETERMPASS then AddCallGraphChild(BlockStack[BlockStackTop], Ident[LibProcIdentIndex].ProcAsBlock);
   GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);  
   end
 else
@@ -2059,7 +2044,7 @@ CompileCompoundStatement;
 // If function, return Result value via the EAX register
 if (BlockStack[BlockStackTop] <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) then
   begin
-  PushVarPtr(Ident[GetIdent('RESULT')].Value, LOCAL, 0);
+  PushVarPtr(Ident[GetIdent('RESULT')].Value, LOCAL, 0, RELOCDATA);
   DerefPtr(Ident[BlockIdentIndex].DataType);
   SaveStackTopToEAX;
   end;
@@ -2123,7 +2108,7 @@ EnterIncludedFile('system.inc');
 NextTok;
 
 Inc(NumBlocks);
-if NumTypes > MAXBLOCKS then
+if NumBlocks > MAXBLOCKS then
   Error('Maximum number of blocks exceeded', '', -1);
   
 CompileBlock(0);

@@ -8,15 +8,12 @@
 program XDPW;
 
 
-// uses SysUtils;       // For debug purposes only
-
 
 {$I XDPWCustom.inc}
 {$I XDPWCommon.inc}
 {$I XDPWScanner.inc}
 {$I XDPWCodeGen.inc}
 {$I XDPWLinker.inc}
-{$I XDPWOptimizer.inc}
 {$I XDPWParser.inc}
 
 
@@ -24,11 +21,19 @@ program XDPW;
 
 procedure ZeroAll;
 begin
-NumIdent := 0; NumTypes := 0; NumImports := 0; NumBlocks := 0; BlockStackTop := 0; CodeSize := 0; CodePosStackTop := 0;
+NumIdent          := 0; 
+NumTypes          := 0; 
+NumImports        := 0; 
+NumBlocks         := 0; 
+BlockStackTop     := 0; 
+NumRelocs         := 0;
+CodeSize          := 0; 
+CodePosStackTop   := 0;
 NumStaticStrChars := 0;
-GlobalDataSize := 0;
+GlobalDataSize    := 0;
 ProgramEntryPoint := 0;
-Clear(@CallGraph, SizeOf(CallGraph));
+
+Clear(@ImportSection, SizeOf(ImportSection));
 end;
 
 
@@ -37,8 +42,6 @@ end;
 var
   ExeName: TString;
   OutFile: TOutFile;
-  BlockIndex: Integer;
-
 
 
 
@@ -57,56 +60,18 @@ if ParamCount < 1 then
   
 CustomParamStr(1, ProgramName);  
 
-FillKeywords;
-
-for BlockIndex := 1 to MAXBLOCKS do
-  BlockIsNotDead[BlockIndex] := FALSE;
-  
+FillKeywords; 
 IsConsoleProgram := 1;  // Console program by default  
-
-
-// First pass: compile the program and build the call graph
-CodeSectionOrigin := 0;
-DataSectionOrigin := 0;
-VarDataOrigin := 0;
+DataSectionOrigin := IMAGEBASE + Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(SizeOf(TImportSection), SECTIONALIGNMENT);
 
 ZeroAll;
-Pass := CALLDETERMPASS;
-InitializeScanner;
-CompileProgram;
-FinalizeScanner;
-
-
-// Visit the call graph nodes and mark all procedures that are called as not dead
-MarkBlockNotDead(1);
-
-
-// Second pass: compile the program and calculate code and data sizes (BlockIsNotDead array is preserved)
-CodeSectionOrigin := 0;
-DataSectionOrigin := 0;
-VarDataOrigin := NumStaticStrChars;
-
-ZeroAll;
-Pass := SIZEDETERMPASS;
 InitializeScanner;
 CompileProgram;
 FinalizeScanner;
 
 FillHeaders(CodeSize, NumStaticStrChars, GlobalDataSize);
-Clear(@ImportSection, SizeOf(ImportSection));
-
-
-// Third pass: compile the program and generate output (BlockIsNotDead array is preserved)
-CodeSectionOrigin := IMAGEBASE + Headers.CodeSectionHeader.VirtualAddress;
-DataSectionOrigin := IMAGEBASE + Headers.DataSectionHeader.VirtualAddress;
-VarDataOrigin := NumStaticStrChars;
-
-ZeroAll;
-Pass := CODEGENERATIONPASS;
-InitializeScanner;
-CompileProgram;
-FinalizeScanner;
-
+Relocate(IMAGEBASE + Headers.CodeSectionHeader.VirtualAddress, 
+         IMAGEBASE + Headers.DataSectionHeader.VirtualAddress + NumStaticStrChars);
 
 
 // Write output file
@@ -119,14 +84,14 @@ if IOResult <> 0 then
 CustomBlockWrite(OutFile, @Headers, SizeOf(Headers));
 Pad(OutFile, SizeOf(Headers), FILEALIGNMENT);
 
-CustomBlockWrite(OutFile, @Code, CodeSize);
-Pad(OutFile, CodeSize, FILEALIGNMENT);
+CustomBlockWrite(OutFile, @ImportSection, SizeOf(ImportSection));
+Pad(OutFile, SizeOf(ImportSection), FILEALIGNMENT);
 
 CustomBlockWrite(OutFile, @StaticStringData, NumStaticStrChars);
 Pad(OutFile, NumStaticStrChars, FILEALIGNMENT);
 
-CustomBlockWrite(OutFile, @ImportSection, SizeOf(ImportSection));
-Pad(OutFile, SizeOf(ImportSection), FILEALIGNMENT);  
+CustomBlockWrite(OutFile, @Code, CodeSize);
+Pad(OutFile, CodeSize, FILEALIGNMENT);
   
 Close(OutFile);
 
