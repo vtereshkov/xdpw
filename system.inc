@@ -556,6 +556,39 @@ end;
 
 
 
+procedure ReadSmallInt(F: Text; P: PStream; var Number: SmallInt);
+var
+  IntNumber: Integer;
+begin
+ReadInt(F, P, IntNumber);
+Number := IntNumber;
+end;
+  
+
+
+
+procedure ReadShortInt(F: Text; P: PStream; var Number: ShortInt);
+var
+  IntNumber: Integer;
+begin
+ReadInt(F, P, IntNumber);
+Number := IntNumber;
+end;
+
+
+
+
+procedure ReadBoolean(F: Text; P: PStream; var Value: Boolean);
+var
+  IntNumber: Integer;
+begin
+ReadInt(F, P, IntNumber);
+Value := IntNumber <> 0;
+end;
+
+
+
+
 procedure ReadReal(F: Text; P: PStream; var Number: Real);
 var
   Ch: Char;

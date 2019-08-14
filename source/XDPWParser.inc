@@ -329,9 +329,18 @@ case proc of
           begin
           LibProcIdentIndex := 0;
 
-          if IsIntegerType(Types[DesignatorType]) or
-            ((Types[DesignatorType].TypeKind = SUBRANGETYPE) and IsIntegerType(Types[Types[DesignatorType].HostType])) then
-                LibProcIdentIndex := GetIdent('READINT')                 // Integer or boolean argument
+          if (Types[DesignatorType].TypeKind = INTEGERTYPE) or
+            ((Types[DesignatorType].TypeKind = SUBRANGETYPE) and (Types[Types[DesignatorType].HostType].TypeKind = INTEGERTYPE)) then
+                LibProcIdentIndex := GetIdent('READINT')                 // Integer argument
+          else if (Types[DesignatorType].TypeKind = SMALLINTTYPE) or
+            ((Types[DesignatorType].TypeKind = SUBRANGETYPE) and (Types[Types[DesignatorType].HostType].TypeKind = SMALLINTTYPE)) then
+                LibProcIdentIndex := GetIdent('READSMALLINT')            // Small integer argument
+          else if (Types[DesignatorType].TypeKind = SHORTINTTYPE) or
+            ((Types[DesignatorType].TypeKind = SUBRANGETYPE) and (Types[Types[DesignatorType].HostType].TypeKind = SHORTINTTYPE)) then
+                LibProcIdentIndex := GetIdent('READSHORTINT')            // Short integer argument
+          else if (Types[DesignatorType].TypeKind = BOOLEANTYPE) or
+            ((Types[DesignatorType].TypeKind = SUBRANGETYPE) and (Types[Types[DesignatorType].HostType].TypeKind = BOOLEANTYPE)) then
+                LibProcIdentIndex := GetIdent('READBOOLEAN')             // Boolean argument          
           else if (Types[DesignatorType].TypeKind = CHARTYPE) or
             ((Types[DesignatorType].TypeKind = SUBRANGETYPE) and (Types[Types[DesignatorType].HostType].TypeKind = CHARTYPE)) then
                 LibProcIdentIndex := GetIdent('READCH')                  // Character argument
