@@ -125,10 +125,7 @@ StringLiteral = "'" {Character | "'" "'"} "'".
 ```
 
 ### Compiler 
-The compiler builds a Windows PE executable. It performs three passes:
-* Dead procedures detection
-* Code and data size calculation
-* Code generation
+The compiler directly builds a Windows PE executable without using any external assembler or linker.
 
 #### Inline procedures and functions
 The following identifiers are implemented as a part of the compiler. Their names
