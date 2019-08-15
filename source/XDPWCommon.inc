@@ -468,7 +468,7 @@ end;
 
 
 
-function GetField(RecType: Byte; const S: TString): Integer;
+function GetField(RecType: Integer; const S: TString): Integer;
 var
   FieldIndex: Integer;
 begin
@@ -631,7 +631,7 @@ end;
 
 
 
-function LowBound(DataType: Byte): Integer;
+function LowBound(DataType: Integer): Integer;
 begin
 Result := 0;
 case Types[DataType].TypeKind of
@@ -650,7 +650,7 @@ end;
 
 
 
-function HighBound(DataType: Byte): Integer;
+function HighBound(DataType: Integer): Integer;
 begin
 Result := 0;
 case Types[DataType].TypeKind of
@@ -669,7 +669,7 @@ end;
 
 
 
-function TypeSize(DataType: Byte): Integer;
+function TypeSize(DataType: Integer): Integer;
 var
   i: Integer;
 begin
@@ -698,7 +698,7 @@ end;
 
 
 
-function GetCompatibleType(LeftType, RightType: Byte): Byte;
+function GetCompatibleType(LeftType, RightType: Integer): Integer;
 begin
 Result := 0;
 
@@ -739,7 +739,7 @@ end;
 
 
 
-function ConversionIsPossible(SrcType, DestType: Byte): Boolean;
+function ConversionIsPossible(SrcType, DestType: Integer): Boolean;
 begin
 // Implicit type conversion is possible if DestType is real and SrcType is integer or a subrange of integer
 Result := (Types[DestType].TypeKind = REALTYPE) and
@@ -760,7 +760,7 @@ end;
 
 
 
-procedure CheckOperator(const Tok: TToken; DataType: Byte); 
+procedure CheckOperator(const Tok: TToken; DataType: Integer); 
 begin
 if Types[DataType].TypeKind = SUBRANGETYPE then
   CheckOperator(Tok, Types[DataType].HostType)

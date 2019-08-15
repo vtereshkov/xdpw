@@ -163,7 +163,7 @@ end;
 
 
 
-procedure DerefPtr(DataType: Byte);
+procedure DerefPtr(DataType: Integer);
 begin
 Gen($5E);                                                       // pop esi
 
@@ -190,7 +190,7 @@ end;
 
 
 
-procedure GetArrayElementPtr(ArrType: Byte);
+procedure GetArrayElementPtr(ArrType: Integer);
 
   function Log2(x: LongInt): ShortInt;
   var
@@ -241,7 +241,7 @@ end;
 
 
 
-procedure GetFieldPtr(RecType: Byte; FieldIndex: Integer);
+procedure GetFieldPtr(RecType: Integer; FieldIndex: Integer);
 var
   Offset: Integer;
 begin
@@ -369,7 +369,7 @@ end;// GenerateFloat
 
 
 
-procedure GenerateMathFunction(func, ResultType: Byte);
+procedure GenerateMathFunction(func, ResultType: Integer);
 begin
 if Types[ResultType].TypeKind = REALTYPE then       // Real type
   begin
@@ -448,7 +448,7 @@ end;// GenerateMathFunction
 
 
 
-procedure GenerateUnaryOperator(op: Byte; ResultType: Byte);
+procedure GenerateUnaryOperator(op: Byte; ResultType: Integer);
 begin
 if Types[ResultType].TypeKind = REALTYPE then     // Real type
   begin
@@ -481,7 +481,7 @@ end;
 
 
 
-procedure GenerateBinaryOperator(op: Byte; ResultType: Byte);
+procedure GenerateBinaryOperator(op: Byte; ResultType: Integer);
 begin
 if Types[ResultType].TypeKind = REALTYPE then     // Real type
   begin
@@ -571,7 +571,7 @@ end;
 
 
 
-procedure GenerateRelation(rel: Byte; ValType: Byte);
+procedure GenerateRelation(rel: Byte; ValType: Integer);
 begin
 if Types[ValType].TypeKind = REALTYPE then        // Real type
   begin
@@ -620,7 +620,7 @@ end;
 
 
 
-procedure GenerateAssignment(DesignatorType: Byte);
+procedure GenerateAssignment(DesignatorType: Integer);
 begin
 // EDX should be preserved
 
@@ -648,7 +648,7 @@ end;
 
 
 
-procedure GenerateStructuredAssignment(DesignatorType: Byte);
+procedure GenerateStructuredAssignment(DesignatorType: Integer);
 begin
 Gen($89); Gen($FB);                                                     // mov ebx, edi   ; edi is used in Write, Read, etc. and should be preserved
 

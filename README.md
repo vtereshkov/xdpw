@@ -43,19 +43,24 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 ```
 Program = "program" Ident ";" Block "." .
 
-Block = { [ "const" Ident "=" ConstExpression ";"
-                   {Ident "=" ConstExpression ";"} ]
-          [ "type" Ident "=" Type ";" {Ident "=" Type ";"} ]
-          [ "var" IdentList ":" Type ";" {IdentList ":" Type ";"} ]
-          [ "procedure" Ident [FormalParam] ";" 
-                        (Block | 
-                         "forward" | 
-                         "external" StringLiteral "name" StringLiteral) ";" ]
-          [ "function"  Ident [FormalParam] [":" TypeIdent] ";" 
-                        (Block | 
-                         "forward" | 
-                         "external" StringLiteral "name" StringLiteral) ";" ] }
-             CompoundStatement .
+Block = { Declarations } CompoundStatement .
+
+Declarations = ConstDeclarations | 
+               TypeDeclarations |
+               VarDeclarations |
+               ProcFuncDeclarations .
+             
+ConstDeclarations = "const" Ident "=" ConstExpression ";"
+                   {Ident "=" ConstExpression ";"} .
+
+TypeDeclarations = "type" Ident "=" Type ";" {Ident "=" Type ";"} .
+
+VarDeclarations = "var" IdentList ":" Type ";" {IdentList ":" Type ";"} .
+
+ProcFuncDeclarations = ("procedure" | "function") Ident [FormalParam] [":" TypeIdent] ";" 
+                       (Directive | Block) .
+
+Directive = ("forward" | ("external" StringLiteral "name" StringLiteral)) ";" .         
 
 ActualParam = "(" (Expression | Designator) |
              {"," (Expression | Designator)} ")" .
