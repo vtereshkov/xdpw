@@ -125,6 +125,10 @@ StringLiteral = "'" {Character | "'" "'"} "'".
 ### Compiler 
 The compiler directly builds a Windows PE executable without using any external assembler or linker.
 
+#### Directives
+`$I` - Include source file. Examples: `{$I windows.inc}`, `{$I samples\gauss.inc}`
+`$A` - Set application type. Examples: `{$A GUI}`, `{$A CONSOLE}`
+
 #### Inline procedures and functions
 The following identifiers are implemented as a part of the compiler. Their names
 are not reserved words and can be locally redefined by the user.
@@ -187,12 +191,12 @@ function UpCase(ch: Char): Char
 ```
 
 ### Samples
-* `FACTOR.PAS`   - Integer factorization demo.
-* `LINEQ.PAS`    - Linear algebraic equation systems solver. Uses `GAUSS.INC` unit. Requires `EQ.TXT`, `EQERR.TXT`, or similar data file.
-* `LIFE.PAS`     - The Game of life.
-* `SORT.PAS`     - Array sorting demo.
-* `FFT.PAS`      - Fast Fourier Transform.
-* `INSERR.PAS`   - Inertial navigation system error estimator. Uses `KALMAN.INC` unit.
-* `LIST.PAS`     - Linked list operations demo.
-* `GUI.PAS`      - GUI application demo. Uses `WINDOWS.INC` unit.
+* `FACTOR.PAS`   - Integer factorization demo
+* `LINEQ.PAS`    - Linear algebraic equation systems solver. Uses `GAUSS.INC` unit. Requires `EQ.TXT`, `EQERR.TXT`, or similar data file
+* `LIFE.PAS`     - The Game of Life
+* `SORT.PAS`     - Array sorting demo
+* `FFT.PAS`      - Fast Fourier Transform
+* `INSERR.PAS`   - Inertial navigation system error estimator. Uses `KALMAN.INC` unit
+* `LIST.PAS`     - Linked list operations demo
+* `GUI.PAS`      - GUI application demo. Uses `WINDOWS.INC` unit
 
