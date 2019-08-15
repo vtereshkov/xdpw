@@ -130,9 +130,8 @@ The compiler directly builds a Windows PE executable without using any external 
 * `$I` - Include source file. Examples: `{$I windows.inc}`, `{$I samples\gauss.inc}`
 * `$A` - Set application type. Examples: `{$A GUI}`, `{$A CONSOLE}`
 
-#### Inline procedures and functions
-The following identifiers are implemented as a part of the compiler. Their names
-are not reserved words and can be locally redefined by the user.
+#### Inlined procedures and functions
+The following identifiers are implemented as part of the compiler. Their names are not reserved words and can be locally redefined by the user.
 ```pascal
 procedure Inc(var x: Integer)
 procedure Dec(var x: Integer)
