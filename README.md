@@ -34,6 +34,7 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * Strings are null-terminated arrays of characters (C style). String manipulation routines should be used instead of direct concatenation or comparison
 * The only file type is `Text`, which is equivalent to `file`. It can be used for both text and untyped files
 * Arrays, strings and records cannot be passed to subroutines by value or used as function results
+* The `external` directive is used for Windows API function declarations. It implies the `stdcall` calling convention
 * The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
 * Single-line comments (`//`) are supported (Delphi style)
 
