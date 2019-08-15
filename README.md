@@ -126,8 +126,8 @@ StringLiteral = "'" {Character | "'" "'"} "'".
 The compiler directly builds a Windows PE executable without using any external assembler or linker.
 
 #### Directives
-`$I` - Include source file. Examples: `{$I windows.inc}`, `{$I samples\gauss.inc}`
-`$A` - Set application type. Examples: `{$A GUI}`, `{$A CONSOLE}`
+* `$I` - Include source file. Examples: `{$I windows.inc}`, `{$I samples\gauss.inc}`
+* `$A` - Set application type. Examples: `{$A GUI}`, `{$A CONSOLE}`
 
 #### Inline procedures and functions
 The following identifiers are implemented as a part of the compiler. Their names
