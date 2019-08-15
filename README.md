@@ -27,6 +27,7 @@ The source file should be specified with its extension (.pas).
 XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal with the following enhancements, differences and limitations:
 * The target operating system is Windows
 * The compiler is self-hosting
+* Object-oriented programming is not supported
 * There are no labels, `goto` and `with` statements
 * There are no `Break`, `Continue` and `Exit` procedures
 * There are no unsigned integers, double-precision floating-point numbers, sets, enumerations, variant records
