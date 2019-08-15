@@ -4,9 +4,9 @@
 XD Pascal is a small educational self-hosting compiler for a subset of the Pascal language. The software is in the public domain. It comes with absolutely no warranty. Any comments, suggestions, or bug reports are appreciated. Feel free to contact the author on GitHub or by e-mail VTereshkov@mail.ru. Enjoy.
 
 ### Features
-* Fast recursive descent parsing
+* Recursive descent parsing
 * Native x86 code generation (Windows executables)
-* Support for both console and GUI applications.
+* Support for both console and GUI applications
 * No external assembler or linker needed
 * Source file inclusion facility
 * Single-precision floating-point arithmetic (using the x87 FPU)
@@ -24,20 +24,18 @@ The source file should be specified with its extension (.pas).
 ### Language
 
 #### Overview
-XD Pascal is a dialect of Pascal programming language that resembles
-Turbo Pascal v. 3.0 with the following enhancements, differences and limitations:
-* Windows is supported
+XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal with the following enhancements, differences and limitations:
+* The target operating system is Windows
 * The compiler is self-hosting
-* There are no labels, `goto` and `with` statements. 
-* Unsigned integers, sets, enumerations, and variant records are not supported.
-* Strings are null-terminated arrays of characters (C style). String 
-  manipulation routines should be used instead of direct concatenation
-  or comparison.
-* The only file type is `Text`. It can be used for both text and untyped files.
-* Structured parameters cannot be passed to subroutines by value.
-* The predefined `Result` variable can be used instead of function 
-  name in assignments (Delphi style).
-* Single-line comments (`//`) are supported (Delphi style).  
+* There are no labels, `goto` and `with` statements
+* There are no `Break`, `Continue` and `Exit` procedures
+* There are no unsigned integers, double-precision floating-point numbers, sets, enumerations, variant records
+* There are no procedural types, but pointers to procedures can be used for implementing Windows API callbacks
+* Strings are null-terminated arrays of characters (C style). String manipulation routines should be used instead of direct concatenation or comparison
+* The only file type is `Text`, which is equivalent to `file`. It can be used for both text and untyped files
+* Arrays, strings and records cannot be passed to subroutines by value or used as function results
+* The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
+* Single-line comments (`//`) are supported (Delphi style)
 
 #### Formal grammar
 ```
