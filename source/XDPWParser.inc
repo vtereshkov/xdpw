@@ -1305,36 +1305,12 @@ end;// CompileStatement
 
 
 procedure CompileType{(var DataType: Integer)};
-var
-  FieldInListName: array [1..MAXFIELDS] of TString;
-  IdentIndex, NumFieldsInList, FieldInListIndex: LongInt;
-  NestedDataType, LowBoundType, HighBoundType, ArrType, IndexType, FieldType, DummyType: Integer;
-  ConstVal: TConst;
-  TypeNameGiven, ExitLoop: Boolean;
-  
-  
 
-  procedure DeclareField(const Name: TString; RecType, FieldType: Integer);
+
+  procedure CompileTypedPointerType(var DataType: Integer);
   var
-    i: Integer;
-  begin
-  for i := 1 to Types[RecType].NumFields do
-    if CustomStrComp(Types[RecType].Field[i]^.Name, Name) = 0 then
-      Error('Duplicate field', '', -1);
-
-  // Add new field
-  Inc(Types[RecType].NumFields);
-  New(Types[RecType].Field[Types[RecType].NumFields]);
-  
-  Types[RecType].Field[Types[RecType].NumFields]^.Name     := Name;
-  Types[RecType].Field[Types[RecType].NumFields]^.DataType := FieldType;
-  Types[RecType].Field[Types[RecType].NumFields]^.Offset   := TypeSize(RecType) - TypeSize(FieldType);
-  end;
-
-
-
-begin
-if Tok.Kind = DEREFERENCETOK then                                 // Typed pointer
+    IdentIndex: LongInt;
+    NestedDataType: Integer;
   begin
   // Add new anonymous type
   Inc(NumTypes);
@@ -1371,9 +1347,16 @@ if Tok.Kind = DEREFERENCETOK then                                 // Typed point
   Types[DataType].BaseType := NestedDataType;
   Types[DataType].Block := BlockStack[BlockStackTop];
 
-  NextTok;
-  end// if DEREFERENCETOK
-else if Tok.Kind = ARRAYTOK then                                  // Array
+  NextTok;  
+  end; // CompileTypedPointerType
+  
+  
+  
+  
+  procedure CompileArrayType(var DataType: Integer);
+  var
+    ArrType, IndexType, NestedDataType: Integer;
+    ExitLoop: Boolean;
   begin
   NextTok;
   EatTok(OBRACKETTOK);
@@ -1409,10 +1392,41 @@ else if Tok.Kind = ARRAYTOK then                                  // Array
   EatTok(OFTOK);
 
   CompileType(NestedDataType);
-  Types[ArrType].BaseType := NestedDataType;
-  end // if ARRAYTOK
-else if Tok.Kind = RECORDTOK then                                 // Record
-  begin
+  Types[ArrType].BaseType := NestedDataType;  
+  end; // CompileArrayType
+  
+  
+  
+  
+  procedure CompileRecordType(var DataType: Integer);
+  
+
+    procedure DeclareField(const Name: TString; RecType, FieldType: Integer);
+    var
+      i: Integer;
+    begin
+    for i := 1 to Types[RecType].NumFields do
+      if CustomStrComp(Types[RecType].Field[i]^.Name, Name) = 0 then
+        Error('Duplicate field', '', -1);
+
+    // Add new field
+    Inc(Types[RecType].NumFields);
+    New(Types[RecType].Field[Types[RecType].NumFields]);
+    
+    Types[RecType].Field[Types[RecType].NumFields]^.Name     := Name;
+    Types[RecType].Field[Types[RecType].NumFields]^.DataType := FieldType;
+    Types[RecType].Field[Types[RecType].NumFields]^.Offset   := TypeSize(RecType) - TypeSize(FieldType);
+    end;
+    
+  
+  var
+    FieldInListName: array [1..MAXFIELDS] of TString;
+    NumFieldsInList, FieldInListIndex: Integer;
+    FieldType: Integer;
+    ExitLoop: Boolean;
+  
+  
+  begin // CompileRecordType
   // Add new anonymous type
   Inc(NumTypes);
   if NumTypes > MAXTYPES then
@@ -1461,7 +1475,59 @@ else if Tok.Kind = RECORDTOK then                                 // Record
   EatTok(ENDTOK);
 
   Types[DataType].Block := BlockStack[BlockStackTop];
-  end// if RECORDTOK
+  end; // CompileRecordType
+
+
+
+
+  procedure CompileSubrangeType(var DataType: Integer);
+  var
+    ConstVal: TConst;
+    LowBoundType, HighBoundType, DummyType: Integer;
+  begin
+  // Add new anonymous type
+  Inc(NumTypes);
+  if NumTypes > MAXTYPES then
+    Error('Maximum number of types exceeded', '', -1);    
+  
+  Types[NumTypes].TypeKind := SUBRANGETYPE;
+  DataType := NumTypes;
+
+  CompileConstExpression(ConstVal, LowBoundType);                               // Subrange lower bound
+  if not IsOrdinalType(Types[LowBoundType]) or (Types[LowBoundType].TypeKind = SUBRANGETYPE) then
+    Error('Ordinal type expected', '', -1);
+  Types[DataType].Low := ConstVal.Value;
+
+  EatTok(RANGETOK);
+
+  CompileConstExpression(ConstVal, HighBoundType);                              // Subrange upper bound
+  if not IsOrdinalType(Types[HighBoundType]) or (Types[HighBoundType].TypeKind = SUBRANGETYPE) then
+    Error('Ordinal type expected', '', -1);
+  Types[DataType].High := ConstVal.Value;
+
+  DummyType := GetCompatibleType(LowBoundType, HighBoundType);
+
+  if Types[DataType].High < Types[DataType].Low then
+    Error('Illegal subrange bounds', '', -1);
+
+  Types[DataType].HostType := LowBoundType;
+  Types[DataType].Block := BlockStack[BlockStackTop];  
+  end; // CompileSubrangeType
+  
+
+
+var
+  IdentIndex: LongInt;
+  TypeNameGiven: Boolean;   
+
+
+begin // CompileType
+if Tok.Kind = DEREFERENCETOK then
+  CompileTypedPointerType(DataType)  
+else if Tok.Kind = ARRAYTOK then
+  CompileArrayType(DataType)  
+else if Tok.Kind = RECORDTOK then
+  CompileRecordType(DataType)  
 else                                                                              // Subrange or type name
   begin
   TypeNameGiven := FALSE;
@@ -1472,41 +1538,13 @@ else                                                                            
     if Ident[IdentIndex].Kind = USERTYPE then TypeNameGiven := TRUE;
     end;
 
-  if TypeNameGiven then                                                           // Type identifier
+  if TypeNameGiven then                                                           // Type name
     begin
     DataType := Ident[IdentIndex].DataType;
     NextTok;
     end
   else                                                                            // Subrange
-    begin
-    // Add new anonymous type
-    Inc(NumTypes);
-    if NumTypes > MAXTYPES then
-      Error('Maximum number of types exceeded', '', -1);    
-    
-    Types[NumTypes].TypeKind := SUBRANGETYPE;
-    DataType := NumTypes;
-
-    CompileConstExpression(ConstVal, LowBoundType);                               // Subrange lower bound
-    if not IsOrdinalType(Types[LowBoundType]) or (Types[LowBoundType].TypeKind = SUBRANGETYPE) then
-      Error('Ordinal type expected', '', -1);
-    Types[DataType].Low := ConstVal.Value;
-
-    EatTok(RANGETOK);
-
-    CompileConstExpression(ConstVal, HighBoundType);                              // Subrange upper bound
-    if not IsOrdinalType(Types[HighBoundType]) or (Types[HighBoundType].TypeKind = SUBRANGETYPE) then
-      Error('Ordinal type expected', '', -1);
-    Types[DataType].High := ConstVal.Value;
-
-    DummyType := GetCompatibleType(LowBoundType, HighBoundType);
-
-    if Types[DataType].High < Types[DataType].Low then
-      Error('Illegal subrange bounds', '', -1);
-
-    Types[DataType].HostType := LowBoundType;
-    Types[DataType].Block := BlockStack[BlockStackTop];
-    end;// else
+    CompileSubrangeType(DataType);
   end;// else  
 
 end;// CompileType
