@@ -66,8 +66,8 @@ Directive = ("forward" | ("external" StringLiteral "name" StringLiteral)) ";" .
 ActualParam = "(" (Expression | Designator) |
              {"," (Expression | Designator)} ")" .
 
-FormalParam = "(" ["const" | "var"] IdentList ":" TypeIdent 
-             {";" ["const" | "var"] IdentList ":" TypeIdent} ")" .
+FormalParam = "(" ["const" | "var"] IdentList ":" ["array" "of"] TypeIdent 
+             {";" ["const" | "var"] IdentList ":" ["array" "of"] TypeIdent} ")" .
 
 IdentList = Ident {"," Ident} .
 
