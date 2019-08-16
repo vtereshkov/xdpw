@@ -1612,15 +1612,14 @@ var
 
        LOCAL:
          if TotalNumParams > 0 then
-           begin
-           ParamDataSize := ParamDataSize + SizeOf(LongInt);                                   // Parameters always occupy 4 bytes each
-           
+           begin          
            if Ident[NumIdent].NestingLevel = 2 then                                            // Inside a non-nested routine
-             AdditionalStackItems := 2                                                         // Old EBP, return address
+             AdditionalStackItems := 1                                                         // Return address
            else                                                                                // Inside a nested routine
-             AdditionalStackItems := 3;                                                        // Old EBP, return address, static link (hidden parameter)  
+             AdditionalStackItems := 2;                                                        // Return address, static link (hidden parameter)  
 
            Ident[NumIdent].Value := (AdditionalStackItems + TotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from EBP (>0)
+           ParamDataSize := ParamDataSize + SizeOf(LongInt);                                   // Parameters always occupy 4 bytes each
            end
          else
            begin
