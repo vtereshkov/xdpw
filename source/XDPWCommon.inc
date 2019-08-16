@@ -124,7 +124,8 @@ const
   WRITELNPROC           = 6;
   NEWPROC               = 7;
   DISPOSEPROC           = 8;
-  HALTPROC              = 9;
+  EXITPROC              = 9;
+  HALTPROC              = 10;
 
   SIZEOFFUNC            = 15;
   ORDFUNC               = 16;
@@ -153,6 +154,7 @@ const
   MAXUNITNESTING        = 5;
   MAXFIELDS             = 100;
   MAXRELOCS             = 20000;
+  MAXEXITCALLS          = 1000;
 
   MAXCODESIZE           = 1024 * 1024;
   MAXDATASIZE           = 32768 * 1024; 
@@ -273,10 +275,11 @@ var
   CodePosStack: array [0..1023] of Integer;
   BlockStack: array [1..MAXNESTING] of Integer;
   Reloc: array [1..MAXRELOCS] of TRelocatable;
+  ExitCallPos: array [1..MAXEXITCALLS] of Integer;
 
   Tok: TToken;
 
-  NumIdent, NumTypes, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs,
+  NumIdent, NumTypes, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, ForLoopNesting, NumExitCalls,
   CodeSize, CodePosStackTop, GlobalDataSize,
   DataSectionOrigin, ProgramEntryPoint,
   UnitStackTop, Line: Integer;
@@ -438,22 +441,15 @@ function GetIdentUnsafe(const S: TString): Integer;
 var
   IdentIndex, BlockStackIndex: Integer;
 begin
-Result := 0;
-
-BlockStackIndex := BlockStackTop;
-while (BlockStackIndex > 0) and (Result = 0) do
-  begin
-
-  IdentIndex := NumIdent;
-  while (IdentIndex > 0) and (Result = 0) do
-    begin
+for BlockStackIndex := BlockStackTop downto 1 do
+  for IdentIndex := NumIdent downto 1 do
     if (CustomStrComp(Ident[IdentIndex].Name, S) = 0) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex]) then 
+      begin
       Result := IdentIndex;
-    Dec(IdentIndex);
-    end;// while
-
-  Dec(BlockStackIndex);
-  end;// while
+      Exit;
+      end;
+      
+Result := 0;
 end;
 
 
@@ -473,17 +469,14 @@ function GetField(RecType: Integer; const S: TString): Integer;
 var
   FieldIndex: Integer;
 begin
-Result := 0;
+for FieldIndex := 1 to Types[RecType].NumFields do
+  if CustomStrComp(Types[RecType].Field[FieldIndex]^.Name, S) = 0 then
+    begin
+    Result := FieldIndex;
+    Exit;
+    end;
 
-FieldIndex := 1;
-while (FieldIndex <= Types[RecType].NumFields) and (Result = 0) do
-  begin
-  if CustomStrComp(Types[RecType].Field[FieldIndex]^.Name, S) = 0 then Result := FieldIndex;
-  Inc(FieldIndex);
-  end;// while
-
-if Result = 0 then
-  Error('Unknown field: ', S, -1);
+Error('Unknown field: ', S, -1);
 end;      
 
 

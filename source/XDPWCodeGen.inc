@@ -989,6 +989,16 @@ end;
 
 
 
+procedure GenerateForProlog;
+begin
+Inc(ForLoopNesting);
+GenerateIfProlog;
+end;
+
+
+
+
+
 procedure GenerateForEpilog(CounterAddress: Integer; Scope, CounterSize: Byte; Down: Boolean);
 begin
 PushVarPtr(CounterAddress, Scope, 0, RELOCDATA);
@@ -999,6 +1009,7 @@ else
 GenerateWhileEpilog;
 
 Gen($59);                                                      // pop ecx    ; Remove the final value of the counter from the stack
+Dec(ForLoopNesting);
 end;
 
 
@@ -1069,11 +1080,40 @@ end;
 
 
 
-procedure GenerateForwardResolution(IdentIndex: Integer);
-var
-  CodePos: Integer;
+procedure GenerateForwardResolution(CodePos: Integer);
 begin
-CodePos := Ident[IdentIndex].Value;
 GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, CodeSize - (CodePos + 5));      // jmp Ident[IdentIndex].Value
 end;
+
+
+
+
+procedure GenerateExitProlog;
+var
+  i: Integer;
+begin
+for i := 1 to ForLoopNesting do
+  Gen($59);                                                    // pop ecx    ; Remove the final value of the counter from the stack
+
+Inc(NumExitCalls);
+ExitCallPos[NumExitCalls] := CodeSize;
+
+GenerateForwardReference;
+end;
+
+
+
+
+procedure GenerateExitEpilog;
+var
+  i: Integer;
+begin
+for i := 1 to NumExitCalls do
+  GenerateForwardResolution(ExitCallPos[i]);
+NumExitCalls := 0;  
+end;
+
+
+
+
 

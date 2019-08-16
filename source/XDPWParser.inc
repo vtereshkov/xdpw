@@ -488,6 +488,9 @@ case proc of
     
     EatTok(CPARTOK);
     end;
+    
+  EXITPROC:
+    GenerateExitProlog;  
 
   HALTPROC:
     begin
@@ -1300,7 +1303,7 @@ case Tok.Kind of
 
     EatTok(DOTOK);
 
-    GenerateIfProlog;
+    GenerateForProlog;
     CompileStatement;
     GenerateForEpilog(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, TypeSize(Ident[IdentIndex].DataType), Down);
     end;
@@ -1678,6 +1681,7 @@ var
   DeclareId('WRITELN',  PROC, 0, 0, VALPASSING, 0, 0.0, WRITELNPROC);
   DeclareId('NEW',      PROC, 0, 0, VALPASSING, 0, 0.0, NEWPROC);
   DeclareId('DISPOSE',  PROC, 0, 0, VALPASSING, 0, 0.0, DISPOSEPROC);
+  DeclareId('EXIT',     PROC, 0, 0, VALPASSING, 0, 0.0, EXITPROC);
   DeclareId('HALT',     PROC, 0, 0, VALPASSING, 0, 0.0, HALTPROC);
 
   // Functions
@@ -2077,7 +2081,7 @@ var
       end
   else                                                                   // Forward declaration resolution
     begin
-    GenerateForwardResolution(ForwardIdentIndex);
+    GenerateForwardResolution(Ident[ForwardIdentIndex].Value);
     CompileBlock(ForwardIdentIndex);
     Ident[ForwardIdentIndex].IsUnresolvedForward := FALSE;
     end;
@@ -2230,6 +2234,9 @@ else
   GenerateStackFrameProlog(LocalDataSize);     // Procedure or function 
 
 CompileCompoundStatement;
+
+// Direct all Exit procedure calls here
+GenerateExitEpilog;
 
 // If function, return Result value via the EAX register
 if (BlockStack[BlockStackTop] <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) then
