@@ -1089,6 +1089,14 @@ end;
 
 
 procedure GenerateExitProlog;
+begin
+NumExitCalls := 0;
+end;
+
+
+
+
+procedure GenerateExitCall;
 var
   i: Integer;
 begin
@@ -1096,6 +1104,9 @@ for i := 1 to ForLoopNesting do
   Gen($59);                                                    // pop ecx    ; Remove the final value of the counter from the stack
 
 Inc(NumExitCalls);
+if NumExitCalls > MAXEXITCALLS then
+  Error('Maximum number of EXIT calls exceeded', '', -1);
+  
 ExitCallPos[NumExitCalls] := CodeSize;
 
 GenerateForwardReference;
@@ -1110,7 +1121,6 @@ var
 begin
 for i := 1 to NumExitCalls do
   GenerateForwardResolution(ExitCallPos[i]);
-NumExitCalls := 0;  
 end;
 
 

@@ -490,7 +490,7 @@ case proc of
     end;
     
   EXITPROC:
-    GenerateExitProlog;  
+    GenerateExitCall;  
 
   HALTPROC:
     begin
@@ -2233,10 +2233,13 @@ if BlockStack[BlockStackTop] = 1 then          // Main program
 else
   GenerateStackFrameProlog(LocalDataSize);     // Procedure or function 
 
+// Block body
+GenerateExitProlog;
 CompileCompoundStatement;
+GenerateExitEpilog;                            // Direct all Exit procedure calls here
 
-// Direct all Exit procedure calls here
-GenerateExitEpilog;
+if ForLoopNesting <> 0 then
+  Error('Internal fault: Illegal FOR loop nesting', '', -1);
 
 // If function, return Result value via the EAX register
 if (BlockStack[BlockStackTop] <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) then
