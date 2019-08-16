@@ -207,6 +207,7 @@ type
     
     // For pointers and arrays 
     BaseType, IndexType: Integer;
+    IsOpenArray: Boolean;
       
     // For records  
     NumFields: Integer;
@@ -683,13 +684,16 @@ case Types[DataType].TypeKind of
   REALTYPE:     Result := SizeOf(Single);
   POINTERTYPE:  Result := SizeOf(Pointer);
   TEXTTYPE:     Result := SizeOf(Integer);
-  ARRAYTYPE:    Result := (HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1) * TypeSize(Types[DataType].BaseType);
+  SUBRANGETYPE: Result := SizeOf(Integer);
+  ARRAYTYPE:    if Types[DataType].IsOpenArray then
+                  Error('Illegal type', '', -1)
+                else  
+                  Result := (HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1) * TypeSize(Types[DataType].BaseType);
   RECORDTYPE:   begin
                 Result := 0;
                 for i := 1 to Types[DataType].NumFields do
                   Result := Result + TypeSize(Types[DataType].Field[i]^.DataType);
-                end;
-  SUBRANGETYPE: Result := SizeOf(Integer)               
+                end               
 else
   Error('Illegal type', '', -1)
 end;// case

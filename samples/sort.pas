@@ -5,16 +5,8 @@ program Sort;
 
 
 
-const
-  DataLength = 60;
-
-
-
 type
   TNumber = Integer;
-  
-  TData = array [1..DataLength] of TNumber;
-  PData = ^TData;
 
 
 
@@ -29,49 +21,51 @@ end;
 
 
 
-
-function Partition(var data: TData; len: Integer): Integer;
-var
-  pivot: TNumber;
-  pivotIndex, i: Integer;
-begin
-pivot := data[len];
-pivotIndex := 1;
-
-for i := 1 to len do
-  if data[i] < pivot then
-    begin
-    Swap(data[pivotIndex], data[i]);
-    Inc(pivotIndex);
-    end; // if
-
-Swap(data[len], data[pivotIndex]);
-
-Result := pivotIndex;
-end;
+procedure QuickSort(var data: array of TNumber; len: Integer);
 
 
-
-
-procedure QuickSort(var data: TData; len: Integer);
-var
-  pivotIndex: Integer;
-  dataShiftedPtr: PData;
-begin
-if len > 1 then
+  function Partition(var data: array of TNumber; low, high: Integer): Integer;
+  var
+    pivot: TNumber;
+    pivotIndex, i: Integer;
   begin
-  pivotIndex := Partition(data, len);
-  dataShiftedPtr := PData(@data[pivotIndex + 1]);
+  pivot := data[high];
+  pivotIndex := low;
+
+  for i := low to high - 1 do
+    if data[i] < pivot then
+      begin
+      Swap(data[pivotIndex], data[i]);
+      Inc(pivotIndex);
+      end; // if
+
+  Swap(data[high], data[pivotIndex]);
+
+  Result := pivotIndex;
+  end; 
   
-  QuickSort(data,            pivotIndex - 1  );
-  QuickSort(dataShiftedPtr^, len - pivotIndex);
-  end; // if
+  
+  procedure Sort(var data: array of TNumber; low, high: Integer);
+  var
+    pivotIndex: Integer;
+  begin
+  if high > low then
+    begin
+    pivotIndex := Partition(data, low, high);
+    
+    Sort(data, low, pivotIndex - 1);
+    Sort(data, pivotIndex + 1, high);
+    end; // if
+  end;  
+    
+  
+begin
+Sort(data, 0, len - 1);
 end;
 
 
 
-
-procedure BubbleSort(var data: TData; len: Integer);
+procedure BubbleSort(var data: array of TNumber; len: Integer);
 var
   changed: Boolean;
   i: Integer;
@@ -79,7 +73,7 @@ begin
 repeat
   changed := FALSE;
 
-  for i := 1 to len - 1 do
+  for i := 0 to len - 2 do
     if data[i + 1] < data[i] then
       begin
       Swap(data[i + 1], data[i]);
@@ -91,17 +85,17 @@ end;
 
 
 
-procedure SelectionSort(var data: TData; len: Integer);
+procedure SelectionSort(var data: array of TNumber; len: Integer);
 var
   i, j, extrIndex: Integer;
   extr: TNumber;
 begin
-for i := 1 to len do
+for i := 0 to len - 1 do
   begin
   extr := data[i];
   extrIndex := i;
 
-  for j := i + 1 to len do
+  for j := i + 1 to len - 1 do
     if data[j] < extr then
       begin
       extr := data[j];
@@ -114,8 +108,25 @@ end;
 
 
 
+function IsSorted(var data: array of TNumber; len: Integer): Boolean;
 var
-  RandomData: TData;
+  i: Integer;
+begin
+Result := TRUE;
+for i := 0 to len - 2 do
+  if data[i + 1] < data[i] then
+    Result := FALSE;
+end;    
+
+
+
+const
+  DataLength = 600;
+
+
+
+var
+  RandomData: array [1..DataLength] of TNumber;
   i: Integer;
   Method: Char;
 
@@ -134,13 +145,12 @@ for i := 1 to DataLength do
   begin
   RandomData[i] := Round((Random - 0.5) * 1000000);
   Write(RandomData[i]);
-  if i mod 4 <> 0 then Write(#9) else WriteLn;
+  if i mod 6 <> 0 then Write(#9) else WriteLn;
   end;
 
 WriteLn;
 WriteLn;
 Write('Select method (Q - quick, B - bubble, S - selection): '); Read(Method);
-WriteLn(Method);
 WriteLn;
 
 case Method of
@@ -172,11 +182,11 @@ WriteLn;
 for i := 1 to DataLength do
   begin
   Write(RandomData[i]); 
-  if i mod 4 <> 0 then Write(#9) else WriteLn;
+  if i mod 6 <> 0 then Write(#9) else WriteLn;
   end;
 WriteLn;
 
-WriteLn;
+WriteLn('Sorted: ', IsSorted(RandomData, DataLength));
 WriteLn('Done.');
 
 ReadLn;

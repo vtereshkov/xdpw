@@ -737,13 +737,21 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       GenerateFloat(0);
       ActualParamType := REALTYPEINDEX;
       end;
-
-    // Strict type checking for parameters passed by reference
-    if IsRefParam and (CurParam^.DataType <> ActualParamType) then
-      Error('Incompatible types', '', -1);
     
-    // Relaxed type checking for parameters passed by value
-    DummyType := GetCompatibleType(CurParam^.DataType, ActualParamType);
+    if IsRefParam then  // Strict type checking for parameters passed by reference, except for open array parameters
+      begin      
+      if (CurParam^.DataType <> ActualParamType) then
+        if (Types[CurParam^.DataType].TypeKind = ARRAYTYPE) and Types[CurParam^.DataType].IsOpenArray then
+          begin
+          if (Types[ActualParamType].TypeKind <> ARRAYTYPE) or (Types[ActualParamType].BaseType <> Types[CurParam^.DataType].BaseType) then
+            Error('Incompatible types', '', -1);
+          end
+        else  
+          Error('Incompatible types', '', -1);
+      end
+    else                // Relaxed type checking for parameters passed by value      
+      DummyType := GetCompatibleType(CurParam^.DataType, ActualParamType);
+      
   until Tok.Kind <> COMMATOK;
 
   EatTok(CPARTOK);
@@ -1371,6 +1379,7 @@ procedure CompileType{(var DataType: Integer)};
     
     Types[NumTypes].TypeKind := ARRAYTYPE;
     Types[NumTypes].Block := BlockStack[BlockStackTop];
+    Types[NumTypes].IsOpenArray := FALSE;
     ArrType := NumTypes;
 
     CompileType(IndexType);
@@ -1709,7 +1718,7 @@ var
   Types[STRINGTYPEINDEX].TypeKind   := ARRAYTYPE;
 
   Types[POINTERTYPEINDEX].BaseType  := ANYTYPEINDEX;
-
+  
   // Add new anonymous type: 0..MAXSTRLENGTH
   Inc(NumTypes);
   if NumTypes > MAXTYPES then
@@ -1721,8 +1730,9 @@ var
   Types[NumTypes].High     := MAXSTRLENGTH;
   Types[NumTypes].Block    := BlockStack[BlockStackTop];
 
-  Types[STRINGTYPEINDEX].BaseType  := CHARTYPEINDEX;
-  Types[STRINGTYPEINDEX].IndexType := NumTypes;
+  Types[STRINGTYPEINDEX].BaseType    := CHARTYPEINDEX;
+  Types[STRINGTYPEINDEX].IndexType   := NumTypes;
+  Types[STRINGTYPEINDEX].IsOpenArray := FALSE;
   end;// DeclarePredefinedTypes
 
 
@@ -1899,7 +1909,7 @@ var
     ForwardIdentIndex, TypeIdentIndex: Integer;
     ParamType, ResultType: Integer;    
     ListPassMethod: Byte;
-    ExitLoop: Boolean;
+    ExitLoop, IsOpenArrayList: Boolean;
 
     
   begin // CompileProcFuncDeclarations   
@@ -1958,6 +1968,18 @@ var
         until ExitLoop;
 
         EatTok(COLONTOK);
+        
+        
+        // Special case: open array parameters
+        if Tok.Kind = ARRAYTOK then
+          begin
+          NextTok;
+          EatTok(OFTOK);
+          IsOpenArrayList := TRUE;
+          end
+        else
+          IsOpenArrayList := FALSE;  
+ 
 
         // Only type names are allowed for formal parameters
         AssertIdent;
@@ -1967,6 +1989,24 @@ var
         else
           Error('Type name expected', '', -1);
         NextTok;
+        
+        
+        // Special case: open array parameters
+        if IsOpenArrayList then
+          begin
+          // Add new anonymous type
+          Inc(NumTypes);
+          if NumTypes > MAXTYPES then
+            Error('Maximum number of types exceeded', '', -1);
+          
+          Types[NumTypes].TypeKind    := ARRAYTYPE;
+          Types[NumTypes].Block       := BlockStack[BlockStackTop];
+          Types[NumTypes].BaseType    := ParamType;
+          Types[NumTypes].IndexType   := Types[STRINGTYPEINDEX].IndexType;   // Any subrange with zero lower bound
+          Types[NumTypes].IsOpenArray := TRUE;
+          
+          ParamType := NumTypes;
+          end;
 
 
         if (ListPassMethod = VALPASSING) and IsStructuredType(Types[ParamType]) then
