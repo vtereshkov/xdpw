@@ -235,7 +235,7 @@ end;
 
 
 
-procedure Rewrite(var F: Text; const Name: string);
+procedure Rewrite(var F: file; const Name: string);
 begin
 F := CreateFileA(Name, GENERIC_WRITE, 0, nil, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
 if Integer(F) = INVALID_HANDLE_VALUE then IOError := -2;
@@ -244,7 +244,7 @@ end;
 
 
 
-procedure Reset(var F: Text; const Name: string);
+procedure Reset(var F: file; const Name: string);
 begin
 F := CreateFileA(Name, GENERIC_READ, 0, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 if Integer(F) = INVALID_HANDLE_VALUE then IOError := -2;
@@ -253,7 +253,7 @@ end;
 
 
 
-procedure Close(F: Text);
+procedure Close(var F: Text);
 begin
 CloseHandle(F);
 end;
@@ -261,26 +261,26 @@ end;
 
 
   
-procedure BlockWrite(F: Text; Buf: Pointer; Len: Integer);
+procedure BlockWrite(var F: file; var Buf; Len: Integer);
 var
   LenWritten: Integer;
 begin
-WriteFile(F, Buf, Len, LenWritten, 0);
+WriteFile(F, @Buf, Len, LenWritten, 0);
 end;
 
 
 
 
-procedure BlockRead(F: Text; Buf: Pointer; Len: Integer; var LenRead: Integer);
+procedure BlockRead(var F: file; var Buf; Len: Integer; var LenRead: Integer);
 begin
-ReadFile(F, Buf, Len, LenRead, 0);
+ReadFile(F, @Buf, Len, LenRead, 0);
 if LenRead < Len then IOError := -1;
 end;
 
 
 
 
-procedure Seek(F: Text; Pos: Integer);
+procedure Seek(var F: file; Pos: Integer);
 begin
 Pos := SetFilePointer(F, Pos, nil, FILE_BEGIN);
 end;
@@ -288,7 +288,7 @@ end;
 
 
 
-function FileSize(F: Text): Integer;
+function FileSize(var F: file): Integer;
 begin
 Result := GetFileSize(F, nil);
 end;
@@ -296,7 +296,7 @@ end;
 
 
 
-function FilePos(F: Text): Integer;
+function FilePos(var F: file): Integer;
 begin
 Result := SetFilePointer(F, 0, nil, FILE_CURRENT);
 end;
@@ -304,7 +304,7 @@ end;
 
 
 
-function EOF(F: Text): Boolean;
+function EOF(var F: file): Boolean;
 begin
 if Integer(F) = 0 then
   Result := FALSE
@@ -338,7 +338,7 @@ else
   if Integer(F) = 0 then     // Console output
     WriteConsole(ch)                
   else                       // File output
-    BlockWrite(F, @ch, 1);   
+    BlockWrite(F, ch, 1);   
 end;
 
 
@@ -513,8 +513,8 @@ else
     end 
   else                          // File input
     begin
-    BlockRead(F, @ch, 1, Len);
-    if ch = #10 then BlockRead(F, @ch, 1, Len);
+    BlockRead(F, ch, 1, Len);
+    if ch = #10 then BlockRead(F, ch, 1, Len);
     if Len <> 1 then ch := #0;
     end;
 
@@ -707,23 +707,7 @@ end;
 
 
 
-
-procedure StrCopy(var Dest: string; const Source: string);
-var
-  i: Integer;
-begin
-i := -1;
-repeat
-  Inc(i);
-  Dest[i] := Source[i];
-until Source[i] = #0;
-end;
-
-
-
-
-
-procedure StrCat(var Dest: string; const Source: string);
+procedure AppendStr(var Dest: string; const Source: string);
 var
   i, j: Integer;
 begin
@@ -739,8 +723,7 @@ end;
 
 
 
-
-function StrComp(const s1, s2: string): Integer;
+function CompareStr(const s1, s2: string): Integer;
 var
   i: Integer;
 begin
@@ -755,20 +738,32 @@ end;
 
 
 
-
-procedure CopyMemory(Dest, Source: Pointer; Len: LongInt);
+procedure Move(const Source; var Dest; Count: Integer);
 var
+  S, D: ^string;
   i: Integer;
-  CurDest, CurSource: PChar;
 begin
-for i := 0 to Len - 1 do
-  begin
-  CurDest := PChar(Integer(Dest) + i);
-  CurSource := PChar(Integer(Source) + i);
-  CurDest^ := CurSource^;
-  end;
+S := @Source;
+D := @Dest;
+
+if S = D then Exit;
+
+for i := 0 to Count - 1 do
+  D^[i] := S^[i];
 end;
 
+
+
+
+procedure FillChar(var Data; Count: Integer; Value: Char);
+var
+  D: ^string;
+  i: Integer;
+begin
+D := @Data;
+for i := 0 to Count - 1 do
+  D^[i] := Value;
+end;
 
 
 
@@ -812,6 +807,16 @@ end;
 
 
 
+function ParamCount: Integer;
+var
+  Str: string;
+begin  
+Result := ParseCmdLine(0, Str) - 1;
+end;   
+
+
+
+
 // Conversion routines
 
 
@@ -830,7 +835,6 @@ end;
 
 
 
-
 procedure Str(Number: Real; var s: string);
 var
   Stream: TStream;
@@ -841,7 +845,6 @@ Stream.Index := 0;
 WriteReal(Text(0), @Stream, Number);
 s[Stream.Index] := #0;
 end;
-
 
 
 
@@ -861,7 +864,6 @@ end;
 
 
 
-
 procedure IStr(Number: Integer; var s: string);
 var
   Stream: TStream;
@@ -872,7 +874,6 @@ Stream.Index := 0;
 WriteInt(Text(0), @Stream, Number);
 s[Stream.Index] := #0;
 end;
-
 
 
 

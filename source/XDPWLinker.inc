@@ -150,36 +150,19 @@ var
 begin
 b := 0;
 for i := 0 to Align(size, alignment) - size - 1 do
-  CustomBlockWrite(f, @b, 1);
+  BlockWrite(f, b, 1);
 end;
 
 
 
   
-procedure Clear(p: Pointer; size: Integer);
-type
-  PByte = ^Byte;
-var
-  i: Integer; 
-  BytePtr: PByte; 
-begin
-for i := 0 to size - 1 do
-  begin
-  BytePtr := PByte(Integer(p) + i);
-  BytePtr^ := 0;
-  end;
-end;
-
-
-
-     
 procedure FillHeaders(CodeSize, InitializedDataSize, UninitializedDataSize: Integer);
 var
   DataSize: Integer;
 begin
 DataSize := InitializedDataSize + UninitializedDataSize;
 
-Clear(@Headers, SizeOf(Headers));
+FillChar(Headers, SizeOf(Headers), #0);
 
 // MZ header
 Headers.MZHeader.MZ[0]                                := 'M';  
@@ -270,14 +253,14 @@ ImportSection.DirectoryTable[NumImports].FirstThunk  := VirtualAddress + SizeOf(
                                                                        + SizeOf(ImportSection.LibraryNames)
                                                                        + SizeOf(ImportSection.LookupTable[0]) * NumImports;
 
-CopyMemory(@ImportSection.LibraryNames[NumImports], Pointer(Integer(@ImportLibName) + STRINGFIRSTINDEX), Length(ImportLibName));
+Move(ImportLibName[STRINGFIRSTINDEX], ImportSection.LibraryNames[NumImports], Length(ImportLibName));
 
 ImportSection.LookupTable[NumImports, 0] := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
                                                            + SizeOf(ImportSection.LibraryNames)
                                                            + SizeOf(ImportSection.LookupTable)
                                                            + SizeOf(ImportSection.NameTable[0]) * NumImports;                                              
 
-CopyMemory(@ImportSection.NameTable[NumImports].Name, Pointer(Integer(@ImportFuncName) + STRINGFIRSTINDEX), Length(ImportFuncName));
+Move(ImportFuncName[STRINGFIRSTINDEX], ImportSection.NameTable[NumImports].Name, Length(ImportFuncName));
 
 Result := IMAGEBASE + VirtualAddress + LongInt(@ImportSection.LookupTable[NumImports, 0]) - LongInt(@ImportSection);
 Inc(NumImports);

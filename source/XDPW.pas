@@ -8,7 +8,6 @@
 program XDPW;
 
 
-
 {$I XDPWCustom.inc}
 {$I XDPWCommon.inc}
 {$I XDPWScanner.inc}
@@ -34,7 +33,7 @@ NumStaticStrChars := 0;
 GlobalDataSize    := 0;
 ProgramEntryPoint := 0;
 
-Clear(@ImportSection, SizeOf(ImportSection));
+FillChar(ImportSection, SizeOf(ImportSection), #0);
 end;
 
 
@@ -80,16 +79,16 @@ CustomRewrite(OutFile, ExeName);
 if IOResult <> 0 then
   Error('Unable to open output file ', ExeName, -1);
   
-CustomBlockWrite(OutFile, @Headers, SizeOf(Headers));
+BlockWrite(OutFile, Headers, SizeOf(Headers));
 Pad(OutFile, SizeOf(Headers), FILEALIGNMENT);
 
-CustomBlockWrite(OutFile, @ImportSection, SizeOf(ImportSection));
+BlockWrite(OutFile, ImportSection, SizeOf(ImportSection));
 Pad(OutFile, SizeOf(ImportSection), FILEALIGNMENT);
 
-CustomBlockWrite(OutFile, @StaticStringData, NumStaticStrChars);
+BlockWrite(OutFile, StaticStringData, NumStaticStrChars);
 Pad(OutFile, NumStaticStrChars, FILEALIGNMENT);
 
-CustomBlockWrite(OutFile, @Code, CodeSize);
+BlockWrite(OutFile, Code, CodeSize);
 Pad(OutFile, CodeSize, FILEALIGNMENT);
   
 Close(OutFile);

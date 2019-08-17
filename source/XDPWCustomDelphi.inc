@@ -10,8 +10,7 @@
 
 
 
-uses Windows;
-// uses SysUtils;       // For debug purposes only
+uses SysUtils;
 
 
 
@@ -29,20 +28,8 @@ type
   
 
   
-function CustomStrComp(const s1, s2: TString): Integer;
-begin
-if s1 > s2 then
-  Result := 1
-else if s1 < s2 then
-  Result := -1
-else
-  Result := 0;
-end;
 
-
-
-
-procedure CustomStrAppend(var s: TString; ch: Char);
+procedure CustomAppendStrChar(var s: TString; ch: Char);
 begin
 s := s + ch;
 end;
@@ -94,29 +81,4 @@ begin
 Assign(F, Name);
 Rewrite(F, 1);
 end;
-
-
-
-
-procedure CustomBlockWrite(var F: TOutFile; Buf: Pointer; Len: Integer);
-begin
-BlockWrite(F, Buf^, Len);
-end;
-
-
-
-
-procedure CustomReadChar(var F: TInFile; var ch: Char);
-var
-  LenRead: Integer;
-begin
-BlockRead(F, ch, 1, LenRead);
-if LenRead = 0 then ch := #0;
-end;
-
-
- 
-  
-
-
 

@@ -9,6 +9,18 @@ var
   ProgramName: TString;
   EndOfProgram: Boolean;
   ch, ch2: Char;
+  
+  
+
+  
+procedure ReadCharSafe(var F: TInFile; var ch: Char);
+var
+  LenRead: Integer;
+begin
+BlockRead(F, ch, 1, LenRead);
+if LenRead = 0 then ch := #0;
+end;
+  
 
 
 
@@ -70,7 +82,7 @@ if UnitStackTop > 1 then
   CustomReset(InFile, UnitStack[UnitStackTop].FileName);
   Seek(InFile, UnitStack[UnitStackTop].Pos);
   Line := UnitStack[UnitStackTop].Line;
-  CustomReadChar(InFile, ch);
+  ReadCharSafe(InFile, ch);
   end
 else
   begin
@@ -82,11 +94,11 @@ end;
 
 
 
-procedure SafeStrAppend(var s: TString; ch: Char);
+procedure AppendStrSafe(var s: TString; ch: Char);
 begin
 if Length(s) >= MAXSTRLENGTH - 1 then
   Error('String is too long', '', -1);
-CustomStrAppend(s, ch);  
+CustomAppendStrChar(s, ch);  
 end;
 
 
@@ -103,7 +115,7 @@ else
     LeaveIncludedFile(ch);
     end
   else
-    CustomReadChar(InFile, ch);
+    ReadCharSafe(InFile, ch);
 
 if ch = #10 then Inc(Line);                            // End of line found
 end;
@@ -162,7 +174,7 @@ case UpCase(ch) of
     while (ch <> '}') and not EndOfProgram do
       begin
       if (ch = #0) or (ch > ' ') then 
-        SafeStrAppend(Text, ch);
+        AppendStrSafe(Text, ch);
       ReadChar(ch);
       end;
       
@@ -176,13 +188,13 @@ case UpCase(ch) of
     while (ch <> '}') and not EndOfProgram do
       begin
       if (ch = #0) or (ch > ' ') then 
-        SafeStrAppend(Text, UpCase(ch));
+        AppendStrSafe(Text, UpCase(ch));
       ReadChar(ch);
       end;
       
-    if CustomStrComp(Text, 'CONSOLE') = 0 then
+    if CompareStr(Text, 'CONSOLE') = 0 then
       IsConsoleProgram := 1
-    else if CustomStrComp(Text, 'GUI') = 0 then
+    else if CompareStr(Text, 'GUI') = 0 then
       IsConsoleProgram := 0
     else
       Error('Unknown application type', '', -1);
@@ -356,7 +368,7 @@ var
 begin
 Text := '';
 repeat
-  SafeStrAppend(Text, ch);
+  AppendStrSafe(Text, ch);
   ReadValidChar(ch);
 until not (((ch >= 'A') and (ch <= 'Z')) or (ch = '_') or ((ch >= '0') and (ch <= '9')));
 
@@ -384,12 +396,12 @@ EndOfLiteral := FALSE;
 repeat
   ReadLiteralChar(ch);
   if ch <> '''' then
-    SafeStrAppend(Text, ch)
+    AppendStrSafe(Text, ch)
   else
     begin
-    CustomReadChar(InFile, ch2);
+    ReadCharSafe(InFile, ch2);
     if ch2 = '''' then                                                      // Apostrophe character found
-      SafeStrAppend(Text, ch)
+      AppendStrSafe(Text, ch)
     else
       begin
       if not EndOfProgram then Seek(InFile, FilePos(InFile) - 1);           // Discard ch2

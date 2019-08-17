@@ -176,21 +176,21 @@ function Min(x, y: Real): Real
 function IMin(x, y: Integer): Integer
 function Max(x, y: Real): Real
 function IMax(x, y: Integer): Integer
-procedure Rewrite(var F: Text; const Name: string)
-procedure Reset(var F: Text; const Name: string)
-procedure Close(F: Text)
-procedure BlockRead(F: Text; Buf: PChar; Len: Integer; var LenRead: Integer)
-procedure BlockWrite(F: Text; Buf: PChar; Len: Integer)
-procedure Seek(F: Text; Pos: Integer)
-function FileSize(F: Text): Integer
-function FilePos(F: Text): Integer
-function EOF(F: Text): Boolean
+procedure Rewrite(var F: file; const Name: string)
+procedure Reset(var F: file; const Name: string)
+procedure Close(var F: file)
+procedure BlockRead(var F: file; var Buf; Len: Integer; var LenRead: Integer)
+procedure BlockWrite(var F: file; var Buf; Len: Integer)
+procedure Seek(var F: file; Pos: Integer)
+function FileSize(var F: file): Integer
+function FilePos(var F: file): Integer
+function EOF(var F: file): Boolean
 function IOResult: Integer
 function Length(const s: string): Integer
-procedure StrCopy(var Dest: string; const Source: string)
-procedure StrCat(var Dest: string; const Source: string)
-function StrComp(const s1, s2: string): Integer
-procedure CopyMemory(Dest, Source: Pointer; Len: LongInt)
+procedure AppendStr(var Dest: string; const Source: string)
+function CompareStr(const s1, s2: string): Integer
+procedure Move(const Source; var Dest; Count: Integer)
+procedure FillChar(var Data; Count: Integer; Value: Char)
 function ParseCmdLine(Index: Integer; var Str: string): Integer
 procedure Val(const s: string; var Number: Real; var Code: Integer)
 procedure Str(Number: Real; var s: string)
@@ -200,12 +200,12 @@ function UpCase(ch: Char): Char
 ```
 
 ### Samples
-* `FACTOR.PAS`   - Integer factorization demo
-* `LINEQ.PAS`    - Linear algebraic equation systems solver. Uses `GAUSS.INC` unit. Requires `EQ.TXT`, `EQERR.TXT`, or similar data file
-* `LIFE.PAS`     - The Game of Life
-* `SORT.PAS`     - Array sorting demo
-* `FFT.PAS`      - Fast Fourier Transform
-* `INSERR.PAS`   - Inertial navigation system error estimator. Uses `KALMAN.INC` unit
-* `LIST.PAS`     - Linked list operations demo
-* `GUI.PAS`      - GUI application demo. Uses `WINDOWS.INC` unit
+* `factor.pas`   - Integer factorization demo
+* `lineq.pas`    - Linear algebraic equation systems solver. Uses `gauss.inc` unit. Requires `eq.txt`, `eqerr.txt`, or similar data file
+* `life.pas`     - The Game of Life
+* `sort.pas`     - Array sorting demo
+* `fft.pas`      - Fast Fourier Transform demo
+* `inserr.pas`   - Inertial navigation system error estimation demo. Uses `kalman.inc` unit
+* `list.pas`     - Linked list operations demo
+* `gui.pas`      - GUI application demo. Uses `windows.inc` unit
 

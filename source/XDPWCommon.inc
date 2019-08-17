@@ -103,7 +103,7 @@ const
 
   // Type indices
 
-  ANYTYPEINDEX          = 1;      // Base type for untyped pointers
+  ANYTYPEINDEX          = 1;      // Untyped parameter, or base type for untyped pointers
   INTEGERTYPEINDEX      = 2;
   SMALLINTTYPEINDEX     = 3;
   SHORTINTTYPEINDEX     = 4;
@@ -432,11 +432,11 @@ Max := NUMKEYWORDS;
 
 repeat
   Mid := (Min + Max) div 2;
-  if CustomStrComp(S, Keyword[Mid]) > 0 then
+  if CompareStr(S, Keyword[Mid]) > 0 then
     Min := Mid + 1
   else
     Max := Mid - 1;
-  Found := CustomStrComp(S, Keyword[Mid]) = 0;
+  Found := CompareStr(S, Keyword[Mid]) = 0;
 until Found or (Min > Max);
 
 if Found then Result := NUMDELIMITERS + Mid;
@@ -452,7 +452,7 @@ var
 begin
 for BlockStackIndex := BlockStackTop downto 1 do
   for IdentIndex := NumIdent downto 1 do
-    if (CustomStrComp(Ident[IdentIndex].Name, S) = 0) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex]) then 
+    if (CompareStr(Ident[IdentIndex].Name, S) = 0) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex]) then 
       begin
       Result := IdentIndex;
       Exit;
@@ -479,7 +479,7 @@ var
   FieldIndex: Integer;
 begin
 for FieldIndex := 1 to Types[RecType].NumFields do
-  if CustomStrComp(Types[RecType].Field[FieldIndex]^.Name, S) = 0 then
+  if CompareStr(Types[RecType].Field[FieldIndex]^.Name, S) = 0 then
     begin
     Result := FieldIndex;
     Exit;

@@ -642,7 +642,7 @@ PushVarPtr(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, BlockStackTop - Ide
 ValType := Ident[IdentIndex].DataType;
 
 
-if IsStructuredType(Types[Ident[IdentIndex].DataType]) then
+if IsStructuredType(Types[Ident[IdentIndex].DataType]) or (Types[Ident[IdentIndex].DataType].TypeKind = ANYTYPE) then
   IsRefParam := (Ident[IdentIndex].PassMethod = CONSTPASSING) or 
                 (Ident[IdentIndex].PassMethod = VARPASSING)                   // For structured parameters, CONST is equivalent to VAR
 else
@@ -721,7 +721,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       IsRefParam := FALSE;
       end
     else
-      if IsStructuredType(Types[CurParam^.DataType]) then
+      if IsStructuredType(Types[CurParam^.DataType]) or (Types[CurParam^.DataType].TypeKind = ANYTYPE) then
         IsRefParam := (CurParam^.PassMethod = CONSTPASSING) or
                       (CurParam^.PassMethod = VARPASSING)                   // For structured parameters, CONST is equivalent to VAR
       else
@@ -748,15 +748,15 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       ActualParamType := REALTYPEINDEX;
       end;
     
-    if IsRefParam then  // Strict type checking for parameters passed by reference, except for open array parameters
-      begin      
+    if IsRefParam then  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
+      begin    
       if (CurParam^.DataType <> ActualParamType) then
         if (Types[CurParam^.DataType].TypeKind = ARRAYTYPE) and Types[CurParam^.DataType].IsOpenArray then
           begin
           if (Types[ActualParamType].TypeKind <> ARRAYTYPE) or (Types[ActualParamType].BaseType <> Types[CurParam^.DataType].BaseType) then
             Error('Incompatible types', '', -1);
-          end
-        else  
+          end  
+        else if Types[CurParam^.DataType].TypeKind <> ANYTYPE then
           Error('Incompatible types', '', -1);
       end
     else                // Relaxed type checking for parameters passed by value      
@@ -1430,7 +1430,7 @@ procedure CompileType{(var DataType: Integer)};
       i: Integer;
     begin
     for i := 1 to Types[RecType].NumFields do
-      if CustomStrComp(Types[RecType].Field[i]^.Name, Name) = 0 then
+      if CompareStr(Types[RecType].Field[i]^.Name, Name) = 0 then
         Error('Duplicate field', '', -1);
 
     // Add new field
@@ -1801,7 +1801,7 @@ var
     // Check if this type was forward-referenced
     for TypeIndex := 1 to NumTypes do
       if (Types[TypeIndex].TypeKind = FORWARDTYPE) and
-         (CustomStrComp(Types[TypeIndex].TypeIdentName, NameTok.Name) = 0) and
+         (CompareStr(Types[TypeIndex].TypeIdentName, NameTok.Name) = 0) and
          (Types[TypeIndex].Block = BlockStack[BlockStackTop]) then
         begin
         // Forward type reference resolution
@@ -1867,7 +1867,7 @@ var
       ImportLibName, ImportFuncName: TString;
       
     begin
-    if (CustomStrComp(Tok.Name, 'EXTERNAL') = 0) then      // External (Windows API) declaration  
+    if (CompareStr(Tok.Name, 'EXTERNAL') = 0) then      // External (Windows API) declaration  
       begin
       if BlockStackTop <> 1 then
         Error('External declaration must be global', '', -1);
@@ -1878,7 +1878,7 @@ var
       EatTok(STRINGLITERALTOK);      
       
       // Read import function name
-      if (Tok.Kind <> IDENTTOK) or (CustomStrComp(Tok.Name, 'NAME') <> 0) then
+      if (Tok.Kind <> IDENTTOK) or (CompareStr(Tok.Name, 'NAME') <> 0) then
         Error('Expected NAME but found ', '', Tok.Kind);
       NextTok;
       ImportFuncName := Tok.Name;
@@ -1888,7 +1888,7 @@ var
       Ident[NumIdent].IsExternal := TRUE;
       Ident[NumIdent].Value := AddImportFunc(ImportLibName, ImportFuncName);
       end
-    else if (CustomStrComp(Tok.Name, 'FORWARD') = 0) then  // Forward declaration
+    else if (CompareStr(Tok.Name, 'FORWARD') = 0) then  // Forward declaration
       begin
       Inc(NumBlocks);
       if NumBlocks > MAXBLOCKS then
@@ -1967,50 +1967,58 @@ var
           NextTok;
         until FALSE;
 
-        EatTok(COLONTOK);
         
-        
-        // Special case: open array parameters
-        if Tok.Kind = ARRAYTOK then
+        if Tok.Kind = COLONTOK then                       // Typed parameters 
           begin
           NextTok;
-          EatTok(OFTOK);
-          IsOpenArrayList := TRUE;
+        
+          // Special case: open array parameters
+          if Tok.Kind = ARRAYTOK then
+            begin
+            NextTok;
+            EatTok(OFTOK);
+            IsOpenArrayList := TRUE;
+            end
+          else
+            IsOpenArrayList := FALSE;  
+   
+
+          // Only type names are allowed for formal parameters
+          AssertIdent;
+          TypeIdentIndex := GetIdent(Tok.Name);
+          if Ident[TypeIdentIndex].Kind = USERTYPE then
+            ParamType := Ident[TypeIdentIndex].DataType
+          else
+            Error('Type name expected', '', -1);
+          NextTok;
+          
+          
+          // Special case: open array parameters
+          if IsOpenArrayList then
+            begin
+            // Add new anonymous type
+            Inc(NumTypes);
+            if NumTypes > MAXTYPES then
+              Error('Maximum number of types exceeded', '', -1);
+            
+            Types[NumTypes].TypeKind    := ARRAYTYPE;
+            Types[NumTypes].Block       := BlockStack[BlockStackTop];
+            Types[NumTypes].BaseType    := ParamType;
+            Types[NumTypes].IndexType   := Types[STRINGTYPEINDEX].IndexType;   // Any subrange with zero lower bound
+            Types[NumTypes].IsOpenArray := TRUE;
+            
+            ParamType := NumTypes;
+            end;
           end
-        else
-          IsOpenArrayList := FALSE;  
- 
+        else                                              // Untyped parameters (CONST or VAR only) 
+          ParamType := ANYTYPEINDEX;
 
-        // Only type names are allowed for formal parameters
-        AssertIdent;
-        TypeIdentIndex := GetIdent(Tok.Name);
-        if Ident[TypeIdentIndex].Kind = USERTYPE then
-          ParamType := Ident[TypeIdentIndex].DataType
-        else
-          Error('Type name expected', '', -1);
-        NextTok;
         
-        
-        // Special case: open array parameters
-        if IsOpenArrayList then
-          begin
-          // Add new anonymous type
-          Inc(NumTypes);
-          if NumTypes > MAXTYPES then
-            Error('Maximum number of types exceeded', '', -1);
-          
-          Types[NumTypes].TypeKind    := ARRAYTYPE;
-          Types[NumTypes].Block       := BlockStack[BlockStackTop];
-          Types[NumTypes].BaseType    := ParamType;
-          Types[NumTypes].IndexType   := Types[STRINGTYPEINDEX].IndexType;   // Any subrange with zero lower bound
-          Types[NumTypes].IsOpenArray := TRUE;
-          
-          ParamType := NumTypes;
-          end;
-
-
         if (ListPassMethod = VALPASSING) and IsStructuredType(Types[ParamType]) then
           Error('Structured parameters cannot be passed by value', '', -1);
+          
+        if (ListPassMethod = VALPASSING) and (ParamType = ANYTYPEINDEX) then
+          Error('Untyped parameters cannot be passed by value', '', -1);          
 
         for IdentInListIndex := 1 to NumIdentInList do
           begin
