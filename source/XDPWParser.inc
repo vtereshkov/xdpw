@@ -1215,14 +1215,12 @@ case Tok.Kind of
           begin
           NextTok;
           CompileStatementList(LoopNesting);
-          end;
-          
+          end;          
         Break;
         end;
 
       NextTok;
-      if Tok.Kind = ENDTOK then Break;
-    until FALSE;
+    until Tok.Kind = ENDTOK;
 
     EatTok(ENDTOK);
 
@@ -1474,11 +1472,9 @@ procedure CompileType{(var DataType: Integer)};
     for FieldInListIndex := 1 to NumFieldsInList do
       DeclareField(FieldInListName[FieldInListIndex], DataType, FieldType);
 
-    if Tok.Kind <> SEMICOLONTOK then Break;
- 
+    if Tok.Kind <> SEMICOLONTOK then Break; 
     NextTok;
-    if Tok.Kind = ENDTOK then Break;
-  until FALSE;
+  until Tok.Kind = ENDTOK;
 
   EatTok(ENDTOK);
 
