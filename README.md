@@ -1,3 +1,5 @@
+![Logo](logo.png)
+
 # XD Pascal Compiler for Windows
 
 ## Summary
