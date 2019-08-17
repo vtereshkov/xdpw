@@ -8,7 +8,7 @@
 procedure CompileConstExpression(var ConstVal: TConst; var ConstValType: Integer); forward;
 procedure CompileDesignator(var ValType: Integer); forward;
 procedure CompileExpression(var ValType: Integer); forward;
-procedure CompileStatement; forward;
+procedure CompileStatement(LoopNesting: Integer); forward;
 procedure CompileType(var DataType: Integer); forward;
 
 
@@ -275,7 +275,7 @@ end;// CompileConstExpression
 
 
 
-procedure CompilePredefinedProc(proc: Byte);
+procedure CompilePredefinedProc(proc: Byte; LoopNesting: Integer);
 var
   DesignatorType, ExpressionType, DummyType: Integer;
   ErrorCode: TConst;
@@ -488,6 +488,16 @@ case proc of
     
     EatTok(CPARTOK);
     end;
+    
+  BREAKPROC:
+    begin
+    if LoopNesting < 1 then
+      Error('BREAK outside of loop is not allowed', '', -1);
+    GenerateBreakCall(LoopNesting);
+    end;  
+
+  CONTINUEPROC:
+    Error('CONTINUE is not supported', '', -1);    
     
   EXITPROC:
     GenerateExitCall;  
@@ -1044,30 +1054,30 @@ end;// CompileExpression
 
 
 
-procedure CompileStatementList;
+procedure CompileStatementList(LoopNesting: Integer);
 begin
-CompileStatement;
+CompileStatement(LoopNesting);
 while Tok.Kind = SEMICOLONTOK do
   begin
   NextTok;
-  CompileStatement;
+  CompileStatement(LoopNesting);
   end;
 end; // CompileStatementList 
 
 
 
 
-procedure CompileCompoundStatement;
+procedure CompileCompoundStatement(LoopNesting: Integer);
 begin
 EatTok(BEGINTOK);
-CompileStatementList;
+CompileStatementList(LoopNesting);
 EatTok(ENDTOK);
 end; // CompileCompoundStatement
 
 
 
 
-procedure CompileStatement;
+procedure CompileStatement{(LoopNesting: Integer)};
 var
   IdentIndex, ResultIdentIndex, NumCaseStatements: Integer;
   ConstVal, ConstVal2: TConst;
@@ -1126,7 +1136,7 @@ case Tok.Kind of
 
       PROC:                                                           // Procedure call
         if Ident[IdentIndex].PredefIndex <> 0 then                    // Predefined procedure call
-          CompilePredefinedProc(Ident[IdentIndex].PredefIndex)
+          CompilePredefinedProc(Ident[IdentIndex].PredefIndex, LoopNesting)
         else                                                          // User-defined procedure call
           begin
           NextTok;
@@ -1143,7 +1153,7 @@ case Tok.Kind of
     end;
 
   BEGINTOK:
-    CompileCompoundStatement;
+    CompileCompoundStatement(LoopNesting);
 
   IFTOK:
     begin
@@ -1154,13 +1164,13 @@ case Tok.Kind of
 
     GenerateIfCondition;              // Satisfied if expression is not zero
     GenerateIfProlog;
-    CompileStatement;
+    CompileStatement(LoopNesting);
 
     if Tok.Kind = ELSETOK then
       begin
       NextTok;
       GenerateElseProlog;                 
-      CompileStatement;
+      CompileStatement(LoopNesting);
       end;
 
     GenerateIfElseEpilog;
@@ -1204,7 +1214,7 @@ case Tok.Kind of
       EatTok(COLONTOK);
 
       GenerateCaseStatementProlog;
-      CompileStatement;
+      CompileStatement(LoopNesting);
       GenerateCaseStatementEpilog;
 
       Inc(NumCaseStatements);
@@ -1215,7 +1225,7 @@ case Tok.Kind of
         if Tok.Kind = ELSETOK then              // Default statements
           begin
           NextTok;
-          CompileStatementList;
+          CompileStatementList(LoopNesting);
           end;
         ExitLoop := TRUE;
         end
@@ -1241,18 +1251,23 @@ case Tok.Kind of
     DummyType := GetCompatibleType(ExpressionType, BOOLEANTYPEINDEX);
     EatTok(DOTOK);
 
+    GenerateBreakProlog(LoopNesting + 1);
     GenerateWhileCondition;                         // Satisfied if expression is not zero
-    GenerateIfProlog;
-    CompileStatement;
+    GenerateWhileProlog;
+    
+    CompileStatement(LoopNesting + 1);
+    
     GenerateWhileEpilog;
+    GenerateBreakEpilog(LoopNesting + 1);
     end;
 
   REPEATTOK:
     begin
+    GenerateBreakProlog(LoopNesting + 1);
     GenerateRepeatProlog;
 
     NextTok;
-    CompileStatementList;
+    CompileStatementList(LoopNesting + 1);
 
     EatTok(UNTILTOK);
 
@@ -1260,6 +1275,7 @@ case Tok.Kind of
     DummyType := GetCompatibleType(ExpressionType, BOOLEANTYPEINDEX);
     GenerateRepeatCondition;
     GenerateRepeatEpilog;
+    GenerateBreakEpilog(LoopNesting + 1);
     end;
 
   FORTOK:
@@ -1292,9 +1308,9 @@ case Tok.Kind of
     CompileExpression(ExpressionType);
     DummyType := GetCompatibleType(ExpressionType, Ident[IdentIndex].DataType);
 
-    SaveStackTopToEDX;                                        // Save final value
+    SaveStackTopToEDX;                                        // Save final value of the counter
     GenerateAssignment(Ident[IdentIndex].DataType);           // Assign initial value to the counter
-    RestoreStackTopFromEDX;                                   // Restore final value
+    RestoreStackTopFromEDX;                                   // Restore final value of the counter
 
     Inc(CodePosStackTop);
     CodePosStack[CodePosStackTop] := CodeSize;                // Save return address used by GenerateForEpilog
@@ -1302,10 +1318,15 @@ case Tok.Kind of
     GenerateForCondition(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, TypeSize(Ident[IdentIndex].DataType), Down);  // Satisfied if counter does not reach the second expression value
 
     EatTok(DOTOK);
-
+    
+    GenerateBreakProlog(LoopNesting + 1);
     GenerateForProlog;
-    CompileStatement;
+    
+    CompileStatement(LoopNesting + 1);    
+    
     GenerateForEpilog(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, TypeSize(Ident[IdentIndex].DataType), Down);
+    GenerateBreakEpilog(LoopNesting + 1);
+    SaveStackTopToEDX;                                        // Pop and discard final value of the counter
     end;
 
 end;// case
@@ -1681,6 +1702,8 @@ var
   DeclareId('WRITELN',  PROC, 0, 0, VALPASSING, 0, 0.0, WRITELNPROC);
   DeclareId('NEW',      PROC, 0, 0, VALPASSING, 0, 0.0, NEWPROC);
   DeclareId('DISPOSE',  PROC, 0, 0, VALPASSING, 0, 0.0, DISPOSEPROC);
+  DeclareId('BREAK',    PROC, 0, 0, VALPASSING, 0, 0.0, BREAKPROC);
+  DeclareId('CONTINUE', PROC, 0, 0, VALPASSING, 0, 0.0, CONTINUEPROC);  
   DeclareId('EXIT',     PROC, 0, 0, VALPASSING, 0, 0.0, EXITPROC);
   DeclareId('HALT',     PROC, 0, 0, VALPASSING, 0, 0.0, HALTPROC);
 
@@ -2235,7 +2258,7 @@ else
 
 // Block body
 GenerateExitProlog;
-CompileCompoundStatement;
+CompileCompoundStatement(0);
 GenerateExitEpilog;                            // Direct all Exit procedure calls here
 
 if ForLoopNesting <> 0 then

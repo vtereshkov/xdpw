@@ -35,10 +35,14 @@ for Number := LowBound to HighBound do
     Divisor := 1;
     DivisorFound := FALSE;
     
-    while (Sqr(Divisor) <= Dividend) and not DivisorFound do
+    while sqr(Divisor) <= Dividend do
       begin
       Inc(Divisor);
-      if Dividend mod Divisor = 0 then DivisorFound := TRUE;
+      if Dividend mod Divisor = 0 then
+        begin
+        DivisorFound := TRUE;
+        Break;
+        end;
       end;
    
     if not DivisorFound then Divisor := Dividend;                // Prime number

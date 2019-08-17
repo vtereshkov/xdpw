@@ -945,6 +945,14 @@ end;
 
 
 
+procedure GenerateWhileProlog;
+begin
+GenerateIfProlog;
+end;
+
+
+
+
 procedure GenerateWhileEpilog;
 var
   CodePos, CurPos, ReturnPos: Integer;
@@ -1008,7 +1016,6 @@ else
   GenerateIncDec(INCPROC, CounterSize);
 GenerateWhileEpilog;
 
-Gen($59);                                                      // pop ecx    ; Remove the final value of the counter from the stack
 Dec(ForLoopNesting);
 end;
 
@@ -1088,9 +1095,39 @@ end;
 
 
 
+procedure GenerateBreakProlog(LoopNesting: Integer);
+begin
+BreakCall[LoopNesting].NumCalls := 0;
+end;
+
+
+
+
+procedure GenerateBreakCall(LoopNesting: Integer);
+begin
+Inc(BreakCall[LoopNesting].NumCalls);
+BreakCall[LoopNesting].Pos[BreakCall[LoopNesting].NumCalls] := CodeSize;
+
+GenerateForwardReference;
+end;
+
+
+
+
+procedure GenerateBreakEpilog(LoopNesting: Integer);
+var
+  i: Integer;
+begin
+for i := 1 to BreakCall[LoopNesting].NumCalls do
+  GenerateForwardResolution(BreakCall[LoopNesting].Pos[i]);
+end;
+
+
+
+
 procedure GenerateExitProlog;
 begin
-NumExitCalls := 0;
+ExitCall.NumCalls := 0;
 end;
 
 
@@ -1103,11 +1140,8 @@ begin
 for i := 1 to ForLoopNesting do
   Gen($59);                                                    // pop ecx    ; Remove the final value of the counter from the stack
 
-Inc(NumExitCalls);
-if NumExitCalls > MAXEXITCALLS then
-  Error('Maximum number of EXIT calls exceeded', '', -1);
-  
-ExitCallPos[NumExitCalls] := CodeSize;
+Inc(ExitCall.NumCalls);
+ExitCall.Pos[ExitCall.NumCalls] := CodeSize;
 
 GenerateForwardReference;
 end;
@@ -1119,8 +1153,8 @@ procedure GenerateExitEpilog;
 var
   i: Integer;
 begin
-for i := 1 to NumExitCalls do
-  GenerateForwardResolution(ExitCallPos[i]);
+for i := 1 to ExitCall.NumCalls do
+  GenerateForwardResolution(ExitCall.Pos[i]);
 end;
 
 

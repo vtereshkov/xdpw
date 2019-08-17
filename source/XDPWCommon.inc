@@ -124,8 +124,10 @@ const
   WRITELNPROC           = 6;
   NEWPROC               = 7;
   DISPOSEPROC           = 8;
-  EXITPROC              = 9;
-  HALTPROC              = 10;
+  BREAKPROC             = 9;
+  CONTINUEPROC          = 10;
+  EXITPROC              = 11;
+  HALTPROC              = 12;
 
   SIZEOFFUNC            = 15;
   ORDFUNC               = 16;
@@ -154,6 +156,8 @@ const
   MAXUNITNESTING        = 5;
   MAXFIELDS             = 100;
   MAXRELOCS             = 20000;
+  MAXLOOPNESTING        = 10;
+  MAXBREAKCALLS         = 1000;
   MAXEXITCALLS          = 1000;
 
   MAXCODESIZE           = 1024 * 1024;
@@ -263,6 +267,11 @@ type
     Value: LongInt;
   end;
   
+  TBreakContinueExitCallList = record
+    NumCalls: Integer;
+    Pos: array [1..MAXBREAKCALLS] of LongInt;
+  end;  
+  
 
 
 var
@@ -275,11 +284,12 @@ var
   CodePosStack: array [0..1023] of Integer;
   BlockStack: array [1..MAXNESTING] of Integer;
   Reloc: array [1..MAXRELOCS] of TRelocatable;
-  ExitCallPos: array [1..MAXEXITCALLS] of Integer;
+  BreakCall, ContinueCall: array [1..MAXLOOPNESTING] of TBreakContinueExitCallList;
+  ExitCall: TBreakContinueExitCallList;
 
   Tok: TToken;
 
-  NumIdent, NumTypes, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, ForLoopNesting, NumExitCalls,
+  NumIdent, NumTypes, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, ForLoopNesting,
   CodeSize, CodePosStackTop, GlobalDataSize,
   DataSectionOrigin, ProgramEntryPoint,
   UnitStackTop, Line: Integer;

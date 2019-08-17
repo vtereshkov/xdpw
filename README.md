@@ -29,7 +29,7 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * The compiler is self-hosting
 * Object-oriented programming is not supported
 * There are no labels, `goto` and `with` statements
-* There are no `Break` and `Continue` procedures, but `Exit` is supported
+* There is no `Continue` procedure
 * There are no unsigned integers, double-precision floating-point numbers, sets, enumerations, variant records
 * There are no procedural types, but pointers to procedures can be used for implementing Windows API callbacks
 * Open array parameters do not have `High` and `Low` functions. Array length should be explicitly passed to a subroutine 
@@ -148,6 +148,7 @@ procedure ReadLn([F: Text;] var x1 {; var xi})
 procedure WriteLn([F: Text;] x1 {; xi})
 procedure New(var P: Pointer)
 procedure Dispose(var P: Pointer)
+procedure Break
 procedure Exit
 procedure Halt[(const error: Integer)]
 function SizeOf(var x | T): Integer

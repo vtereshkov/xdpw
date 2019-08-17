@@ -28,7 +28,6 @@ NumBlocks         := 0;
 BlockStackTop     := 0; 
 NumRelocs         := 0;
 ForLoopNesting    := 0;
-NumExitCalls      := 0;
 CodeSize          := 0; 
 CodePosStackTop   := 0;
 NumStaticStrChars := 0;

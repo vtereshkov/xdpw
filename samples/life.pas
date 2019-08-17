@@ -79,7 +79,7 @@ for i := 1 to FieldSize do
       for nj := j - 1 to j + 1 do
         if Fld[ind(ni, nj)] and not ((ni = i) and (nj = j)) then Inc(n);
 
-    // Bear or kill the current cell in the next generation
+    // Revive or kill the current cell in the next generation
     if Fld[ind(i, j)] then
       NextFld[ind(i, j)] := (n > 1) and (n < 4)  // Kill the cell or keep it alive
     else
