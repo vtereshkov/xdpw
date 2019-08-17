@@ -1,4 +1,4 @@
-![Logo](logo.png)
+![Logo](logo.png | width=50)
 
 # XD Pascal Compiler for Windows
 
