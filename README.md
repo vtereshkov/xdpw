@@ -30,6 +30,7 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * The target operating system is Windows
 * The compiler is self-hosting
 * Object-oriented programming is not supported
+* There are no units. Source file inclusion directives should be used instead 
 * There are no labels, `goto` and `with` statements
 * There are no unsigned integers, double-precision floating-point numbers, sets, enumerations, variant records
 * There are no procedural types, but pointers to procedures can be used for implementing Windows API callbacks
