@@ -1,4 +1,4 @@
-<img src="logo.png" width="100">
+<img src="logo.png">
 
 # XD Pascal Compiler for Windows
 
