@@ -279,7 +279,6 @@ procedure CompilePredefinedProc(proc: Byte; LoopNesting: Integer);
 var
   DesignatorType, ExpressionType, DummyType: Integer;
   ErrorCode: TConst;
-  ExitLoop: Boolean;
   LibProcIdentIndex: Integer;
   IsFirstParam, FileSpecified: Boolean;
 begin
@@ -357,12 +356,9 @@ case proc of
 
         IsFirstParam := FALSE;
 
-        ExitLoop := FALSE;
-        if Tok.Kind = COMMATOK then
-          NextTok
-        else
-          ExitLoop := TRUE;
-      until ExitLoop;
+        if Tok.Kind <> COMMATOK then Break;
+        NextTok;
+      until FALSE;
       EatTok(CPARTOK);
       end; // if OPARTOR
       
@@ -442,12 +438,9 @@ case proc of
 
         IsFirstParam := FALSE;
 
-        ExitLoop := FALSE;
-        if Tok.Kind = COMMATOK then
-          NextTok
-        else
-          ExitLoop := TRUE;
-      until ExitLoop;
+        if Tok.Kind <> COMMATOK then Break;
+        NextTok;
+      until FALSE;
       EatTok(CPARTOK);
       end; // if OPARTOR
       
@@ -1082,7 +1075,7 @@ var
   IdentIndex, ResultIdentIndex, NumCaseStatements: Integer;
   ConstVal, ConstVal2: TConst;
   ExpressionType, DesignatorType, ConstValType, SelectorType, DummyType: Integer;
-  Down, ExitLoop, TreatCharAsString: Boolean;
+  Down, TreatCharAsString: Boolean;
 begin
 
 case Tok.Kind of
@@ -1204,12 +1197,9 @@ case Tok.Kind of
         else
           GenerateCaseEqualityCheck(ConstVal.Value);                     // Equality check
 
-        ExitLoop := FALSE;
-        if Tok.Kind = COMMATOK then
-          NextTok
-        else
-          ExitLoop := TRUE;
-      until ExitLoop;
+        if Tok.Kind <> COMMATOK then Break;
+        NextTok;
+      until FALSE;
 
       EatTok(COLONTOK);
 
@@ -1219,7 +1209,6 @@ case Tok.Kind of
 
       Inc(NumCaseStatements);
 
-      ExitLoop := FALSE;
       if Tok.Kind <> SEMICOLONTOK then
         begin
         if Tok.Kind = ELSETOK then              // Default statements
@@ -1227,14 +1216,13 @@ case Tok.Kind of
           NextTok;
           CompileStatementList(LoopNesting);
           end;
-        ExitLoop := TRUE;
-        end
-      else
-        begin
-        NextTok;
-        if Tok.Kind = ENDTOK then ExitLoop := TRUE;
-        end
-    until ExitLoop;
+          
+        Break;
+        end;
+
+      NextTok;
+      if Tok.Kind = ENDTOK then Break;
+    until FALSE;
 
     EatTok(ENDTOK);
 
@@ -1388,7 +1376,6 @@ procedure CompileType{(var DataType: Integer)};
   procedure CompileArrayType(var DataType: Integer);
   var
     ArrType, IndexType, NestedDataType: Integer;
-    ExitLoop: Boolean;
   begin
   NextTok;
   EatTok(OBRACKETTOK);
@@ -1411,15 +1398,11 @@ procedure CompileType{(var DataType: Integer)};
       Error('Ordinal type expected', '', -1);
     Types[ArrType].IndexType := IndexType;
 
-    ExitLoop := FALSE;
-    if Tok.Kind = COMMATOK then
-      begin
-      Types[ArrType].BaseType := NumTypes + 1;
-      NextTok;
-      end
-    else
-      ExitLoop := TRUE;
-  until ExitLoop;
+    if Tok.Kind <> COMMATOK then Break;
+    
+    Types[ArrType].BaseType := NumTypes + 1;
+    NextTok;
+  until FALSE;
 
   EatTok(CBRACKETTOK);
   EatTok(OFTOK);
@@ -1456,7 +1439,6 @@ procedure CompileType{(var DataType: Integer)};
     FieldInListName: array [1..MAXFIELDS] of TString;
     NumFieldsInList, FieldInListIndex: Integer;
     FieldType: Integer;
-    ExitLoop: Boolean;
   
   
   begin // CompileRecordType
@@ -1481,12 +1463,9 @@ procedure CompileType{(var DataType: Integer)};
 
       NextTok;
 
-      ExitLoop := FALSE;
-      if Tok.Kind = COMMATOK then
-        NextTok
-      else
-        ExitLoop := TRUE;
-    until ExitLoop;
+      if Tok.Kind <> COMMATOK then Break;
+      NextTok;
+    until FALSE;
 
     EatTok(COLONTOK);
 
@@ -1495,15 +1474,11 @@ procedure CompileType{(var DataType: Integer)};
     for FieldInListIndex := 1 to NumFieldsInList do
       DeclareField(FieldInListName[FieldInListIndex], DataType, FieldType);
 
-    ExitLoop := FALSE;
-    if Tok.Kind <> SEMICOLONTOK then
-      ExitLoop := TRUE
-    else
-      begin
-      NextTok;
-      if Tok.Kind = ENDTOK then ExitLoop := TRUE;
-      end
-  until ExitLoop;
+    if Tok.Kind <> SEMICOLONTOK then Break;
+ 
+    NextTok;
+    if Tok.Kind = ENDTOK then Break;
+  until FALSE;
 
   EatTok(ENDTOK);
 
@@ -1847,7 +1822,6 @@ var
     IdentInListName: array [1..MAXPARAMS] of TString;
     NumIdentInList, IdentInListIndex: Integer;
     VarType: Integer;
-    ExitLoop: Boolean;
   begin
   repeat
     NumIdentInList := 0;
@@ -1859,12 +1833,9 @@ var
 
       NextTok;
 
-      ExitLoop := FALSE;
-      if Tok.Kind = COMMATOK then
-        NextTok
-      else
-        ExitLoop := TRUE;
-    until ExitLoop;
+      if Tok.Kind <> COMMATOK then Break;
+      NextTok;
+    until FALSE;
 
     EatTok(COLONTOK);
 
@@ -1935,7 +1906,7 @@ var
     ForwardIdentIndex, TypeIdentIndex: Integer;
     ParamType, ResultType: Integer;    
     ListPassMethod: Byte;
-    ExitLoop, IsOpenArrayList: Boolean;
+    IsOpenArrayList: Boolean;
 
     
   begin // CompileProcFuncDeclarations   
@@ -1986,12 +1957,9 @@ var
 
           NextTok;
 
-          ExitLoop := FALSE;
-          if Tok.Kind = COMMATOK then
-            NextTok
-          else
-            ExitLoop := TRUE;
-        until ExitLoop;
+          if Tok.Kind <> COMMATOK then Break;
+          NextTok;
+        until FALSE;
 
         EatTok(COLONTOK);
         
@@ -2052,12 +2020,9 @@ var
           Ident[NumIdent].Param[Ident[NumIdent].NumParams]^.Name       := IdentInListName[IdentInListIndex];
           end;// for
 
-        ExitLoop := FALSE;
-        if Tok.Kind = SEMICOLONTOK then
-          NextTok
-        else
-          ExitLoop := TRUE;
-      until ExitLoop;
+        if Tok.Kind <> SEMICOLONTOK then Break;
+        NextTok;
+      until FALSE;
 
       EatTok(CPARTOK);
       end;// if Tok.Kind = OPARTOR
