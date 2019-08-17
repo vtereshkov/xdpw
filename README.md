@@ -68,8 +68,8 @@ Directive = ("forward" | ("external" StringLiteral "name" StringLiteral)) ";" .
 ActualParam = "(" (Expression | Designator) |
              {"," (Expression | Designator)} ")" .
 
-FormalParam = "(" ["const" | "var"] IdentList ":" ["array" "of"] TypeIdent 
-             {";" ["const" | "var"] IdentList ":" ["array" "of"] TypeIdent} ")" .
+FormalParam = "(" ["const" | "var"] IdentList [":" ["array" "of"] TypeIdent] 
+             {";" ["const" | "var"] IdentList [":" ["array" "of"] TypeIdent]} ")" .
 
 IdentList = Ident {"," Ident} .
 
@@ -212,3 +212,6 @@ function UpCase(ch: Char): Char
 * `list.pas`     - Linked list operations demo
 * `gui.pas`      - GUI application demo. Uses `windows.inc` unit
 
+### Known issues
+
+The AVG antivirus reports false positive results on some programs compiled with XD Pascal.
