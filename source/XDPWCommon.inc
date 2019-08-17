@@ -156,9 +156,9 @@ const
   MAXUNITNESTING        = 5;
   MAXFIELDS             = 100;
   MAXRELOCS             = 20000;
-  MAXLOOPNESTING        = 10;
-  MAXBREAKCALLS         = 1000;
-  MAXEXITCALLS          = 1000;
+  MAXLOOPNESTING        = 20;
+  MAXBREAKCALLS         = 100;
+  MAXEXITCALLS          = 100;
 
   MAXCODESIZE           = 1024 * 1024;
   MAXDATASIZE           = 32768 * 1024; 
@@ -408,7 +408,6 @@ procedure Error(const Msg, Name: TString; TokKind: Integer);
 begin
 Write('Error ', UnitStack[UnitStackTop].FileName, ' ', Line, ': ', Msg, Name);
 if TokKind > -1 then WriteToken(TokKind);
-WriteLn;
 WriteLn;
 
 DisposeAll;

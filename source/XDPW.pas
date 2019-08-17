@@ -50,12 +50,10 @@ begin
 WriteLn;
 WriteLn('XD Pascal for Windows ', VERSIONMAJOR, '.', VERSIONMINOR);
 WriteLn('Developed by Vasiliy Tereshkov, 2009-2010, 2019');
-WriteLn;
 
 if ParamCount < 1 then
   begin
   WriteLn('Usage: xdpw <file.pas>');
-  WriteLn;
   Halt(1);
   end;  
   
@@ -98,6 +96,5 @@ Close(OutFile);
 
 
 WriteLn('Compilation complete. Code size: ', CodeSize, ' bytes. Data size: ', NumStaticStrChars + GlobalDataSize, ' bytes.');
-WriteLn;
 end.
 

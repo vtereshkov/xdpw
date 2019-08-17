@@ -1125,6 +1125,36 @@ end;
 
 
 
+procedure GenerateContinueProlog(LoopNesting: Integer);
+begin
+ContinueCall[LoopNesting].NumCalls := 0;
+end;
+
+
+
+
+procedure GenerateContinueCall(LoopNesting: Integer);
+begin
+Inc(ContinueCall[LoopNesting].NumCalls);
+ContinueCall[LoopNesting].Pos[ContinueCall[LoopNesting].NumCalls] := CodeSize;
+
+GenerateForwardReference;
+end;
+
+
+
+
+procedure GenerateContinueEpilog(LoopNesting: Integer);
+var
+  i: Integer;
+begin
+for i := 1 to ContinueCall[LoopNesting].NumCalls do
+  GenerateForwardResolution(ContinueCall[LoopNesting].Pos[i]);
+end;
+
+
+
+
 procedure GenerateExitProlog;
 begin
 ExitCall.NumCalls := 0;

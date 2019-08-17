@@ -490,7 +490,11 @@ case proc of
     end;  
 
   CONTINUEPROC:
-    Error('CONTINUE is not supported', '', -1);    
+    begin
+    if LoopNesting < 1 then
+      Error('CONTINUE outside of loop is not allowed', '', -1);
+    GenerateContinueCall(LoopNesting);
+    end;    
     
   EXITPROC:
     GenerateExitCall;  
@@ -1238,11 +1242,13 @@ case Tok.Kind of
     EatTok(DOTOK);
 
     GenerateBreakProlog(LoopNesting + 1);
+    GenerateContinueProlog(LoopNesting + 1);
     GenerateWhileCondition;                         // Satisfied if expression is not zero
     GenerateWhileProlog;
     
     CompileStatement(LoopNesting + 1);
     
+    GenerateContinueEpilog(LoopNesting + 1);
     GenerateWhileEpilog;
     GenerateBreakEpilog(LoopNesting + 1);
     end;
@@ -1250,12 +1256,14 @@ case Tok.Kind of
   REPEATTOK:
     begin
     GenerateBreakProlog(LoopNesting + 1);
+    GenerateContinueProlog(LoopNesting + 1);
     GenerateRepeatProlog;
 
     NextTok;
     CompileStatementList(LoopNesting + 1);
 
     EatTok(UNTILTOK);
+    GenerateContinueEpilog(LoopNesting + 1);
 
     CompileExpression(ExpressionType);
     DummyType := GetCompatibleType(ExpressionType, BOOLEANTYPEINDEX);
@@ -1306,10 +1314,12 @@ case Tok.Kind of
     EatTok(DOTOK);
     
     GenerateBreakProlog(LoopNesting + 1);
+    GenerateContinueProlog(LoopNesting + 1);
     GenerateForProlog;
     
     CompileStatement(LoopNesting + 1);    
     
+    GenerateContinueEpilog(LoopNesting + 1);
     GenerateForEpilog(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, TypeSize(Ident[IdentIndex].DataType), Down);
     GenerateBreakEpilog(LoopNesting + 1);
     SaveStackTopToEDX;                                        // Pop and discard final value of the counter
