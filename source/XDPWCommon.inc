@@ -10,7 +10,7 @@ const
   VERSIONMINOR          = 9;
   
   NUMDELIMITERS         = 22;
-  NUMKEYWORDS           = 31;
+  NUMKEYWORDS           = 33;
 
   // Standard token codes
 
@@ -37,37 +37,39 @@ const
   CBRACKETTOK           = 21;
   DEREFERENCETOK        = 22;
 
-  ANDTOK                = 23;
-  ARRAYTOK              = 24;
-  BEGINTOK              = 25;
-  CASETOK               = 26;
-  CONSTTOK              = 27;
-  IDIVTOK               = 28;
-  DOTOK                 = 29;
-  DOWNTOTOK             = 30;
-  ELSETOK               = 31;
-  ENDTOK                = 32;
-  FORTOK                = 33;
-  FUNCTIONTOK           = 34;
-  IFTOK                 = 35;
-  MODTOK                = 36;
-  NILTOK                = 37;
-  NOTTOK                = 38;
-  OFTOK                 = 39;
-  ORTOK                 = 40;
-  PROCEDURETOK          = 41;
-  PROGRAMTOK            = 42;
-  RECORDTOK             = 43;
-  REPEATTOK             = 44;
-  SHLTOK                = 45;
-  SHRTOK                = 46;
-  THENTOK               = 47;
-  TOTOK                 = 48;
-  TYPETOK               = 49;
-  UNTILTOK              = 50;
-  VARTOK                = 51;
-  WHILETOK              = 52;
-  XORTOK                = 53;
+  ANDTOK                = NUMDELIMITERS +  1;
+  ARRAYTOK              = NUMDELIMITERS +  2;
+  BEGINTOK              = NUMDELIMITERS +  3;
+  CASETOK               = NUMDELIMITERS +  4;
+  CONSTTOK              = NUMDELIMITERS +  5;
+  IDIVTOK               = NUMDELIMITERS +  6;
+  DOTOK                 = NUMDELIMITERS +  7;
+  DOWNTOTOK             = NUMDELIMITERS +  8;
+  ELSETOK               = NUMDELIMITERS +  9;
+  ENDTOK                = NUMDELIMITERS + 10;
+  FILETOK               = NUMDELIMITERS + 11;
+  FORTOK                = NUMDELIMITERS + 12;
+  FUNCTIONTOK           = NUMDELIMITERS + 13;
+  IFTOK                 = NUMDELIMITERS + 14;
+  MODTOK                = NUMDELIMITERS + 15;
+  NILTOK                = NUMDELIMITERS + 16;
+  NOTTOK                = NUMDELIMITERS + 17;
+  OFTOK                 = NUMDELIMITERS + 18;
+  ORTOK                 = NUMDELIMITERS + 19;
+  PROCEDURETOK          = NUMDELIMITERS + 20;
+  PROGRAMTOK            = NUMDELIMITERS + 21;
+  RECORDTOK             = NUMDELIMITERS + 22;
+  REPEATTOK             = NUMDELIMITERS + 23;
+  SHLTOK                = NUMDELIMITERS + 24;
+  SHRTOK                = NUMDELIMITERS + 25;
+  STRINGTOK             = NUMDELIMITERS + 26;
+  THENTOK               = NUMDELIMITERS + 27;
+  TOTOK                 = NUMDELIMITERS + 28;
+  TYPETOK               = NUMDELIMITERS + 29;
+  UNTILTOK              = NUMDELIMITERS + 30;
+  VARTOK                = NUMDELIMITERS + 31;
+  WHILETOK              = NUMDELIMITERS + 32;
+  XORTOK                = NUMDELIMITERS + 33;
 
   // Non-standard token codes
 
@@ -95,7 +97,7 @@ const
   BOOLEANTYPE           = 6;
   REALTYPE              = 7;
   POINTERTYPE           = 8;
-  TEXTTYPE              = 9;
+  FILETYPE              = 9;
   ARRAYTYPE             = 10;
   RECORDTYPE            = 11;
   SUBRANGETYPE          = 12;
@@ -111,7 +113,7 @@ const
   BOOLEANTYPEINDEX      = 6;
   REALTYPEINDEX         = 7;
   POINTERTYPEINDEX      = 8;      // Untyped pointer, compatible with any other
-  TEXTTYPEINDEX         = 9;      // Universal file type
+  FILETYPEINDEX         = 9;      // Universal file type
   STRINGTYPEINDEX       = 10;
 
   // Predefined routine codes
@@ -312,27 +314,29 @@ Keyword[7]  := 'DO';
 Keyword[8]  := 'DOWNTO';
 Keyword[9]  := 'ELSE';
 Keyword[10] := 'END';
-Keyword[11] := 'FOR';
-Keyword[12] := 'FUNCTION';
-Keyword[13] := 'IF';
-Keyword[14] := 'MOD';
-Keyword[15] := 'NIL';
-Keyword[16] := 'NOT';
-Keyword[17] := 'OF';
-Keyword[18] := 'OR';
-Keyword[19] := 'PROCEDURE';
-Keyword[20] := 'PROGRAM';
-Keyword[21] := 'RECORD';
-Keyword[22] := 'REPEAT';
-Keyword[23] := 'SHL';
-Keyword[24] := 'SHR';
-Keyword[25] := 'THEN';
-Keyword[26] := 'TO';
-Keyword[27] := 'TYPE';
-Keyword[28] := 'UNTIL';
-Keyword[29] := 'VAR';
-Keyword[30] := 'WHILE';
-Keyword[31] := 'XOR';
+Keyword[11] := 'FILE';
+Keyword[12] := 'FOR';
+Keyword[13] := 'FUNCTION';
+Keyword[14] := 'IF';
+Keyword[15] := 'MOD';
+Keyword[16] := 'NIL';
+Keyword[17] := 'NOT';
+Keyword[18] := 'OF';
+Keyword[19] := 'OR';
+Keyword[20] := 'PROCEDURE';
+Keyword[21] := 'PROGRAM';
+Keyword[22] := 'RECORD';
+Keyword[23] := 'REPEAT';
+Keyword[24] := 'SHL';
+Keyword[25] := 'SHR';
+Keyword[26] := 'STRING';
+Keyword[27] := 'THEN';
+Keyword[28] := 'TO';
+Keyword[29] := 'TYPE';
+Keyword[30] := 'UNTIL';
+Keyword[31] := 'VAR';
+Keyword[32] := 'WHILE';
+Keyword[33] := 'XOR';
 end;  
 
 
@@ -603,7 +607,7 @@ end;
 
 function IsCastableType(const T: TType): Boolean;
 begin
-Result := IsOrdinalType(T) or (T.TypeKind = TEXTTYPE) or (T.TypeKind = POINTERTYPE);
+Result := IsOrdinalType(T) or (T.TypeKind = FILETYPE) or (T.TypeKind = POINTERTYPE);
 end;
 
 
@@ -685,7 +689,7 @@ case Types[DataType].TypeKind of
   BOOLEANTYPE:  Result := SizeOf(Boolean);
   REALTYPE:     Result := SizeOf(Single);
   POINTERTYPE:  Result := SizeOf(Pointer);
-  TEXTTYPE:     Result := SizeOf(Integer);
+  FILETYPE:     Result := SizeOf(Integer);
   SUBRANGETYPE: Result := SizeOf(Integer);
   ARRAYTYPE:    if Types[DataType].IsOpenArray then
                   Error('Illegal type', '', -1)

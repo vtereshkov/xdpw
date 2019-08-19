@@ -32,7 +32,7 @@ type
   Word = SmallInt;
   LongInt = Integer;  
   Single = Real;
-  file = Text;  
+  Text = file;  
   PChar = ^Char;
   
   TStream = record

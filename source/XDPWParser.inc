@@ -316,7 +316,7 @@ case proc of
         // 3rd argument - designator
         CompileDesignator(DesignatorType);
 
-        if Types[DesignatorType].TypeKind = TEXTTYPE then           // Text file handle
+        if Types[DesignatorType].TypeKind = FILETYPE then           // Text file handle
           begin
           if not IsFirstParam then
             Error('Incompatible types', '', -1);
@@ -403,7 +403,7 @@ case proc of
         // 3rd argument - expression
         CompileExpression(ExpressionType);
 
-        if Types[ExpressionType].TypeKind = TEXTTYPE then           // Text file handle
+        if Types[ExpressionType].TypeKind = FILETYPE then           // Text file handle
           begin
           if not IsFirstParam then
             Error('Incompatible types', '', -1);
@@ -1332,12 +1332,55 @@ end;// CompileStatement
 
 
 
+procedure CompileTypeIdent(var DataType: Integer; AllowForwardReference: Boolean);
+var
+  IdentIndex: Integer;
+begin
+// STRING, FILE or type name allowed
+case Tok.Kind of
+  STRINGTOK:
+    DataType := STRINGTYPEINDEX;
+  FILETOK:
+    DataType := FILETYPEINDEX
+else
+  AssertIdent;
+  
+  if AllowForwardReference then
+    IdentIndex := GetIdentUnsafe(Tok.Name)
+  else
+    IdentIndex := GetIdent(Tok.Name);                         
+  
+  if IdentIndex = 0 then                                    // Forward-referenced type
+    begin
+    // Add new forward-referenced type
+    Inc(NumTypes);
+    if NumTypes > MAXTYPES then
+      Error('Maximum number of types exceeded', '', -1);    
+    
+    Types[NumTypes].TypeKind := FORWARDTYPE;
+    Types[NumTypes].TypeIdentName := Tok.Name;
+    Types[NumTypes].Block := BlockStack[BlockStackTop];
+    DataType := NumTypes;
+    end
+  else
+    begin
+    if Ident[IdentIndex].Kind <> USERTYPE then
+      Error('Type name expected', '', -1);
+    DataType := Ident[IdentIndex].DataType;                 // Usual type
+    end;
+end; // case
+
+NextTok;
+end;
+  
+
+
+
 procedure CompileType{(var DataType: Integer)};
 
 
   procedure CompileTypedPointerType(var DataType: Integer);
   var
-    IdentIndex: LongInt;
     NestedDataType: Integer;
   begin
   // Add new anonymous type
@@ -1350,32 +1393,10 @@ procedure CompileType{(var DataType: Integer)};
 
   // Compile pointer base type
   NextTok;
-  AssertIdent;
-  IdentIndex := GetIdentUnsafe(Tok.Name);                         
-  
-  if IdentIndex = 0 then                                          // Check for a forward-referenced base type
-    begin
-    // Add new forward-referenced type
-    Inc(NumTypes);
-    if NumTypes > MAXTYPES then
-      Error('Maximum number of types exceeded', '', -1);    
+  CompileTypeIdent(NestedDataType, TRUE);
     
-    Types[NumTypes].TypeKind := FORWARDTYPE;
-    Types[NumTypes].TypeIdentName := Tok.Name;
-    Types[NumTypes].Block := BlockStack[BlockStackTop];
-    NestedDataType := NumTypes;
-    end
-  else
-    begin
-    if Ident[IdentIndex].Kind <> USERTYPE then
-      Error('Type name expected', '', -1);
-    NestedDataType := Ident[IdentIndex].DataType;                 // Usual base type
-    end;
-
   Types[DataType].BaseType := NestedDataType;
   Types[DataType].Block := BlockStack[BlockStackTop];
-
-  NextTok;  
   end; // CompileTypedPointerType
   
   
@@ -1536,14 +1557,24 @@ var
 
 
 begin // CompileType
-if Tok.Kind = DEREFERENCETOK then
-  CompileTypedPointerType(DataType)  
-else if Tok.Kind = ARRAYTOK then
-  CompileArrayType(DataType)  
-else if Tok.Kind = RECORDTOK then
-  CompileRecordType(DataType)  
+case Tok.Kind of
+  DEREFERENCETOK: 
+    CompileTypedPointerType(DataType);  
+  ARRAYTOK:       
+    CompileArrayType(DataType);  
+  RECORDTOK:      
+    CompileRecordType(DataType);
+  STRINGTOK:
+    begin 
+    DataType := STRINGTYPEINDEX;
+    NextTok;
+    end;
+  FILETOK:
+    begin 
+    DataType := FILETYPEINDEX;
+    NextTok;
+    end     
 else                                                                              // Subrange or type name
-  begin
   TypeNameGiven := FALSE;
   IdentIndex := 0;
   if Tok.Kind = IDENTTOK then      
@@ -1559,7 +1590,7 @@ else                                                                            
     end
   else                                                                            // Subrange
     CompileSubrangeType(DataType);
-  end;// else  
+end; // case  
 
 end;// CompileType
 
@@ -1671,8 +1702,6 @@ var
   DeclareId('BOOLEAN',  USERTYPE, 0, BOOLEANTYPEINDEX,  VALPASSING, 0, 0.0, 0);
   DeclareId('REAL',     USERTYPE, 0, REALTYPEINDEX,     VALPASSING, 0, 0.0, 0);
   DeclareId('POINTER',  USERTYPE, 0, POINTERTYPEINDEX,  VALPASSING, 0, 0.0, 0);
-  DeclareId('TEXT',     USERTYPE, 0, TEXTTYPEINDEX,     VALPASSING, 0, 0.0, 0);
-  DeclareId('STRING',   USERTYPE, 0, STRINGTYPEINDEX,   VALPASSING, 0, 0.0, 0);
 
   // Procedures
   DeclareId('INC',      PROC, 0, 0, VALPASSING, 0, 0.0, INCPROC);
@@ -1721,7 +1750,7 @@ var
   Types[BOOLEANTYPEINDEX].TypeKind  := BOOLEANTYPE;
   Types[REALTYPEINDEX].TypeKind     := REALTYPE;
   Types[POINTERTYPEINDEX].TypeKind  := POINTERTYPE;
-  Types[TEXTTYPEINDEX].TypeKind     := TEXTTYPE;
+  Types[FILETYPEINDEX].TypeKind     := FILETYPE;
   Types[STRINGTYPEINDEX].TypeKind   := ARRAYTYPE;
 
   Types[POINTERTYPEINDEX].BaseType  := ANYTYPEINDEX;
@@ -1909,7 +1938,7 @@ var
   var
     IdentInListName: array [1..MAXPARAMS] of TString;
     NumIdentInList, IdentInListIndex: Integer;
-    ForwardIdentIndex, TypeIdentIndex: Integer;
+    ForwardIdentIndex: Integer;
     ParamType, ResultType: Integer;    
     ListPassMethod: Byte;
     IsOpenArrayList: Boolean;
@@ -1968,6 +1997,7 @@ var
         until FALSE;
 
         
+        // Formal parameter list type
         if Tok.Kind = COLONTOK then                       // Typed parameters 
           begin
           NextTok;
@@ -1980,19 +2010,11 @@ var
             IsOpenArrayList := TRUE;
             end
           else
-            IsOpenArrayList := FALSE;  
-   
-
-          // Only type names are allowed for formal parameters
-          AssertIdent;
-          TypeIdentIndex := GetIdent(Tok.Name);
-          if Ident[TypeIdentIndex].Kind = USERTYPE then
-            ParamType := Ident[TypeIdentIndex].DataType
-          else
-            Error('Type name expected', '', -1);
-          NextTok;
-          
-          
+            IsOpenArrayList := FALSE;
+     
+          // Type itself
+          CompileTypeIdent(ParamType, FALSE);          
+                     
           // Special case: open array parameters
           if IsOpenArrayList then
             begin
@@ -2008,7 +2030,7 @@ var
             Types[NumTypes].IsOpenArray := TRUE;
             
             ParamType := NumTypes;
-            end;
+            end;  
           end
         else                                              // Untyped parameters (CONST or VAR only) 
           ParamType := ANYTYPEINDEX;
@@ -2041,20 +2063,15 @@ var
       EatTok(CPARTOK);
       end;// if Tok.Kind = OPARTOR
 
+ 
+    // Function result type
     Ident[NumIdent].DataType := 0;
-
+    
     if IsFunction then
       begin
       EatTok(COLONTOK);
-
-      // Only type names are allowed for function results
-      AssertIdent;
-      TypeIdentIndex := GetIdent(Tok.Name);
-      if Ident[TypeIdentIndex].Kind = USERTYPE then
-        ResultType := Ident[TypeIdentIndex].DataType
-      else
-        Error('Type name expected', '', -1);
-      NextTok;
+      
+      CompileTypeIdent(ResultType, FALSE);
 
       if IsStructuredType(Types[ResultType]) then
         Error('Structured result is not allowed', '', -1);

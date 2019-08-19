@@ -65,11 +65,12 @@ ProcFuncDeclarations = ("procedure" | "function") Ident [FormalParam] [":" TypeI
 
 Directive = ("forward" | ("external" StringLiteral "name" StringLiteral)) ";" .         
 
-ActualParam = "(" (Expression | Designator) |
-             {"," (Expression | Designator)} ")" .
+ActualParams = "(" (Expression | Designator) |
+              {"," (Expression | Designator)} ")" .
 
-FormalParam = "(" ["const" | "var"] IdentList [":" ["array" "of"] TypeIdent] 
-             {";" ["const" | "var"] IdentList [":" ["array" "of"] TypeIdent]} ")" .
+FormalParams = "(" FormalParamList {";" FormalParamList} ")" .
+              
+FormalParamList = ["const" | "var"] IdentList [":" ["array" "of"] TypeIdent] .             
 
 IdentList = Ident {"," Ident} .
 
@@ -77,7 +78,9 @@ Type = "^" TypeIdent |
        "array" "[" Type {"," Type} "]" "of" Type |
        "record" IdentList ":" Type {";" IdentList ":" Type} [";"] "end" |
        ConstExpression ".." ConstExpression |
-       TypeIdent .
+       Ident .
+       
+TypeIdent = "string" | "file" | Ident .       
 
 Designator = Ident {"^" | ("[" Expression {"," Expression} "]") | ("." Ident)} .
 
@@ -117,9 +120,7 @@ Factor = Ident [ActualParam] |
          "(" Expression ")" | 
          "not" Factor |
          "nil" |
-         TypeIdent "(" Expression ")" .
-
-TypeIdent = Ident .
+         Ident "(" Expression ")" .
 
 Ident = (Letter | "_") {Letter | "_" | Digit}.
 
