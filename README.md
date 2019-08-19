@@ -60,7 +60,7 @@ TypeDeclarations = "type" Ident "=" Type ";" {Ident "=" Type ";"} .
 
 VarDeclarations = "var" IdentList ":" Type ";" {IdentList ":" Type ";"} .
 
-ProcFuncDeclarations = ("procedure" | "function") Ident [FormalParam] [":" TypeIdent] ";" 
+ProcFuncDeclarations = ("procedure" | "function") Ident [FormalParams] [":" TypeIdent] ";" 
                        (Directive | Block) .
 
 Directive = ("forward" | ("external" StringLiteral "name" StringLiteral)) ";" .         
@@ -85,7 +85,7 @@ TypeIdent = "string" | "file" | Ident .
 Designator = Ident {"^" | ("[" Expression {"," Expression} "]") | ("." Ident)} .
 
 Statement = [ (Designator | Ident) ":=" Expression | 
-              Ident [ActualParam] |
+              Ident [ActualParams] |
               CompoundStatement |
               "if" Expression "then" Statement ["else" Statement] |
               "case" Expression "of" CaseElement {";" CaseElement} 
@@ -111,7 +111,7 @@ SimpleExpression = ["+"|"-"] Term {("+"|"-"|"or"|"xor") Term}.
 
 Term = Factor {("*"|"/"|"div"|"mod"|"shl"|"shr"|"and") Factor}.
 
-Factor = Ident [ActualParam] |
+Factor = Ident [ActualParams] |
          Designator |
          "@" Designator | 
          Number | 
