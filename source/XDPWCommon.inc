@@ -365,43 +365,37 @@ end;
 
 procedure WriteToken(TokKind: Integer);
 begin
-if TokKind = 0 then
-  Write('no token')
-else if TokKind <= NUMDELIMITERS then
-  case TokKind of
-    OPARTOK:        Write('(');
-    CPARTOK:        Write(')');
-    MULTOK:         Write('*');
-    PLUSTOK:        Write('+');
-    COMMATOK:       Write(',');
-    MINUSTOK:       Write('-');
-    PERIODTOK:      Write('.');
-    RANGETOK:       Write('..');
-    DIVTOK:         Write('/');
-    COLONTOK:       Write(':');
-    ASSIGNTOK:      Write(':=');
-    SEMICOLONTOK:   Write(';');
-    LTTOK:          Write('<');
-    LETOK:          Write('<=');
-    NETOK:          Write('<>');
-    EQTOK:          Write('=');
-    GTTOK:          Write('>');
-    GETOK:          Write('>=');
-    ADDRESSTOK:     Write('@');
-    OBRACKETTOK:    Write('[');
-    CBRACKETTOK:    Write(']');
-    DEREFERENCETOK: Write('^');
-  end // case
-else if TokKind <= NUMDELIMITERS + NUMKEYWORDS then
-  Write(Keyword[TokKind - NUMDELIMITERS])
-else if TokKind = IDENTTOK then
-  Write('identifier')
-else if (TokKind = INTNUMBERTOK) or (TokKind = FRACNUMBERTOK) then
-  Write('number')
-else if (TokKind = CHARLITERALTOK) or (TokKind = STRINGLITERALTOK) then
-  Write('literal')
+case TokKind of
+  0:                                                Write('no token');
+  OPARTOK:                                          Write('(');
+  CPARTOK:                                          Write(')');
+  MULTOK:                                           Write('*');
+  PLUSTOK:                                          Write('+');
+  COMMATOK:                                         Write(',');
+  MINUSTOK:                                         Write('-');
+  PERIODTOK:                                        Write('.');
+  RANGETOK:                                         Write('..');
+  DIVTOK:                                           Write('/');
+  COLONTOK:                                         Write(':');
+  ASSIGNTOK:                                        Write(':=');
+  SEMICOLONTOK:                                     Write(';');
+  LTTOK:                                            Write('<');
+  LETOK:                                            Write('<=');
+  NETOK:                                            Write('<>');
+  EQTOK:                                            Write('=');
+  GTTOK:                                            Write('>');
+  GETOK:                                            Write('>=');
+  ADDRESSTOK:                                       Write('@');
+  OBRACKETTOK:                                      Write('[');
+  CBRACKETTOK:                                      Write(']');
+  DEREFERENCETOK:                                   Write('^');
+  NUMDELIMITERS + 1 .. NUMDELIMITERS + NUMKEYWORDS: Write(Keyword[TokKind - NUMDELIMITERS]);
+  IDENTTOK:                                         Write('identifier');
+  INTNUMBERTOK, FRACNUMBERTOK:                      Write('number');
+  CHARLITERALTOK, STRINGLITERALTOK:                 Write('literal')
 else
   Write('unknown token');
+end; //case
 end;
 
 
