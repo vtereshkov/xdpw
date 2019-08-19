@@ -215,4 +215,4 @@ function UpCase(ch: Char): Char
 
 ### Known issues
 
-The AVG antivirus reports false positive results on some programs compiled with XD Pascal.
+The AVG antivirus gives false positive results on some programs compiled with XD Pascal.
