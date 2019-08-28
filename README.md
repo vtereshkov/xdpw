@@ -78,7 +78,7 @@ Type = "^" TypeIdent |
        "array" "[" Type {"," Type} "]" "of" Type |
        "record" IdentList ":" Type {";" IdentList ":" Type} [";"] "end" |
        ConstExpression ".." ConstExpression |
-       ("procedure" | "function") [FormalParams] [":" TypeIdent] 
+       ("procedure" | "function") [FormalParams] [":" TypeIdent] |
        Ident .
        
 TypeIdent = "string" | "file" | Ident .       
