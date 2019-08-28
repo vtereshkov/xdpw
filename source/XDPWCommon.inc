@@ -198,6 +198,8 @@ type
   end;
 
   PParam = ^TParam;
+  
+  PParams = array [1..MAXPARAMS] of PParam;
 
   TField = record
     Name: TString;
@@ -256,7 +258,7 @@ type
     Scope: Byte;
     PassMethod: Byte;                  // Value, CONST or VAR parameter status
     NumParams: Integer;
-    Param: array [1..MAXPARAMS] of PParam;
+    Param: PParams;
     ProcAsBlock: Integer;
     PredefIndex: Byte;
     IsUnresolvedForward: Boolean;

@@ -624,6 +624,259 @@ end;// CompilePredefinedFunc
 
 
 
+procedure CompileTypeIdent(var DataType: Integer; AllowForwardReference: Boolean);
+var
+  IdentIndex: Integer;
+begin
+// STRING, FILE or type name allowed
+case Tok.Kind of
+  STRINGTOK:
+    DataType := STRINGTYPEINDEX;
+  FILETOK:
+    DataType := FILETYPEINDEX
+else
+  AssertIdent;
+  
+  if AllowForwardReference then
+    IdentIndex := GetIdentUnsafe(Tok.Name)
+  else
+    IdentIndex := GetIdent(Tok.Name);                         
+  
+  if IdentIndex = 0 then                                    // Forward-referenced type
+    begin
+    // Add new forward-referenced type
+    Inc(NumTypes);
+    if NumTypes > MAXTYPES then
+      Error('Maximum number of types exceeded', '', -1);    
+    
+    Types[NumTypes].TypeKind := FORWARDTYPE;
+    Types[NumTypes].TypeIdentName := Tok.Name;
+    Types[NumTypes].Block := BlockStack[BlockStackTop];
+    DataType := NumTypes;
+    end
+  else
+    begin
+    if Ident[IdentIndex].Kind <> USERTYPE then
+      Error('Type name expected', '', -1);
+    DataType := Ident[IdentIndex].DataType;                 // Usual type
+    end;
+end; // case
+
+NextTok;
+end;
+  
+
+
+
+procedure CompileFormalParametersAndResult(IsFunction: Boolean; var NumFormalParams: Integer; var FormalParam: PParams; var ResultType: Integer);
+var
+  IdentInListName: array [1..MAXPARAMS] of TString;
+  NumIdentInList, IdentInListIndex: Integer;  
+  ParamType: Integer;    
+  ListPassMethod: Byte;
+  IsOpenArrayList: Boolean;
+  
+begin
+NumFormalParams := 0;
+  
+if Tok.Kind = OPARTOK then
+  begin
+  NextTok;
+  repeat
+    NumIdentInList := 0;
+    ListPassMethod := VALPASSING;
+
+    if Tok.Kind = CONSTTOK then
+      begin
+      ListPassMethod := CONSTPASSING;
+      NextTok;
+      end
+    else if Tok.Kind = VARTOK then
+      begin
+      ListPassMethod := VARPASSING;
+      NextTok;
+      end;
+
+    repeat
+      AssertIdent;
+
+      Inc(NumIdentInList);
+      IdentInListName[NumIdentInList] := Tok.Name;
+
+      NextTok;
+
+      if Tok.Kind <> COMMATOK then Break;
+      NextTok;
+    until FALSE;
+
+    
+    // Formal parameter list type
+    if Tok.Kind = COLONTOK then                       // Typed parameters 
+      begin
+      NextTok;
+    
+      // Special case: open array parameters
+      if Tok.Kind = ARRAYTOK then
+        begin
+        NextTok;
+        EatTok(OFTOK);
+        IsOpenArrayList := TRUE;
+        end
+      else
+        IsOpenArrayList := FALSE;
+ 
+      // Type itself
+      CompileTypeIdent(ParamType, FALSE);          
+                 
+      // Special case: open array parameters
+      if IsOpenArrayList then
+        begin
+        // Add new anonymous type
+        Inc(NumTypes);
+        if NumTypes > MAXTYPES then
+          Error('Maximum number of types exceeded', '', -1);
+        
+        Types[NumTypes].TypeKind    := ARRAYTYPE;
+        Types[NumTypes].Block       := BlockStack[BlockStackTop];
+        Types[NumTypes].BaseType    := ParamType;
+        Types[NumTypes].IndexType   := Types[STRINGTYPEINDEX].IndexType;   // Any subrange with zero lower bound
+        Types[NumTypes].IsOpenArray := TRUE;
+        
+        ParamType := NumTypes;
+        end;  
+      end
+    else                                              // Untyped parameters (CONST or VAR only) 
+      ParamType := ANYTYPEINDEX;
+
+    
+    if (ListPassMethod = VALPASSING) and IsStructuredType(Types[ParamType]) then
+      Error('Structured parameters cannot be passed by value', '', -1);
+      
+    if (ListPassMethod = VALPASSING) and (ParamType = ANYTYPEINDEX) then
+      Error('Untyped parameters cannot be passed by value', '', -1);          
+
+    for IdentInListIndex := 1 to NumIdentInList do
+      begin
+      Inc(NumFormalParams);
+
+      if NumFormalParams > MAXPARAMS then
+        Error('Too many formal parameters', '', -1);
+
+      New(FormalParam[NumFormalParams]);
+
+      FormalParam[NumFormalParams]^.DataType   := ParamType;
+      FormalParam[NumFormalParams]^.PassMethod := ListPassMethod;
+      FormalParam[NumFormalParams]^.Name       := IdentInListName[IdentInListIndex];
+      end;// for
+
+    if Tok.Kind <> SEMICOLONTOK then Break;
+    NextTok;
+  until FALSE;
+
+  EatTok(CPARTOK);
+  end;// if Tok.Kind = OPARTOR
+
+
+// Function result type
+ResultType := 0;
+
+if IsFunction then
+  begin
+  EatTok(COLONTOK);
+  
+  CompileTypeIdent(ResultType, FALSE);
+
+  if IsStructuredType(Types[ResultType]) then
+    Error('Structured result is not allowed', '', -1);
+  end;
+end; // CompileFormalParametersAndResult
+
+
+
+
+procedure CompileActualParameters(NumFormalParams: Integer; var FormalParam: PParams);
+var
+  NumActualParams: Integer;
+  ActualParamType, DummyType: Integer;
+  IsRefParam, TreatCharAsString: Boolean;
+  CurParam: PParam;
+begin
+NumActualParams := 0;
+
+if Tok.Kind = OPARTOK then                            // Actual parameter list found
+  begin
+  repeat
+    NextTok;
+
+    if NumActualParams + 1 > NumFormalParams then
+      Error('Too many actual parameters', '', -1);
+
+    CurParam := FormalParam[NumActualParams + 1];
+
+    // Evaluate actual parameters and push them onto the stack
+
+    TreatCharAsString := (Tok.Kind = CHARLITERALTOK) and (CurParam^.DataType = STRINGTYPEINDEX);
+
+    if (Tok.Kind = STRINGLITERALTOK) or TreatCharAsString then
+      begin
+      if CurParam^.PassMethod <> CONSTPASSING then
+        Error('String literals can be passed as CONST only', '', -1);
+      IsRefParam := FALSE;
+      end
+    else
+      if IsStructuredType(Types[CurParam^.DataType]) or (Types[CurParam^.DataType].TypeKind = ANYTYPE) then
+        IsRefParam := (CurParam^.PassMethod = CONSTPASSING) or
+                      (CurParam^.PassMethod = VARPASSING)                   // For structured parameters, CONST is equivalent to VAR
+      else
+        IsRefParam := CurParam^.PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
+
+    if TreatCharAsString then
+      begin                                     // Special case
+      PushVarPtr(Tok.StrAddress, GLOBAL, 0, RELOCNONE);
+      ActualParamType := STRINGTYPEINDEX;
+      NextTok;
+      end
+    else
+      if IsRefParam then                        // General rule
+        CompileDesignator(ActualParamType)
+      else
+        CompileExpression(ActualParamType);
+
+    Inc(NumActualParams);
+
+    // Try to convert integer to real
+    if ConversionIsPossible(ActualParamType, CurParam^.DataType) and not IsRefParam then
+      begin
+      GenerateFloat(0);
+      ActualParamType := REALTYPEINDEX;
+      end;
+    
+    if IsRefParam then  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
+      begin    
+      if (CurParam^.DataType <> ActualParamType) then
+        if (Types[CurParam^.DataType].TypeKind = ARRAYTYPE) and Types[CurParam^.DataType].IsOpenArray then
+          begin
+          if (Types[ActualParamType].TypeKind <> ARRAYTYPE) or (Types[ActualParamType].BaseType <> Types[CurParam^.DataType].BaseType) then
+            Error('Incompatible types', '', -1);
+          end  
+        else if Types[CurParam^.DataType].TypeKind <> ANYTYPE then
+          Error('Incompatible types', '', -1);
+      end
+    else                // Relaxed type checking for parameters passed by value      
+      DummyType := GetCompatibleType(CurParam^.DataType, ActualParamType);
+      
+  until Tok.Kind <> COMMATOK;
+
+  EatTok(CPARTOK);
+  end;// if Tok.Kind = OPARTOR
+
+if NumActualParams < NumFormalParams then
+  Error('Too few actual parameters', '', -1);
+  
+end;// CompileActualParameters  
+
+
+
 
 procedure CompileDesignator{(var ValType: Integer)};
 var
@@ -691,91 +944,6 @@ end; // CompileDesignator
 
 
 
-procedure CompileActualParameters(IdentIndex: Integer);
-var
-  NumActualParams: Integer;
-  ActualParamType, DummyType: Integer;
-  IsRefParam, TreatCharAsString: Boolean;
-  CurParam: PParam;
-begin
-NumActualParams := 0;
-
-if Tok.Kind = OPARTOK then                            // Actual parameter list found
-  begin
-  repeat
-    NextTok;
-
-    if NumActualParams + 1 > Ident[IdentIndex].NumParams then
-      Error('Too many actual parameters', '', -1);
-
-    CurParam := Ident[IdentIndex].Param[NumActualParams + 1];
-
-    // Evaluate actual parameters and push them onto the stack
-
-    TreatCharAsString := (Tok.Kind = CHARLITERALTOK) and (CurParam^.DataType = STRINGTYPEINDEX);
-
-    if (Tok.Kind = STRINGLITERALTOK) or TreatCharAsString then
-      begin
-      if CurParam^.PassMethod <> CONSTPASSING then
-        Error('String literals can be passed as CONST only', '', -1);
-      IsRefParam := FALSE;
-      end
-    else
-      if IsStructuredType(Types[CurParam^.DataType]) or (Types[CurParam^.DataType].TypeKind = ANYTYPE) then
-        IsRefParam := (CurParam^.PassMethod = CONSTPASSING) or
-                      (CurParam^.PassMethod = VARPASSING)                   // For structured parameters, CONST is equivalent to VAR
-      else
-        IsRefParam := CurParam^.PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
-
-    if TreatCharAsString then
-      begin                                     // Special case
-      PushVarPtr(Tok.StrAddress, GLOBAL, 0, RELOCNONE);
-      ActualParamType := STRINGTYPEINDEX;
-      NextTok;
-      end
-    else
-      if IsRefParam then                        // General rule
-        CompileDesignator(ActualParamType)
-      else
-        CompileExpression(ActualParamType);
-
-    Inc(NumActualParams);
-
-    // Try to convert integer to real
-    if ConversionIsPossible(ActualParamType, CurParam^.DataType) and not IsRefParam then
-      begin
-      GenerateFloat(0);
-      ActualParamType := REALTYPEINDEX;
-      end;
-    
-    if IsRefParam then  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
-      begin    
-      if (CurParam^.DataType <> ActualParamType) then
-        if (Types[CurParam^.DataType].TypeKind = ARRAYTYPE) and Types[CurParam^.DataType].IsOpenArray then
-          begin
-          if (Types[ActualParamType].TypeKind <> ARRAYTYPE) or (Types[ActualParamType].BaseType <> Types[CurParam^.DataType].BaseType) then
-            Error('Incompatible types', '', -1);
-          end  
-        else if Types[CurParam^.DataType].TypeKind <> ANYTYPE then
-          Error('Incompatible types', '', -1);
-      end
-    else                // Relaxed type checking for parameters passed by value      
-      DummyType := GetCompatibleType(CurParam^.DataType, ActualParamType);
-      
-  until Tok.Kind <> COMMATOK;
-
-  EatTok(CPARTOK);
-  end;// if Tok.Kind = OPARTOR
-
-if NumActualParams < Ident[IdentIndex].NumParams then
-  Error('Too few actual parameters', '', -1);
-  
-end;// CompileActualParameters  
-
-        
-
-
-
 procedure CompileFactor(var ValType: Integer);
 var
   IdentIndex: Integer;
@@ -794,7 +962,7 @@ case Tok.Kind of
       else                                                                          // User-defined function call
         begin
         NextTok;
-        CompileActualParameters(IdentIndex);
+        CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].Param);
         
         if Ident[IdentIndex].IsExternal then
           begin
@@ -1137,7 +1305,7 @@ case Tok.Kind of
         else                                                          // User-defined procedure call
           begin
           NextTok;
-          CompileActualParameters(IdentIndex);
+          CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].Param);
           
           if Ident[IdentIndex].IsExternal then
             GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams, FALSE)
@@ -1329,50 +1497,6 @@ end;// case
 
 end;// CompileStatement
 
-
-
-
-procedure CompileTypeIdent(var DataType: Integer; AllowForwardReference: Boolean);
-var
-  IdentIndex: Integer;
-begin
-// STRING, FILE or type name allowed
-case Tok.Kind of
-  STRINGTOK:
-    DataType := STRINGTYPEINDEX;
-  FILETOK:
-    DataType := FILETYPEINDEX
-else
-  AssertIdent;
-  
-  if AllowForwardReference then
-    IdentIndex := GetIdentUnsafe(Tok.Name)
-  else
-    IdentIndex := GetIdent(Tok.Name);                         
-  
-  if IdentIndex = 0 then                                    // Forward-referenced type
-    begin
-    // Add new forward-referenced type
-    Inc(NumTypes);
-    if NumTypes > MAXTYPES then
-      Error('Maximum number of types exceeded', '', -1);    
-    
-    Types[NumTypes].TypeKind := FORWARDTYPE;
-    Types[NumTypes].TypeIdentName := Tok.Name;
-    Types[NumTypes].Block := BlockStack[BlockStackTop];
-    DataType := NumTypes;
-    end
-  else
-    begin
-    if Ident[IdentIndex].Kind <> USERTYPE then
-      Error('Type name expected', '', -1);
-    DataType := Ident[IdentIndex].DataType;                 // Usual type
-    end;
-end; // case
-
-NextTok;
-end;
-  
 
 
 
@@ -1936,12 +2060,7 @@ var
     
   
   var
-    IdentInListName: array [1..MAXPARAMS] of TString;
-    NumIdentInList, IdentInListIndex: Integer;
     ForwardIdentIndex: Integer;
-    ParamType, ResultType: Integer;    
-    ListPassMethod: Byte;
-    IsOpenArrayList: Boolean;
 
     
   begin // CompileProcFuncDeclarations   
@@ -1966,119 +2085,7 @@ var
 
     NextTok;
 
-    if Tok.Kind = OPARTOK then                                    // Formal parameter list found
-      begin
-      NextTok;
-      repeat
-        NumIdentInList := 0;
-        ListPassMethod := VALPASSING;
-
-        if Tok.Kind = CONSTTOK then
-          begin
-          ListPassMethod := CONSTPASSING;
-          NextTok;
-          end
-        else if Tok.Kind = VARTOK then
-          begin
-          ListPassMethod := VARPASSING;
-          NextTok;
-          end;
-
-        repeat
-          AssertIdent;
-
-          Inc(NumIdentInList);
-          IdentInListName[NumIdentInList] := Tok.Name;
-
-          NextTok;
-
-          if Tok.Kind <> COMMATOK then Break;
-          NextTok;
-        until FALSE;
-
-        
-        // Formal parameter list type
-        if Tok.Kind = COLONTOK then                       // Typed parameters 
-          begin
-          NextTok;
-        
-          // Special case: open array parameters
-          if Tok.Kind = ARRAYTOK then
-            begin
-            NextTok;
-            EatTok(OFTOK);
-            IsOpenArrayList := TRUE;
-            end
-          else
-            IsOpenArrayList := FALSE;
-     
-          // Type itself
-          CompileTypeIdent(ParamType, FALSE);          
-                     
-          // Special case: open array parameters
-          if IsOpenArrayList then
-            begin
-            // Add new anonymous type
-            Inc(NumTypes);
-            if NumTypes > MAXTYPES then
-              Error('Maximum number of types exceeded', '', -1);
-            
-            Types[NumTypes].TypeKind    := ARRAYTYPE;
-            Types[NumTypes].Block       := BlockStack[BlockStackTop];
-            Types[NumTypes].BaseType    := ParamType;
-            Types[NumTypes].IndexType   := Types[STRINGTYPEINDEX].IndexType;   // Any subrange with zero lower bound
-            Types[NumTypes].IsOpenArray := TRUE;
-            
-            ParamType := NumTypes;
-            end;  
-          end
-        else                                              // Untyped parameters (CONST or VAR only) 
-          ParamType := ANYTYPEINDEX;
-
-        
-        if (ListPassMethod = VALPASSING) and IsStructuredType(Types[ParamType]) then
-          Error('Structured parameters cannot be passed by value', '', -1);
-          
-        if (ListPassMethod = VALPASSING) and (ParamType = ANYTYPEINDEX) then
-          Error('Untyped parameters cannot be passed by value', '', -1);          
-
-        for IdentInListIndex := 1 to NumIdentInList do
-          begin
-          Inc(Ident[NumIdent].NumParams);
-
-          if Ident[NumIdent].NumParams > MAXPARAMS then
-            Error('Too many formal parameters in ', Ident[NumIdent].Name, -1);
-
-          New(Ident[NumIdent].Param[Ident[NumIdent].NumParams]);
-
-          Ident[NumIdent].Param[Ident[NumIdent].NumParams]^.DataType   := ParamType;
-          Ident[NumIdent].Param[Ident[NumIdent].NumParams]^.PassMethod := ListPassMethod;
-          Ident[NumIdent].Param[Ident[NumIdent].NumParams]^.Name       := IdentInListName[IdentInListIndex];
-          end;// for
-
-        if Tok.Kind <> SEMICOLONTOK then Break;
-        NextTok;
-      until FALSE;
-
-      EatTok(CPARTOK);
-      end;// if Tok.Kind = OPARTOR
-
- 
-    // Function result type
-    Ident[NumIdent].DataType := 0;
-    
-    if IsFunction then
-      begin
-      EatTok(COLONTOK);
-      
-      CompileTypeIdent(ResultType, FALSE);
-
-      if IsStructuredType(Types[ResultType]) then
-        Error('Structured result is not allowed', '', -1);
-
-      Ident[NumIdent].DataType := ResultType;
-      end;
-
+    CompileFormalParametersAndResult(IsFunction, Ident[NumIdent].NumParams, Ident[NumIdent].Param, Ident[NumIdent].DataType);
     end// if ForwardIdentIndex = 0
   else
     NextTok;
