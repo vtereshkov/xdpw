@@ -6,13 +6,14 @@ program Sort;
 
 
 type
-  TNumber = Integer;
+  TValue = Integer;
+  TCompareFunc = function(x, y: TValue): Boolean;
+    
 
 
-
-procedure Swap(var x, y: TNumber);
+procedure Swap(var x, y: TValue);
 var
-  buf: TNumber;
+  buf: TValue;
 begin
 buf := x;
 x := y;
@@ -21,19 +22,19 @@ end;
 
 
 
-procedure QuickSort(var data: array of TNumber; len: Integer);
+procedure QuickSort(var data: array of TValue; len: Integer; Ordered: TCompareFunc);
 
 
-  function Partition(var data: array of TNumber; low, high: Integer): Integer;
+  function Partition(var data: array of TValue; low, high: Integer; Ordered: TCompareFunc): Integer;
   var
-    pivot: TNumber;
+    pivot: TValue;
     pivotIndex, i: Integer;
   begin
   pivot := data[high];
   pivotIndex := low;
 
   for i := low to high - 1 do
-    if data[i] < pivot then
+    if not Ordered(data[i], pivot) then
       begin
       Swap(data[pivotIndex], data[i]);
       Inc(pivotIndex);
@@ -45,27 +46,27 @@ procedure QuickSort(var data: array of TNumber; len: Integer);
   end; 
   
   
-  procedure Sort(var data: array of TNumber; low, high: Integer);
+  procedure Sort(var data: array of TValue; low, high: Integer; Ordered: TCompareFunc);
   var
     pivotIndex: Integer;
   begin
   if high > low then
     begin
-    pivotIndex := Partition(data, low, high);
+    pivotIndex := Partition(data, low, high, Ordered);
     
-    Sort(data, low, pivotIndex - 1);
-    Sort(data, pivotIndex + 1, high);
+    Sort(data, low, pivotIndex - 1, Ordered);
+    Sort(data, pivotIndex + 1, high, Ordered);
     end; // if
   end;  
     
   
 begin
-Sort(data, 0, len - 1);
+Sort(data, 0, len - 1, Ordered);
 end;
 
 
 
-procedure BubbleSort(var data: array of TNumber; len: Integer);
+procedure BubbleSort(var data: array of TValue; len: Integer; Ordered: TCompareFunc);
 var
   changed: Boolean;
   i: Integer;
@@ -74,7 +75,7 @@ repeat
   changed := FALSE;
 
   for i := 0 to len - 2 do
-    if data[i + 1] < data[i] then
+    if not Ordered(data[i + 1], data[i]) then
       begin
       Swap(data[i + 1], data[i]);
       changed := TRUE;
@@ -85,10 +86,10 @@ end;
 
 
 
-procedure SelectionSort(var data: array of TNumber; len: Integer);
+procedure SelectionSort(var data: array of TValue; len: Integer; Ordered: TCompareFunc);
 var
   i, j, extrIndex: Integer;
-  extr: TNumber;
+  extr: TValue;
 begin
 for i := 0 to len - 1 do
   begin
@@ -96,7 +97,7 @@ for i := 0 to len - 1 do
   extrIndex := i;
 
   for j := i + 1 to len - 1 do
-    if data[j] < extr then
+    if not Ordered(data[j], extr) then
       begin
       extr := data[j];
       extrIndex := j;
@@ -108,15 +109,32 @@ end;
 
 
 
-function IsSorted(var data: array of TNumber; len: Integer): Boolean;
+function Sorted(var data: array of TValue; len: Integer; Ordered: TCompareFunc): Boolean;
 var
   i: Integer;
 begin
 Result := TRUE;
 for i := 0 to len - 2 do
-  if data[i + 1] < data[i] then
+  if not Ordered(data[i + 1], data[i]) then
+    begin
     Result := FALSE;
-end;    
+    Break;
+    end;
+end;
+
+
+
+function OrderedAscending(y, x: TValue): Boolean;
+begin
+Result := y >= x;
+end;
+
+
+
+function OrderedDescending(y, x: TValue): Boolean;
+begin
+Result := y <= x;
+end;   
 
 
 
@@ -126,9 +144,10 @@ const
 
 
 var
-  RandomData: array [1..DataLength] of TNumber;
+  RandomData: array [1..DataLength] of TValue;
   i: Integer;
-  Method: Char;
+  Ordered: TCompareFunc;
+  Order, Method: Char;
 
 
 
@@ -150,6 +169,27 @@ for i := 1 to DataLength do
 
 WriteLn;
 WriteLn;
+Write('Select order (A - ascending, D - descending): '); Read(Order);
+WriteLn;
+
+case Order of
+  'A', 'a': 
+    begin
+    WriteLn('Ascending order');
+    Ordered := @OrderedAscending;
+    end;
+  'D', 'd':
+    begin
+    WriteLn('Descending order');
+    Ordered := @OrderedDescending;
+    end
+else
+  WriteLn('Order is not selected.');
+  ReadLn;
+  Halt;     
+end;
+
+WriteLn;
 Write('Select method (Q - quick, B - bubble, S - selection): '); Read(Method);
 WriteLn;
 
@@ -157,17 +197,17 @@ case Method of
   'Q', 'q': 
     begin
     WriteLn('Quick sorting');
-    QuickSort(RandomData, DataLength);
+    QuickSort(RandomData, DataLength, Ordered);
     end;
   'B', 'b':
     begin
     WriteLn('Bubble sorting');
-    BubbleSort(RandomData, DataLength);
+    BubbleSort(RandomData, DataLength, Ordered);
     end;
   'S', 's': 
     begin
     WriteLn('Selection sorting');
-    SelectionSort(RandomData, DataLength);
+    SelectionSort(RandomData, DataLength, Ordered);
     end
 else
   WriteLn('Sorting method is not selected.');
@@ -186,7 +226,7 @@ for i := 1 to DataLength do
   end;
 WriteLn;
 
-WriteLn('Sorted: ', IsSorted(RandomData, DataLength));
+WriteLn('Sorted: ', Sorted(RandomData, DataLength, Ordered));
 WriteLn('Done.');
 
 ReadLn;

@@ -278,7 +278,6 @@ end;// CompileConstExpression
 procedure CompilePredefinedProc(proc: Byte; LoopNesting: Integer);
 var
   DesignatorType, ExpressionType, DummyType: Integer;
-  ErrorCode: TConst;
   LibProcIdentIndex: Integer;
   IsFirstParam, FileSpecified: Boolean;
 begin
@@ -504,12 +503,12 @@ case proc of
     if Tok.Kind = OPARTOK then
       begin
       NextTok;
-      CompileConstExpression(ErrorCode, ExpressionType);
+      CompileExpression(ExpressionType);
       DummyType := GetCompatibleType(ExpressionType, INTEGERTYPEINDEX);
       EatTok(CPARTOK);
       end
     else
-      ErrorCode.Value := 0;
+      PushConst(0);
       
     LibProcIdentIndex := GetIdent('EXITPROCESS');
     GenerateExternalCall(Ident[LibProcIdentIndex].Value, Ident[LibProcIdentIndex].NumParams, FALSE);
@@ -805,70 +804,73 @@ NumActualParams := 0;
 
 if Tok.Kind = OPARTOK then                            // Actual parameter list found
   begin
-  repeat
-    NextTok;
+  NextTok;
+  
+  if Tok.Kind <> CPARTOK then
+    repeat
+      if NumActualParams + 1 > NumFormalParams then
+        Error('Too many actual parameters', '', -1);
 
-    if NumActualParams + 1 > NumFormalParams then
-      Error('Too many actual parameters', '', -1);
+      CurParam := FormalParam[NumActualParams + 1];
 
-    CurParam := FormalParam[NumActualParams + 1];
+      // Evaluate actual parameters and push them onto the stack
 
-    // Evaluate actual parameters and push them onto the stack
+      TreatCharAsString := (Tok.Kind = CHARLITERALTOK) and (CurParam^.DataType = STRINGTYPEINDEX);
 
-    TreatCharAsString := (Tok.Kind = CHARLITERALTOK) and (CurParam^.DataType = STRINGTYPEINDEX);
-
-    if (Tok.Kind = STRINGLITERALTOK) or TreatCharAsString then
-      begin
-      if CurParam^.PassMethod <> CONSTPASSING then
-        Error('String literals can be passed as CONST only', '', -1);
-      IsRefParam := FALSE;
-      end
-    else
-      if IsStructuredType(Types[CurParam^.DataType]) or (Types[CurParam^.DataType].TypeKind = ANYTYPE) then
-        IsRefParam := (CurParam^.PassMethod = CONSTPASSING) or
-                      (CurParam^.PassMethod = VARPASSING)                   // For structured parameters, CONST is equivalent to VAR
+      if (Tok.Kind = STRINGLITERALTOK) or TreatCharAsString then
+        begin
+        if CurParam^.PassMethod <> CONSTPASSING then
+          Error('String literals can be passed as CONST only', '', -1);
+        IsRefParam := FALSE;
+        end
       else
-        IsRefParam := CurParam^.PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
+        if IsStructuredType(Types[CurParam^.DataType]) or (Types[CurParam^.DataType].TypeKind = ANYTYPE) then
+          IsRefParam := (CurParam^.PassMethod = CONSTPASSING) or
+                        (CurParam^.PassMethod = VARPASSING)                   // For structured parameters, CONST is equivalent to VAR
+        else
+          IsRefParam := CurParam^.PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
 
-    if TreatCharAsString then
-      begin                                     // Special case
-      PushVarPtr(Tok.StrAddress, GLOBAL, 0, RELOCNONE);
-      ActualParamType := STRINGTYPEINDEX;
-      NextTok;
-      end
-    else
-      if IsRefParam then                        // General rule
-        CompileDesignator(ActualParamType)
+      if TreatCharAsString then
+        begin                                     // Special case
+        PushVarPtr(Tok.StrAddress, GLOBAL, 0, RELOCNONE);
+        ActualParamType := STRINGTYPEINDEX;
+        NextTok;
+        end
       else
-        CompileExpression(ActualParamType);
+        if IsRefParam then                        // General rule
+          CompileDesignator(ActualParamType)
+        else
+          CompileExpression(ActualParamType);
 
-    Inc(NumActualParams);
+      Inc(NumActualParams);
 
-    // Try to convert integer to real
-    if ConversionIsPossible(ActualParamType, CurParam^.DataType) and not IsRefParam then
-      begin
-      GenerateFloat(0);
-      ActualParamType := REALTYPEINDEX;
-      end;
-    
-    if IsRefParam then  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
-      begin    
-      if (CurParam^.DataType <> ActualParamType) then
-        if (Types[CurParam^.DataType].TypeKind = ARRAYTYPE) and Types[CurParam^.DataType].IsOpenArray then
-          begin
-          if (Types[ActualParamType].TypeKind <> ARRAYTYPE) or (Types[ActualParamType].BaseType <> Types[CurParam^.DataType].BaseType) then
-            Error('Incompatible types', '', -1);
-          end  
-        else if Types[CurParam^.DataType].TypeKind <> ANYTYPE then
-          Error('Incompatible types', '', -1);
-      end
-    else                // Relaxed type checking for parameters passed by value      
-      DummyType := GetCompatibleType(CurParam^.DataType, ActualParamType);
+      // Try to convert integer to real
+      if ConversionIsPossible(ActualParamType, CurParam^.DataType) and not IsRefParam then
+        begin
+        GenerateFloat(0);
+        ActualParamType := REALTYPEINDEX;
+        end;
       
-  until Tok.Kind <> COMMATOK;
+      if IsRefParam then  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
+        begin    
+        if (CurParam^.DataType <> ActualParamType) then
+          if (Types[CurParam^.DataType].TypeKind = ARRAYTYPE) and Types[CurParam^.DataType].IsOpenArray then
+            begin
+            if (Types[ActualParamType].TypeKind <> ARRAYTYPE) or (Types[ActualParamType].BaseType <> Types[CurParam^.DataType].BaseType) then
+              Error('Incompatible types', '', -1);
+            end  
+          else if Types[CurParam^.DataType].TypeKind <> ANYTYPE then
+            Error('Incompatible types', '', -1);
+        end
+      else                // Relaxed type checking for parameters passed by value      
+        DummyType := GetCompatibleType(CurParam^.DataType, ActualParamType);
+        
+    if Tok.Kind <> COMMATOK then Break;
+    NextTok;
+    until FALSE;
 
   EatTok(CPARTOK);
-  end;// if Tok.Kind = OPARTOR
+  end;// if Tok.Kind = OPARTOK
 
 if NumActualParams < NumFormalParams then
   Error('Too few actual parameters', '', -1);
@@ -954,60 +956,82 @@ case Tok.Kind of
   IDENTTOK:
     begin
     IdentIndex := GetIdent(Tok.Name);
-    if Ident[IdentIndex].Kind = PROC then
-      Error('Expected expression but found procedure ', Ident[IdentIndex].Name, -1)
-    else if Ident[IdentIndex].Kind = FUNC then                                      // Function call
-      if Ident[IdentIndex].PredefIndex <> 0 then                                    // Predefined function call
-        CompilePredefinedFunc(Ident[IdentIndex].PredefIndex, ValType)
-      else                                                                          // User-defined function call
-        begin
-        NextTok;
-        CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].Param);
+    
+    case Ident[IdentIndex].Kind of
+      PROC:
+        Error('Expected expression but found procedure ', Ident[IdentIndex].Name, -1);
         
-        if Ident[IdentIndex].IsExternal then
+      FUNC:                                                                           // Function call
+        if Ident[IdentIndex].PredefIndex <> 0 then                                    // Predefined function call
+          CompilePredefinedFunc(Ident[IdentIndex].PredefIndex, ValType)
+        else                                                                          // User-defined function call
           begin
-          GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams, TRUE);
-          end
-        else
-          begin  
-          GenerateCall(Ident[IdentIndex].Value, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
-          RestoreStackTopFromEAX;
+          NextTok;
+          CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].Param);
+          
+          if Ident[IdentIndex].IsExternal then
+            GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams, TRUE)
+          else
+            begin  
+            GenerateCall(Ident[IdentIndex].Value, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
+            RestoreStackTopFromEAX;
+            end;
+            
+          ValType := Ident[IdentIndex].DataType;
           end;
           
-        ValType := Ident[IdentIndex].DataType;
-        end // FUNC
-    else if Ident[IdentIndex].Kind = VARIABLE then            // Designator
-      begin
-      CompileDesignator(ValType);
-      if not IsStructuredType(Types[ValType]) then  // Factors of type 'array' or 'record' should contain a pointer to them
-        DerefPtr(ValType);
-      end
-    else if Ident[IdentIndex].Kind = CONSTANT then            // Constant
-      begin
-      ValType := Ident[IdentIndex].DataType;
-      if ValType = REALTYPE then
+      VARIABLE:                                                                       // Designator
         begin
-        FictitiousIntegerPtr := Pointer(@Ident[IdentIndex].FracValue);
-        PushConst(Integer(FictitiousIntegerPtr^));
+        CompileDesignator(ValType);
+        if not IsStructuredType(Types[ValType]) then  // Factors of type 'array' or 'record' should contain a pointer to them
+          DerefPtr(ValType);
+        
+        if Tok.Kind = OPARTOK then                    // Procedural variable call - parentheses required even for empty parameter list
+          begin
+          if (Types[ValType].TypeKind <> PROCEDURALTYPE) or (Types[ValType].ResultType = 0) then 
+            Error('Function variable expected', '', -1); 
+
+          SaveStackTopToEDI;                          // Save call address
+          CompileActualParameters(Types[ValType].NumParams, Types[ValType].Param);
+          RestoreStackTopFromEDI;                     // Restore call address
+          GenerateIndirectCall;
+          RestoreStackTopFromEAX; 
+          
+          ValType := Types[ValType].ResultType;
+          end;  
+        end;
+        
+      CONSTANT:                                                                       // Constant
+        begin
+        ValType := Ident[IdentIndex].DataType;
+        if ValType = REALTYPE then
+          begin
+          FictitiousIntegerPtr := Pointer(@Ident[IdentIndex].FracValue);
+          PushConst(Integer(FictitiousIntegerPtr^));
+          end
+        else
+          PushConst(Ident[IdentIndex].Value);
+        NextTok;
+        end;
+        
+      USERTYPE:                                                                       // Type cast
+        begin                                                                      
+        NextTok;
+        EatTok(OPARTOK);
+        CompileExpression(ValType);
+        EatTok(CPARTOK);
+
+        if not (IsCastableType(Types[Ident[IdentIndex].DataType]) and 
+                IsCastableType(Types[ValType])) then
+          Error('Invalid typecast', '', -1);
+
+        ValType := Ident[IdentIndex].DataType;
         end
+        
       else
-        PushConst(Ident[IdentIndex].Value);
-      NextTok;
-      end
-    else                                                      // Type cast
-      begin
-      NextTok;
-      EatTok(OPARTOK);
-      CompileExpression(ValType);
-      EatTok(CPARTOK);
-
-      if not (IsCastableType(Types[Ident[IdentIndex].DataType]) and 
-              IsCastableType(Types[ValType])) then
-        Error('Invalid typecast', '', -1);
-
-      ValType := Ident[IdentIndex].DataType;
-      end;
-    end;
+        Error('Internal fault: Illegal identifier', '', -1);  
+      end; // case Ident[IdentIndex].Kind      
+    end;  
 
 
   ADDRESSTOK:
@@ -1017,6 +1041,9 @@ case Tok.Kind of
     
     if (Ident[IdentIndex].Kind = PROC) or (Ident[IdentIndex].Kind = FUNC) then
       begin
+      if (Ident[IdentIndex].PredefIndex <> 0) or (Ident[IdentIndex].Block <> 1) then
+        Error('Procedure or function cannot be predefined or nested', '', -1);
+        
       PushRelocConst(Ident[IdentIndex].Value, RELOCCODE); // To be resolved later when code section origin is known
       NextTok;
       end
@@ -1256,7 +1283,7 @@ case Tok.Kind of
     IdentIndex := GetIdent(Tok.Name);
     case Ident[IdentIndex].Kind of
 
-      VARIABLE, FUNC:                                                 // Variable or function result assignment
+      VARIABLE, FUNC:                                                 // Variable or function result assignment, or procedural variable call
         begin
         if Ident[IdentIndex].Kind = VARIABLE then
           CompileDesignator(DesignatorType)
@@ -1272,32 +1299,51 @@ case Tok.Kind of
           NextTok;
           end;    
 
-        EatTok(ASSIGNTOK);
-
-        TreatCharAsString := (Tok.Kind = CHARLITERALTOK) and (DesignatorType = STRINGTYPEINDEX);
-        if TreatCharAsString then
-          begin                                                       // Special case
-          PushVarPtr(Tok.StrAddress, GLOBAL, 0, RELOCNONE);
-          ExpressionType := STRINGTYPEINDEX;
-          NextTok;
-          end
-        else                                                          
-          CompileExpression(ExpressionType);                          // General rule - right-hand side expression
-
-        // Try to convert integer to real
-        if ConversionIsPossible(ExpressionType, DesignatorType) then
+        if Tok.Kind = ASSIGNTOK then                                    // Assignment
           begin
-          GenerateFloat(0);
-          ExpressionType := REALTYPEINDEX;
-          end;
+          NextTok;
+        
+          TreatCharAsString := (Tok.Kind = CHARLITERALTOK) and (DesignatorType = STRINGTYPEINDEX);
+          if TreatCharAsString then
+            begin                                                       // Special case
+            PushVarPtr(Tok.StrAddress, GLOBAL, 0, RELOCNONE);
+            ExpressionType := STRINGTYPEINDEX;
+            NextTok;
+            end
+          else                                                          
+            CompileExpression(ExpressionType);                          // General rule - right-hand side expression
 
-        DummyType := GetCompatibleType(DesignatorType, ExpressionType);
+          // Try to convert integer to real
+          if ConversionIsPossible(ExpressionType, DesignatorType) then
+            begin
+            GenerateFloat(0);
+            ExpressionType := REALTYPEINDEX;
+            end;
 
-        if IsStructuredType(Types[DesignatorType]) then
-          GenerateStructuredAssignment(DesignatorType)
-        else
-          GenerateAssignment(DesignatorType);
-        end;// VARIABLE
+          DummyType := GetCompatibleType(DesignatorType, ExpressionType);
+
+          if IsStructuredType(Types[DesignatorType]) then
+            GenerateStructuredAssignment(DesignatorType)
+          else
+            GenerateAssignment(DesignatorType);
+          end
+          
+        else                                                            // Procedural variable call                                                              
+          begin
+          CheckTok(OPARTOK);                                            // Parentheses required even for empty parameter list
+         
+          if (Types[DesignatorType].TypeKind <> PROCEDURALTYPE) or (Types[DesignatorType].ResultType <> 0) then 
+            Error('Procedure variable expected', '', -1);  
+
+          DerefPtr(DesignatorType);
+          SaveStackTopToEDI;                                            // Save call address
+          CompileActualParameters(Types[DesignatorType].NumParams, Types[DesignatorType].Param);
+          RestoreStackTopFromEDI;                                       // Restore call address
+          GenerateIndirectCall;
+          end;  
+  
+        end; // VARIABLE, FUNC
+        
 
       PROC:                                                           // Procedure call
         if Ident[IdentIndex].PredefIndex <> 0 then                    // Predefined procedure call
@@ -1316,9 +1362,11 @@ case Tok.Kind of
       Error('Expected statement but found ', Ident[IdentIndex].Name, -1);
     end// case Ident[IdentIndex].Kind
     end;
+    
 
   BEGINTOK:
     CompileCompoundStatement(LoopNesting);
+    
 
   IFTOK:
     begin
@@ -1340,6 +1388,7 @@ case Tok.Kind of
 
     GenerateIfElseEpilog;
     end;
+    
 
   CASETOK:
     begin
@@ -1397,7 +1446,8 @@ case Tok.Kind of
     EatTok(ENDTOK);
 
     GenerateCaseEpilog(NumCaseStatements);
-    end;  
+    end;
+  
 
   WHILETOK:
     begin
@@ -1420,6 +1470,7 @@ case Tok.Kind of
     GenerateWhileEpilog;
     GenerateBreakEpilog(LoopNesting + 1);
     end;
+    
 
   REPEATTOK:
     begin
@@ -1439,6 +1490,7 @@ case Tok.Kind of
     GenerateRepeatEpilog;
     GenerateBreakEpilog(LoopNesting + 1);
     end;
+    
 
   FORTOK:
     begin
@@ -1673,7 +1725,25 @@ procedure CompileType{(var DataType: Integer)};
   Types[DataType].Block := BlockStack[BlockStackTop];  
   end; // CompileSubrangeType
   
-
+  
+  
+  
+  procedure CompileProceduralType(var DataType: Integer; IsFunction: Boolean);
+  begin
+  Inc(NumTypes);
+  if NumTypes > MAXTYPES then
+    Error('Maximum number of types exceeded', '', -1);    
+  
+  Types[NumTypes].TypeKind := PROCEDURALTYPE;
+  Types[NumTypes].Block := BlockStack[BlockStackTop];
+  DataType := NumTypes;
+  
+  NextTok;
+  
+  CompileFormalParametersAndResult(IsFunction, Types[DataType].NumParams, Types[DataType].Param, Types[DataType].ResultType);  
+  end; // CompileProceduralType
+  
+  
 
 var
   IdentIndex: LongInt;
@@ -1697,7 +1767,9 @@ case Tok.Kind of
     begin 
     DataType := FILETYPEINDEX;
     NextTok;
-    end     
+    end;
+  PROCEDURETOK, FUNCTIONTOK:
+    CompileProceduralType(DataType, Tok.Kind = FUNCTIONTOK)     
 else                                                                              // Subrange or type name
   TypeNameGiven := FALSE;
   IdentIndex := 0;
@@ -1758,9 +1830,15 @@ var
   case Kind of
     PROC, FUNC:
       if PredefIndex = 0 then
-        Ident[NumIdent].Value := CodeSize                                 // Routine entry point address
+        begin
+        Ident[NumIdent].Value := CodeSize;                                // Routine entry point address
+        Ident[NumIdent].PredefIndex := 0;
+        end
       else
+        begin
+        Ident[NumIdent].Value := 0;
         Ident[NumIdent].PredefIndex := PredefIndex;                       // Predefined routine index
+        end;
 
     VARIABLE:
       case Scope of
@@ -2219,6 +2297,11 @@ var
   // Delete local types
   while (NumTypes > 0) and (Types[NumTypes].Block = BlockStack[BlockStackTop]) do
     begin
+    // If procedural type, delete parameters first
+    if Types[NumTypes].TypeKind = PROCEDURALTYPE then
+      for ParamIndex := 1 to Types[NumTypes].NumParams do
+        Dispose(Types[NumTypes].Param[ParamIndex]); 
+    
     // If record, delete fields first
     if Types[NumTypes].TypeKind = RECORDTYPE then
       for FieldIndex := 1 to Types[NumTypes].NumFields do
@@ -2278,7 +2361,8 @@ if (BlockStack[BlockStackTop] <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) the
 if BlockStack[BlockStackTop] = 1 then          // Main program
   begin
   GenerateProgramEpilog;
-  LibProcIdentIndex := GetIdent('EXITPROCESS');
+  LibProcIdentIndex := GetIdent('EXITPROCESS');  
+  PushConst(0);
   GenerateExternalCall(Ident[LibProcIdentIndex].Value, Ident[LibProcIdentIndex].NumParams, FALSE);
   end
 else

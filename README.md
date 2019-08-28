@@ -32,12 +32,12 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * Object-oriented programming is not supported
 * There are no units. Source file inclusion directives should be used instead 
 * There are no labels, `goto` and `with` statements
-* There are no unsigned integers, double-precision floating-point numbers, sets, enumerations, variant records
-* There are no procedural types, but pointers to procedures can be used for implementing Windows API callbacks
+* There are no unsigned integers, double-precision floating-point numbers, sets, enumerations, and variant records
 * Open array parameters do not have `High` and `Low` functions. Array length should be explicitly passed to a subroutine 
 * Strings are null-terminated arrays of characters (C style). String manipulation routines should be used instead of direct concatenation or comparison
 * The only file type is `Text`, which is equivalent to `file`. It can be used for both text and untyped files
 * Arrays, strings and records cannot be passed to subroutines by value or used as function results
+* Calls via procedural variables require parentheses even for empty parameter lists
 * The `external` directive is used for Windows API function declarations. It implies the `stdcall` calling convention
 * The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
 * Single-line comments (`//`) are supported (Delphi style)
@@ -65,8 +65,8 @@ ProcFuncDeclarations = ("procedure" | "function") Ident [FormalParams] [":" Type
 
 Directive = ("forward" | ("external" StringLiteral "name" StringLiteral)) ";" .         
 
-ActualParams = "(" (Expression | Designator) |
-              {"," (Expression | Designator)} ")" .
+ActualParams = "(" [ (Expression | Designator) |
+              {"," (Expression | Designator)} ] ")" .
 
 FormalParams = "(" FormalParamList {";" FormalParamList} ")" .
               
@@ -78,6 +78,7 @@ Type = "^" TypeIdent |
        "array" "[" Type {"," Type} "]" "of" Type |
        "record" IdentList ":" Type {";" IdentList ":" Type} [";"] "end" |
        ConstExpression ".." ConstExpression |
+       ("procedure" | "function") [FormalParams] [":" TypeIdent] 
        Ident .
        
 TypeIdent = "string" | "file" | Ident .       
@@ -85,7 +86,7 @@ TypeIdent = "string" | "file" | Ident .
 Designator = Ident {"^" | ("[" Expression {"," Expression} "]") | ("." Ident)} .
 
 Statement = [ (Designator | Ident) ":=" Expression | 
-              Ident [ActualParams] |
+              (Designator | Ident) [ActualParams] |
               CompoundStatement |
               "if" Expression "then" Statement ["else" Statement] |
               "case" Expression "of" CaseElement {";" CaseElement} 
@@ -111,7 +112,7 @@ SimpleExpression = ["+"|"-"] Term {("+"|"-"|"or"|"xor") Term}.
 
 Term = Factor {("*"|"/"|"div"|"mod"|"shl"|"shr"|"and") Factor}.
 
-Factor = Ident [ActualParams] |
+Factor = (Designator | Ident) [ActualParams] |
          Designator |
          "@" Designator | 
          Number | 

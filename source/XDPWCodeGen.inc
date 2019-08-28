@@ -289,12 +289,27 @@ end;
 
 
 
+procedure SaveStackTopToEDI;
+begin
+Gen($5F);                                                         // pop edi
+end;
+
+
+
+
+procedure RestoreStackTopFromEDI;
+begin
+Gen($57);                                                         // push edi
+end;
+
+
+
 
 procedure SaveFileHandle;
 begin
-Gen($5F);                                                   // pop edi
-Gen($58);                                                   // pop eax  ; pop and discard unnecessary stream handle, i.e. 0
-Gen($58);                                                   // pop eax  ; pop and discard unnecessary console handle, i.e. 0
+SaveStackTopToEDI;        // Pop file handle and save it to EDI
+SaveStackTopToEAX;        // Pop and discard unnecessary stream handle, i.e. 0
+SaveStackTopToEAX;        // Pop and discard unnecessary console handle, i.e. 0
 end;
 
 
@@ -302,7 +317,7 @@ end;
 
 procedure RestoreFileHandle;
 begin
-Gen($57);                                                   // push edi
+RestoreStackTopFromEDI;   // Push previously saved file handle 
 end;
 
 
@@ -659,7 +674,7 @@ Gen($5F);                                                               // pop e
 
 // Copy source to destination
 Gen($B9); GenDWord(TypeSize(DesignatorType));                           // mov ecx, TypeSize(DesignatorType)
-Gen($FC);                                                               // cld          ; increment si, di after each step
+Gen($FC);                                                               // cld          ; increment esi, edi after each step
 Gen($F3); Gen($A4);                                                     // rep movsb
 
 Gen($89); Gen($DF);                                                     // mov edi, ebx
@@ -698,6 +713,14 @@ CodePos := CodeSize;
 Gen($E8); GenDWord(EntryPoint - (CodePos + 5));                           // call EntryPoint
 end;
 
+
+
+
+procedure GenerateIndirectCall;
+begin
+Gen($58);                                                                 // pop eax
+Gen($FF); Gen($D0);                                                       // call eax
+end;
 
 
 

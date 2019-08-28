@@ -101,9 +101,10 @@ const
   ARRAYTYPE             = 10;
   RECORDTYPE            = 11;
   SUBRANGETYPE          = 12;
+  PROCEDURALTYPE        = 13;
   FORWARDTYPE           = 101;
 
-  // Type indices
+  // Predefined type indices
 
   ANYTYPEINDEX          = 1;      // Untyped parameter, or base type for untyped pointers
   INTEGERTYPEINDEX      = 2;
@@ -222,6 +223,11 @@ type
     // For records  
     NumFields: Integer;
     Field: array [1..MAXFIELDS] of ^TField;
+    
+    // For procedural types
+    NumParams: Integer;
+    Param: PParams;
+    ResultType: Integer;
     
     // For forward types
     TypeIdentName: TString;   
@@ -354,11 +360,17 @@ for i := 1 to NumIdent do
     for j := 1 to Ident[i].NumParams do
       Dispose(Ident[i].Param[j]);
 
-// Dispose dynamically allocated field data
+// Dispose dynamically allocated parameter and field data
 for i := 1 to NumTypes do
+  begin
+  if Types[i].TypeKind = PROCEDURALTYPE then
+    for j := 1 to Types[i].NumParams do
+      Dispose(Types[i].Param[j]);
+  
   if Types[i].TypeKind = RECORDTYPE then
     for j := 1 to Types[i].NumFields do
       Dispose(Types[i].Field[j]);
+  end;    
 end;
 
 
@@ -603,7 +615,7 @@ end;
 
 function IsCastableType(const T: TType): Boolean;
 begin
-Result := IsOrdinalType(T) or (T.TypeKind = FILETYPE) or (T.TypeKind = POINTERTYPE);
+Result := IsOrdinalType(T) or (T.TypeKind = FILETYPE) or (T.TypeKind = POINTERTYPE) or (T.TypeKind = PROCEDURALTYPE);
 end;
 
 
@@ -678,24 +690,25 @@ var
 begin
 Result := 0;
 case Types[DataType].TypeKind of
-  INTEGERTYPE:  Result := SizeOf(Integer);
-  SMALLINTTYPE: Result := SizeOf(SmallInt);
-  SHORTINTTYPE: Result := SizeOf(ShortInt);
-  CHARTYPE:     Result := SizeOf(Char);
-  BOOLEANTYPE:  Result := SizeOf(Boolean);
-  REALTYPE:     Result := SizeOf(Single);
-  POINTERTYPE:  Result := SizeOf(Pointer);
-  FILETYPE:     Result := SizeOf(Integer);
-  SUBRANGETYPE: Result := SizeOf(Integer);
-  ARRAYTYPE:    if Types[DataType].IsOpenArray then
-                  Error('Illegal type', '', -1)
-                else  
-                  Result := (HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1) * TypeSize(Types[DataType].BaseType);
-  RECORDTYPE:   begin
-                Result := 0;
-                for i := 1 to Types[DataType].NumFields do
-                  Result := Result + TypeSize(Types[DataType].Field[i]^.DataType);
-                end               
+  INTEGERTYPE:    Result := SizeOf(Integer);
+  SMALLINTTYPE:   Result := SizeOf(SmallInt);
+  SHORTINTTYPE:   Result := SizeOf(ShortInt);
+  CHARTYPE:       Result := SizeOf(Char);
+  BOOLEANTYPE:    Result := SizeOf(Boolean);
+  REALTYPE:       Result := SizeOf(Single);
+  POINTERTYPE:    Result := SizeOf(Pointer);
+  FILETYPE:       Result := SizeOf(Integer);
+  SUBRANGETYPE:   Result := SizeOf(Integer);
+  ARRAYTYPE:      if Types[DataType].IsOpenArray then
+                    Error('Illegal type', '', -1)
+                  else  
+                    Result := (HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1) * TypeSize(Types[DataType].BaseType);
+  RECORDTYPE:     begin
+                  Result := 0;
+                  for i := 1 to Types[DataType].NumFields do
+                    Result := Result + TypeSize(Types[DataType].Field[i]^.DataType);
+                  end;
+  PROCEDURALTYPE: Result := SizeOf(Pointer)               
 else
   Error('Illegal type', '', -1)
 end;// case
@@ -716,6 +729,11 @@ else                                         // Special cases
   if (Types[LeftType].TypeKind = POINTERTYPE) and (Types[RightType].TypeKind = POINTERTYPE) and
      ((Types[LeftType].BaseType = ANYTYPE) or (Types[RightType].BaseType = ANYTYPE)) then
     Result := LeftType;
+    
+  // Procedural types are compatible with any untyped pointers
+  if ((Types[LeftType].TypeKind = PROCEDURALTYPE) and (Types[RightType].TypeKind = POINTERTYPE) and (Types[RightType].BaseType = ANYTYPE)) or
+     ((Types[LeftType].TypeKind = POINTERTYPE) and (Types[LeftType].BaseType = ANYTYPE) and (Types[RightType].TypeKind = PROCEDURALTYPE)) then
+    Result := RightType;    
 
   // Subranges are compatible with their host types
   if Types[LeftType].TypeKind = SUBRANGETYPE then
@@ -772,14 +790,19 @@ if Types[DataType].TypeKind = SUBRANGETYPE then
   CheckOperator(Tok, Types[DataType].HostType)
 else 
   begin
-  if not IsOrdinalType(Types[DataType]) and (Types[DataType].TypeKind <> REALTYPE) and (Types[DataType].TypeKind <> POINTERTYPE) then
+  if not IsOrdinalType(Types[DataType]) and 
+    (Types[DataType].TypeKind <> REALTYPE) and 
+    (Types[DataType].TypeKind <> POINTERTYPE) and
+    (Types[DataType].TypeKind <> PROCEDURALTYPE) 
+  then
     Error('Operator is not applicable', '', -1);
    
   if (IsIntegerType(Types[DataType]) and not IsOperatorForIntegers(Tok)) or
     ((Types[DataType].TypeKind = REALTYPE) and not IsOperatorForReals(Tok)) or   
     ((Types[DataType].TypeKind = CHARTYPE) and not IsRelationOperator(Tok)) or
     ((Types[DataType].TypeKind = BOOLEANTYPE) and not IsOperatorForBooleans(Tok)) or
-    ((Types[DataType].TypeKind = POINTERTYPE) and not IsRelationOperator(Tok)) 
+    ((Types[DataType].TypeKind = POINTERTYPE) and not IsRelationOperator(Tok)) or
+    ((Types[DataType].TypeKind = PROCEDURALTYPE) and not IsRelationOperator(Tok)) 
   then
     Error('Operator is not applicable', '', -1);
   end;  
