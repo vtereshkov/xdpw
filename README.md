@@ -144,64 +144,64 @@ The compiler directly builds a Windows PE executable without using any external 
 #### Inlined procedures and functions
 The following identifiers are implemented as part of the compiler. Their names are not reserved words and can be locally redefined by the user.
 ```pascal
-procedure Inc(var x: Integer)
-procedure Dec(var x: Integer)
-procedure Read([F: Text;] var x1 {; var xi})
-procedure Write([F: Text;] x1 {; xi})
-procedure ReadLn([F: Text;] var x1 {; var xi})
-procedure WriteLn([F: Text;] x1 {; xi})
-procedure New(var P: Pointer)
-procedure Dispose(var P: Pointer)
-procedure Break
-procedure Continue
-procedure Exit
-procedure Halt[(const error: Integer)]
-function SizeOf(var x | T): Integer
-function Ord(x: T): Integer
-function Chr(x: Integer): Char
-function Pred(x: T): T
-function Succ(x: T): T
-function Round(x: Real): Integer 
-function Abs(x: T): T
-function Sqr(x: T): T
-function Sin(x: Real): Real  
-function Cos(x: Real): Real  
-function Arctan(x: Real): Real  
-function Exp(x: Real): Real
-function Ln(x: Real): Real
-function SqRt(x: Real): Real
+procedure Inc(var x: Integer);
+procedure Dec(var x: Integer);
+procedure Read([F: Text;] var x1 {; var xi});
+procedure Write([F: Text;] x1 {; xi});
+procedure ReadLn([F: Text;] var x1 {; var xi});
+procedure WriteLn([F: Text;] x1 {; xi});
+procedure New(var P: Pointer);
+procedure Dispose(var P: Pointer);
+procedure Break;
+procedure Continue;
+procedure Exit;
+procedure Halt[(const error: Integer)];
+function SizeOf(var x | T): Integer;
+function Ord(x: T): Integer;
+function Chr(x: Integer): Char;
+function Pred(x: T): T;
+function Succ(x: T): T;
+function Round(x: Real): Integer;
+function Abs(x: T): T;
+function Sqr(x: T): T;
+function Sin(x: Real): Real;  
+function Cos(x: Real): Real;  
+function Arctan(x: Real): Real;  
+function Exp(x: Real): Real;
+function Ln(x: Real): Real;
+function SqRt(x: Real): Real;
 ```
 
 ### System library
 ```pascal
-function Timer: Integer
-procedure Randomize
-function Random: Real
-function Min(x, y: Real): Real
-function IMin(x, y: Integer): Integer
-function Max(x, y: Real): Real
-function IMax(x, y: Integer): Integer
-procedure Rewrite(var F: file; const Name: string)
-procedure Reset(var F: file; const Name: string)
-procedure Close(var F: file)
-procedure BlockRead(var F: file; var Buf; Len: Integer; var LenRead: Integer)
-procedure BlockWrite(var F: file; var Buf; Len: Integer)
-procedure Seek(var F: file; Pos: Integer)
-function FileSize(var F: file): Integer
-function FilePos(var F: file): Integer
-function EOF(var F: file): Boolean
-function IOResult: Integer
-function Length(const s: string): Integer
-procedure AppendStr(var Dest: string; const Source: string)
-function CompareStr(const s1, s2: string): Integer
-procedure Move(const Source; var Dest; Count: Integer)
-procedure FillChar(var Data; Count: Integer; Value: Char)
-function ParseCmdLine(Index: Integer; var Str: string): Integer
-procedure Val(const s: string; var Number: Real; var Code: Integer)
-procedure Str(Number: Real; var s: string)
-procedure IVal(const s: string; var Number: Integer; var Code: Integer)
-procedure IStr(Number: Integer; var s: string)
-function UpCase(ch: Char): Char
+function Timer: Integer;
+procedure Randomize;
+function Random: Real;
+function Min(x, y: Real): Real;
+function IMin(x, y: Integer): Integer;
+function Max(x, y: Real): Real;
+function IMax(x, y: Integer): Integer;
+procedure Rewrite(var F: file; const Name: string);
+procedure Reset(var F: file; const Name: string);
+procedure Close(var F: file);
+procedure BlockRead(var F: file; var Buf; Len: Integer; var LenRead: Integer);
+procedure BlockWrite(var F: file; var Buf; Len: Integer);
+procedure Seek(var F: file; Pos: Integer);
+function FileSize(var F: file): Integer;
+function FilePos(var F: file): Integer;
+function EOF(var F: file): Boolean;
+function IOResult: Integer;
+function Length(const s: string): Integer;
+procedure AppendStr(var Dest: string; const Source: string);
+function CompareStr(const s1, s2: string): Integer;
+procedure Move(const Source; var Dest; Count: Integer);
+procedure FillChar(var Data; Count: Integer; Value: Char);
+function ParseCmdLine(Index: Integer; var Str: string): Integer;
+procedure Val(const s: string; var Number: Real; var Code: Integer);
+procedure Str(Number: Real; var s: string);
+procedure IVal(const s: string; var Number: Integer; var Code: Integer);
+procedure IStr(Number: Integer; var s: string);
+function UpCase(ch: Char): Char;
 ```
 
 ### Samples
