@@ -707,6 +707,14 @@ end;
 
 
 
+procedure SetLength(var s: string; NewLength: Integer);
+begin
+if NewLength >= 0 then s[NewLength] := #0;
+end;
+
+
+
+
 procedure AppendStr(var Dest: string; const Source: string);
 var
   i, j: Integer;

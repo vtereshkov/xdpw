@@ -27,33 +27,19 @@ type
   TOutFile = file;
   
 
+
+
+procedure CustomAppendStr(var s1: TString; const s2: TString);
+begin
+s1 := s1 + s2;
+end;
+
+
   
 
 procedure CustomAppendStrChar(var s: TString; ch: Char);
 begin
 s := s + ch;
-end;
-
-
-
-
-procedure CustomChangeExt(const InStr, Ext: TString; var OutStr: TString);
-var
-  i, DotPos: Integer;
-begin
-i := Length(InStr);
-DotPos := 0;
-
-while (i > 0) and (DotPos = 0) do
-  begin
-  if InStr[i] = '.' then DotPos := i;
-  Dec(i);
-  end;
-
-if DotPos > 0 then
-  OutStr := Copy(InStr, 1, DotPos) + Ext
-else
-  OutStr := InStr + Ext;
 end;
 
 

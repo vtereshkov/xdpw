@@ -10,7 +10,6 @@ const
   
   
 
-
 type
   TString  = string;
   TKeyName = string;
@@ -18,6 +17,14 @@ type
   TInFile = file;
   TOutFile = file;
   
+
+
+
+procedure CustomAppendStr(var s1: TString; const s2: TString);
+begin
+AppendStr(s1, s2);
+end;
+
 
 
   
@@ -28,30 +35,6 @@ begin
 Len := Length(s);
 s[Len] := ch;
 s[Len + 1] := #0;
-end;
-
-
-
-
-procedure CustomChangeExt(const InStr, Ext: TString; var OutStr: TString);
-var
-  i, DotPos: Integer;
-begin
-i := Length(InStr) - 1;
-DotPos := -1;
-
-while (i >= 0) and (DotPos = -1) do
-  begin
-  if InStr[i] = '.' then DotPos := i;
-  Dec(i);
-  end;
-
-OutStr := InStr;
-
-if DotPos >= 0 then
-  OutStr[DotPos + 1] := #0;
-  
-AppendStr(OutStr, Ext);
 end;
 
 

@@ -39,6 +39,27 @@ end;
 
 
 
+procedure ChangeExt(const InStr, Ext: TString; var OutStr: TString);
+var
+  i, DotPos: Integer;
+begin
+DotPos := -1;
+
+for i := STRINGFIRSTINDEX + Length(InStr) - 1 downto STRINGFIRSTINDEX do
+  if InStr[i] = '.' then
+    begin
+    DotPos := i;
+    Break;
+    end;
+
+OutStr := InStr;
+if DotPos >= 0 then SetLength(OutStr, DotPos - STRINGFIRSTINDEX + 1);  
+CustomAppendStr(OutStr, Ext);
+end;
+
+
+
+
 var
   ExeName: TString;
   OutFile: TOutFile;
@@ -73,7 +94,7 @@ Relocate(IMAGEBASE + Headers.CodeSectionHeader.VirtualAddress,
 
 
 // Write output file
-CustomChangeExt(ProgramName, 'exe', ExeName);
+ChangeExt(ProgramName, 'exe', ExeName);
 CustomRewrite(OutFile, ExeName);
 
 if IOResult <> 0 then
