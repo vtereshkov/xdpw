@@ -77,7 +77,11 @@ if ParamCount < 1 then
   Halt(1);
   end;  
   
-CustomParamStr(1, ProgramName);  
+CustomParamStr(1, ProgramName);
+
+
+// Compile
+WriteLn('Compiling ', ProgramName);
 
 FillKeywords; 
 IsConsoleProgram := 1;  // Console program by default  
