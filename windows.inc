@@ -40,7 +40,7 @@ type
   
   POINT = record 
     x: LongInt; 
-	  y: LongInt; 
+    y: LongInt; 
   end;
 
 
