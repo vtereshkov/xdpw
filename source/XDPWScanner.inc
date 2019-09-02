@@ -44,11 +44,9 @@ end;
 
 
 procedure FinalizeScanner;
-var
-  DummyIOResult: Integer;
 begin
 Close(InFile);
-DummyIOResult := IOResult;
+IOResult;
 end;
 
 

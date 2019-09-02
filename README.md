@@ -33,6 +33,7 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * There are no units. Source file inclusion directives should be used instead 
 * There are no labels, `goto` and `with` statements
 * There are no unsigned integers, double-precision floating-point numbers, sets, enumerations, and variant records
+* There are no typed constants
 * Open array parameters do not have `High` and `Low` functions. Array length should be explicitly passed to a subroutine 
 * Strings are null-terminated arrays of characters (C style). String manipulation routines should be used instead of direct concatenation or comparison
 * The only file type is `Text`, which is equivalent to `file`. It can be used for both text and untyped files
@@ -40,6 +41,7 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * Calls via procedural variables require parentheses even for empty parameter lists
 * The `external` directive is used for Windows API function declarations. It implies the `stdcall` calling convention
 * The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
+* Functions can be called like procedures (Delphi style)
 * Single-line comments (`//`) are supported (Delphi style)
 
 #### Formal grammar
@@ -88,17 +90,26 @@ Designator = Ident {"^" | ("[" Expression {"," Expression} "]") | ("." Ident)} .
 Statement = [ (Designator | Ident) ":=" Expression | 
               (Designator | Ident) [ActualParams] |
               CompoundStatement |
-              "if" Expression "then" Statement ["else" Statement] |
-              "case" Expression "of" CaseElement {";" CaseElement} 
-                    ["else" StatementList] [";"] "end" |
-              "while" Expression "do" Statement |
-              "repeat" StatementList "until" Expression | 
-              "for" Ident ":=" Expression ("to" | "downto") Expression "do"
-                    Statement ].
+              IfStatement |
+              CaseStatement |
+              WhileStatement |
+              RepeatStatement | 
+              ForStatement ] .
 
 StatementList = Statement {";" Statement} .
 
 CompoundStatement = "begin" StatementList "end" .
+
+IfStatement = "if" Expression "then" Statement ["else" Statement] .
+
+CaseStatement = "case" Expression "of" CaseElement {";" CaseElement} 
+                    ["else" StatementList] [";"] "end" .
+                    
+WhileStatement = "while" Expression "do" Statement .
+
+RepeatStatement = "repeat" StatementList "until" Expression .
+
+ForStatement = "for" Ident ":=" Expression ("to" | "downto") Expression "do" Statement.                    
  
 CaseElement = CaseLabel {"," CaseLabel} ":" Statement .
 

@@ -742,12 +742,10 @@ end;
 
 
 
-procedure GenerateExternalCall(EntryPoint: LongInt; NumParams: Integer; ReturnResult: Boolean);
+procedure GenerateExternalCall(EntryPoint: LongInt; NumParams: Integer);
 begin
 InverseStack(NumParams);
 Gen($FF); Gen($15); GenDWord(EntryPoint);                               // call ds:[EntryPoint]
-if ReturnResult then
-  Gen($50);                                                             // push eax
 end;
 
 

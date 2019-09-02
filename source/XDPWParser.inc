@@ -218,7 +218,7 @@ procedure CompileConstExpression{(var ConstVal: TConst; var ConstValType: Intege
 var
   OpTok: TToken;
   RightConstVal: TConst;
-  RightConstValType, DummyType: Integer;
+  RightConstValType: Integer;
   Yes: Boolean;
 
 begin
@@ -243,7 +243,7 @@ if IsRelationOperator(Tok) then
     RightConstValType := REALTYPEINDEX;
     end;
 
-  DummyType := GetCompatibleType(ConstValType, RightConstValType);
+  GetCompatibleType(ConstValType, RightConstValType);
   CheckOperator(OpTok, ConstValType);
 
   if Types[ConstValType].TypeKind = REALTYPE then
@@ -277,7 +277,7 @@ end;// CompileConstExpression
 
 procedure CompilePredefinedProc(proc: Byte; LoopNesting: Integer);
 var
-  DesignatorType, ExpressionType, DummyType: Integer;
+  DesignatorType, ExpressionType: Integer;
   LibProcIdentIndex: Integer;
   IsFirstParam, FileSpecified: Boolean;
 begin
@@ -289,7 +289,7 @@ case proc of
     EatTok(OPARTOK);
     AssertIdent;
     CompileDesignator(DesignatorType);
-    DummyType := GetCompatibleType(DesignatorType, INTEGERTYPEINDEX);
+    GetCompatibleType(DesignatorType, INTEGERTYPEINDEX);
     GenerateIncDec(proc, TypeSize(DesignatorType));
     EatTok(CPARTOK);
     end;
@@ -467,7 +467,7 @@ case proc of
     EatTok(OPARTOK);
     AssertIdent;
     CompileDesignator(DesignatorType);
-    DummyType := GetCompatibleType(DesignatorType, POINTERTYPEINDEX);
+    GetCompatibleType(DesignatorType, POINTERTYPEINDEX);
     
     if proc = NEWPROC then
       LibProcIdentIndex := GetIdent('GETMEM')
@@ -504,14 +504,14 @@ case proc of
       begin
       NextTok;
       CompileExpression(ExpressionType);
-      DummyType := GetCompatibleType(ExpressionType, INTEGERTYPEINDEX);
+      GetCompatibleType(ExpressionType, INTEGERTYPEINDEX);
       EatTok(CPARTOK);
       end
     else
       PushConst(0);
       
     LibProcIdentIndex := GetIdent('EXITPROCESS');
-    GenerateExternalCall(Ident[LibProcIdentIndex].Value, Ident[LibProcIdentIndex].NumParams, FALSE);
+    GenerateExternalCall(Ident[LibProcIdentIndex].Value, Ident[LibProcIdentIndex].NumParams);
     end;
 
 end;// case
@@ -524,7 +524,7 @@ end;// CompilePredefinedProc
 procedure CompilePredefinedFunc(func: Byte; var ValType: Integer);
 var
   IdentIndex: Integer;
-  DummyType: Integer;
+
 begin
 NextTok;
 EatTok(OPARTOK);
@@ -559,7 +559,7 @@ case func of
       ValType := REALTYPEINDEX;
       end;
 
-    DummyType := GetCompatibleType(ValType, REALTYPEINDEX);
+    GetCompatibleType(ValType, REALTYPEINDEX);
     GenerateRound(func = TRUNCFUNC);
     ValType := INTEGERTYPEINDEX;
     end;
@@ -575,7 +575,7 @@ case func of
   CHRFUNC:
     begin
     CompileExpression(ValType);
-    DummyType := GetCompatibleType(ValType, INTEGERTYPEINDEX);
+    GetCompatibleType(ValType, INTEGERTYPEINDEX);
     ValType := CHARTYPEINDEX;
     end;
 
@@ -610,7 +610,7 @@ case func of
         ValType := REALTYPEINDEX;
         end;
 
-      DummyType := GetCompatibleType(ValType, REALTYPEINDEX);
+      GetCompatibleType(ValType, REALTYPEINDEX);
       end;
 
     GenerateMathFunction(func, ValType);
@@ -662,7 +662,7 @@ else
 end; // case
 
 NextTok;
-end;
+end; // CompileTypeIdent
   
 
 
@@ -796,7 +796,7 @@ end; // CompileFormalParametersAndResult
 procedure CompileActualParameters(NumFormalParams: Integer; var FormalParam: PParams);
 var
   NumActualParams: Integer;
-  ActualParamType, DummyType: Integer;
+  ActualParamType: Integer;
   IsRefParam, TreatCharAsString: Boolean;
   CurParam: PParam;
 begin
@@ -863,7 +863,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
             Error('Incompatible types', '', -1);
         end
       else                // Relaxed type checking for parameters passed by value      
-        DummyType := GetCompatibleType(CurParam^.DataType, ActualParamType);
+        GetCompatibleType(CurParam^.DataType, ActualParamType);
         
     if Tok.Kind <> COMMATOK then Break;
     NextTok;
@@ -875,7 +875,37 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
 if NumActualParams < NumFormalParams then
   Error('Too few actual parameters', '', -1);
   
-end;// CompileActualParameters  
+end;// CompileActualParameters
+
+
+
+
+procedure CompileCall(IdentIndex: Integer);
+begin
+CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].Param);
+  
+if Ident[IdentIndex].IsExternal then
+  GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams)
+else 
+  GenerateCall(Ident[IdentIndex].Value, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
+end; // CompileCall
+
+
+
+
+procedure CompileIndirectCall(ProcVarType: Integer; FunctionOnly: Boolean);
+begin
+if (Types[ProcVarType].TypeKind <> PROCEDURALTYPE) or (FunctionOnly and (Types[ProcVarType].ResultType = 0)) then 
+  Error('Appropriate procedural variable expected', '', -1); 
+
+DerefPtr(ProcVarType);
+
+SaveStackTopToEDI;                          // Save call address
+CompileActualParameters(Types[ProcVarType].NumParams, Types[ProcVarType].Param);
+RestoreStackTopFromEDI;                     // Restore call address
+
+GenerateIndirectCall;
+end; // CompileIndirectCall  
 
 
 
@@ -883,7 +913,7 @@ end;// CompileActualParameters
 procedure CompileDesignator{(var ValType: Integer)};
 var
   IdentIndex, FieldIndex: Integer;
-  ArrayIndexType, DummyType: Integer;
+  ArrayIndexType: Integer;
   IsRefParam: Boolean;
 begin
 AssertIdent;
@@ -924,7 +954,7 @@ while (Tok.Kind = DEREFERENCETOK) or (Tok.Kind = OBRACKETTOK) or (Tok.Kind = PER
         Error('Array expected', '', -1);
       NextTok;
       CompileExpression(ArrayIndexType);                        // Array index
-      DummyType := GetCompatibleType(ArrayIndexType, Types[ValType].IndexType);
+      GetCompatibleType(ArrayIndexType, Types[ValType].IndexType);
       GetArrayElementPtr(ValType);
       ValType := Types[ValType].BaseType;
     until Tok.Kind <> COMMATOK;
@@ -967,38 +997,25 @@ case Tok.Kind of
         else                                                                          // User-defined function call
           begin
           NextTok;
-          CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].Param);
-          
-          if Ident[IdentIndex].IsExternal then
-            GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams, TRUE)
-          else
-            begin  
-            GenerateCall(Ident[IdentIndex].Value, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
-            RestoreStackTopFromEAX;
-            end;
-            
+          CompileCall(IdentIndex);
+          RestoreStackTopFromEAX;
           ValType := Ident[IdentIndex].DataType;
           end;
           
       VARIABLE:                                                                       // Designator
         begin
         CompileDesignator(ValType);
-        if not IsStructuredType(Types[ValType]) then  // Factors of type 'array' or 'record' should contain a pointer to them
-          DerefPtr(ValType);
-        
-        if Tok.Kind = OPARTOK then                    // Procedural variable call - parentheses required even for empty parameter list
+       
+        if Tok.Kind = OPARTOK then                     // Procedural variable call - parentheses required even for empty parameter list
           begin
-          if (Types[ValType].TypeKind <> PROCEDURALTYPE) or (Types[ValType].ResultType = 0) then 
-            Error('Function variable expected', '', -1); 
-
-          SaveStackTopToEDI;                          // Save call address
-          CompileActualParameters(Types[ValType].NumParams, Types[ValType].Param);
-          RestoreStackTopFromEDI;                     // Restore call address
-          GenerateIndirectCall;
-          RestoreStackTopFromEAX; 
-          
+          CompileIndirectCall(ValType, TRUE);
+          RestoreStackTopFromEAX;
           ValType := Types[ValType].ResultType;
-          end;  
+          end       
+        else                                           // Usual variable
+          if not IsStructuredType(Types[ValType]) then // Factors of type 'array' or 'record' should contain a pointer to them
+            DerefPtr(ValType);
+   
         end;
         
       CONSTANT:                                                                       // Constant
@@ -1213,7 +1230,7 @@ end;// CompileSimpleExpression
 procedure CompileExpression{(var ValType: Integer)};
 var
   OpTok: TToken;
-  RightValType, DummyType: Integer;
+  RightValType: Integer;
 begin
 CompileSimpleExpression(ValType);
 
@@ -1235,7 +1252,7 @@ if IsRelationOperator(Tok) then
     RightValType := REALTYPEINDEX;
     end;
 
-  DummyType := GetCompatibleType(ValType, RightValType);
+  GetCompatibleType(ValType, RightValType);
   CheckOperator(OpTok, ValType);
   ValType := BOOLEANTYPEINDEX;
   GenerateRelation(OpTok.Kind, RightValType);
@@ -1270,280 +1287,338 @@ end; // CompileCompoundStatement
 
 
 procedure CompileStatement{(LoopNesting: Integer)};
-var
-  IdentIndex, ResultIdentIndex, NumCaseStatements: Integer;
-  ConstVal, ConstVal2: TConst;
-  ExpressionType, DesignatorType, ConstValType, SelectorType, DummyType: Integer;
-  Down, TreatCharAsString: Boolean;
-begin
 
+
+
+  procedure CompileAssignment(DesignatorType: Integer);
+  var
+    ExpressionType: Integer;
+    TreatCharAsString: Boolean;
+    
+  begin
+  NextTok;
+
+  TreatCharAsString := (Tok.Kind = CHARLITERALTOK) and (DesignatorType = STRINGTYPEINDEX);
+  if TreatCharAsString then
+    begin                                                       // Special case
+    PushVarPtr(Tok.StrAddress, GLOBAL, 0, RELOCNONE);
+    ExpressionType := STRINGTYPEINDEX;
+    NextTok;
+    end
+  else                                                          
+    CompileExpression(ExpressionType);                          // General rule: right-hand side expression
+
+  // Try to convert integer to real
+  if ConversionIsPossible(ExpressionType, DesignatorType) then
+    begin
+    GenerateFloat(0);
+    ExpressionType := REALTYPEINDEX;
+    end;
+
+  GetCompatibleType(DesignatorType, ExpressionType);
+
+  if IsStructuredType(Types[DesignatorType]) then
+    GenerateStructuredAssignment(DesignatorType)
+  else
+    GenerateAssignment(DesignatorType);
+  
+  end; // CompileAssignment
+  
+
+  
+  
+  procedure CompileIfStatement(LoopNesting: Integer);
+  var
+    ExpressionType: Integer;
+    
+  begin
+  NextTok;
+  
+  CompileExpression(ExpressionType);
+  GetCompatibleType(ExpressionType, BOOLEANTYPEINDEX);
+  
+  EatTok(THENTOK);
+
+  GenerateIfCondition;              // Satisfied if expression is not zero
+  GenerateIfProlog;
+  CompileStatement(LoopNesting);
+
+  if Tok.Kind = ELSETOK then
+    begin
+    NextTok;
+    GenerateElseProlog;                 
+    CompileStatement(LoopNesting);
+    end;
+
+  GenerateIfElseEpilog;
+  end; // CompileIfStatement  
+
+
+
+  
+  procedure CompileCaseStatement(LoopNesting: Integer);
+  var
+    SelectorType, ConstValType: Integer;
+    NumCaseStatements: Integer;
+    ConstVal, ConstVal2: TConst;
+    
+  begin
+  NextTok;
+  
+  CompileExpression(SelectorType);
+  if not IsOrdinalType(Types[SelectorType]) then
+    Error('Ordinal variable expected as CASE selector', '', -1);
+  
+  EatTok(OFTOK);
+
+  GenerateCaseProlog;  
+
+  NumCaseStatements := 0;
+
+  repeat       // Loop over all cases
+
+    repeat     // Loop over all constants for the current case
+      CompileConstExpression(ConstVal, ConstValType);
+      GetCompatibleType(ConstValType, SelectorType);
+
+      if Tok.Kind = RANGETOK then                                      // Range check
+        begin
+        NextTok;
+        CompileConstExpression(ConstVal2, ConstValType);
+        GetCompatibleType(ConstValType, SelectorType);
+        GenerateCaseRangeCheck(ConstVal.Value, ConstVal2.Value);
+        end
+      else
+        GenerateCaseEqualityCheck(ConstVal.Value);                     // Equality check
+
+      if Tok.Kind <> COMMATOK then Break;
+      NextTok;
+    until FALSE;
+
+    EatTok(COLONTOK);
+
+    GenerateCaseStatementProlog;
+    CompileStatement(LoopNesting);
+    GenerateCaseStatementEpilog;
+
+    Inc(NumCaseStatements);
+
+    if Tok.Kind <> SEMICOLONTOK then
+      begin
+      if Tok.Kind = ELSETOK then              // Default statements
+        begin
+        NextTok;
+        CompileStatementList(LoopNesting);
+        end;          
+      Break;
+      end;
+
+    NextTok;
+  until Tok.Kind = ENDTOK;
+
+  EatTok(ENDTOK);
+
+  GenerateCaseEpilog(NumCaseStatements);
+  end; // CompileCaseStatement
+  
+  
+  
+  
+  procedure CompileWhileStatement(LoopNesting: Integer);
+  var
+    ExpressionType: Integer;
+    
+  begin
+  Inc(CodePosStackTop);
+  CodePosStack[CodePosStackTop] := CodeSize;      // Save return address used by GenerateWhileEpilog
+
+  NextTok;
+  CompileExpression(ExpressionType);
+  GetCompatibleType(ExpressionType, BOOLEANTYPEINDEX);
+  
+  EatTok(DOTOK);
+
+  GenerateBreakProlog(LoopNesting);
+  GenerateContinueProlog(LoopNesting);
+  GenerateWhileCondition;                         // Satisfied if expression is not zero
+  GenerateWhileProlog;
+  
+  CompileStatement(LoopNesting);
+  
+  GenerateContinueEpilog(LoopNesting);
+  GenerateWhileEpilog;
+  GenerateBreakEpilog(LoopNesting);
+  end; // CompileWhileStatement
+  
+  
+  
+  
+  procedure CompileRepeatStatement(LoopNesting: Integer);
+  var
+    ExpressionType: Integer;
+    
+  begin
+  GenerateBreakProlog(LoopNesting);
+  GenerateContinueProlog(LoopNesting);
+  GenerateRepeatProlog;
+
+  NextTok;
+  CompileStatementList(LoopNesting);
+
+  EatTok(UNTILTOK);
+  
+  GenerateContinueEpilog(LoopNesting);
+
+  CompileExpression(ExpressionType);
+  GetCompatibleType(ExpressionType, BOOLEANTYPEINDEX);
+  
+  GenerateRepeatCondition;
+  GenerateRepeatEpilog;
+  GenerateBreakEpilog(LoopNesting);
+  end; // CompileRepeatStatement
+  
+  
+  
+  
+  procedure CompileForStatement(LoopNesting: Integer);
+  var
+    IdentIndex: Integer;
+    ExpressionType: Integer;
+    Down: Boolean;
+      
+  begin
+  NextTok;
+  
+  AssertIdent;
+  IdentIndex := GetIdent(Tok.Name);
+
+  if (Ident[IdentIndex].Kind <> VARIABLE) or
+    ((Ident[IdentIndex].NestingLevel <> 1) and (Ident[IdentIndex].NestingLevel <> BlockStackTop)) or
+     (Ident[IdentIndex].PassMethod <> VALPASSING) then
+    Error('Simple local variable expected as FOR loop counter', '', -1);
+
+  if not IsOrdinalType(Types[Ident[IdentIndex].DataType]) then
+    Error('Ordinal variable expected as FOR loop counter', '', -1);
+
+  PushVarPtr(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, 0, RELOCDATA);
+
+  NextTok;
+  EatTok(ASSIGNTOK);
+  
+  CompileExpression(ExpressionType);
+  GetCompatibleType(ExpressionType, Ident[IdentIndex].DataType);
+
+  if not ((Tok.Kind = TOTOK) or (Tok.Kind = DOWNTOTOK)) then
+    Error('Expected TO or DOWNTO but found ', '', Tok.Kind);
+
+  Down := Tok.Kind = DOWNTOTOK;
+
+  NextTok;
+  CompileExpression(ExpressionType);
+  GetCompatibleType(ExpressionType, Ident[IdentIndex].DataType);
+
+  SaveStackTopToEDX;                                        // Save final value of the counter
+  GenerateAssignment(Ident[IdentIndex].DataType);           // Assign initial value to the counter
+  RestoreStackTopFromEDX;                                   // Restore final value of the counter
+
+  Inc(CodePosStackTop);
+  CodePosStack[CodePosStackTop] := CodeSize;                // Save return address used by GenerateForEpilog
+
+  GenerateForCondition(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, TypeSize(Ident[IdentIndex].DataType), Down);  // Satisfied if counter does not reach the second expression value
+
+  EatTok(DOTOK);
+  
+  GenerateBreakProlog(LoopNesting);
+  GenerateContinueProlog(LoopNesting);
+  GenerateForProlog;
+  
+  CompileStatement(LoopNesting);    
+  
+  GenerateContinueEpilog(LoopNesting);
+  GenerateForEpilog(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, TypeSize(Ident[IdentIndex].DataType), Down);
+  GenerateBreakEpilog(LoopNesting);
+  
+  SaveStackTopToEDX;                                        // Pop and discard final value of the counter
+  end; // CompileForStatement
+
+
+  
+var
+  IdentIndex, ResultIdentIndex: Integer;
+  DesignatorType: Integer;
+
+  
+begin // CompileStatement
 case Tok.Kind of
+
   IDENTTOK:
     begin
     IdentIndex := GetIdent(Tok.Name);
     case Ident[IdentIndex].Kind of
 
-      VARIABLE, FUNC:                                                 // Variable or function result assignment, or procedural variable call
+      VARIABLE:                                                         // Assignment or procedural variable call
         begin
-        if Ident[IdentIndex].Kind = VARIABLE then
-          CompileDesignator(DesignatorType)
-        else
-          begin
-          if Ident[IdentIndex].ProcAsBlock <> BlockStack[BlockStackTop] then
-            Error('Expected current function name but found ', Ident[IdentIndex].Name, -1);
-
-          ResultIdentIndex := GetIdent('RESULT');
-          PushVarPtr(Ident[ResultIdentIndex].Value, LOCAL, 0, RELOCDATA);
-          DesignatorType := Ident[ResultIdentIndex].DataType;
-
-          NextTok;
-          end;    
+        CompileDesignator(DesignatorType);
 
         if Tok.Kind = ASSIGNTOK then                                    // Assignment
-          begin
-          NextTok;
-        
-          TreatCharAsString := (Tok.Kind = CHARLITERALTOK) and (DesignatorType = STRINGTYPEINDEX);
-          if TreatCharAsString then
-            begin                                                       // Special case
-            PushVarPtr(Tok.StrAddress, GLOBAL, 0, RELOCNONE);
-            ExpressionType := STRINGTYPEINDEX;
-            NextTok;
-            end
-          else                                                          
-            CompileExpression(ExpressionType);                          // General rule - right-hand side expression
-
-          // Try to convert integer to real
-          if ConversionIsPossible(ExpressionType, DesignatorType) then
-            begin
-            GenerateFloat(0);
-            ExpressionType := REALTYPEINDEX;
-            end;
-
-          DummyType := GetCompatibleType(DesignatorType, ExpressionType);
-
-          if IsStructuredType(Types[DesignatorType]) then
-            GenerateStructuredAssignment(DesignatorType)
-          else
-            GenerateAssignment(DesignatorType);
-          end
-          
+          CompileAssignment(DesignatorType)
         else                                                            // Procedural variable call                                                              
           begin
-          CheckTok(OPARTOK);                                            // Parentheses required even for empty parameter list
-         
-          if (Types[DesignatorType].TypeKind <> PROCEDURALTYPE) or (Types[DesignatorType].ResultType <> 0) then 
-            Error('Procedure variable expected', '', -1);  
-
-          DerefPtr(DesignatorType);
-          SaveStackTopToEDI;                                            // Save call address
-          CompileActualParameters(Types[DesignatorType].NumParams, Types[DesignatorType].Param);
-          RestoreStackTopFromEDI;                                       // Restore call address
-          GenerateIndirectCall;
+          CheckTok(OPARTOK);                                            // Parentheses required even for empty parameter list         
+          CompileIndirectCall(DesignatorType, FALSE);
           end;  
   
-        end; // VARIABLE, FUNC
-        
+        end; // VARIABLE        
 
-      PROC:                                                           // Procedure call
-        if Ident[IdentIndex].PredefIndex <> 0 then                    // Predefined procedure call
+      PROC, FUNC:                                                     // Procedure or function call (returned result discarded)
+        if Ident[IdentIndex].PredefIndex <> 0 then                    // Predefined procedure
+          begin
+          if Ident[IdentIndex].Kind <> PROC then
+            Error('Expected procedure but found predefined function ', Ident[IdentIndex].Name, -1);            
           CompilePredefinedProc(Ident[IdentIndex].PredefIndex, LoopNesting)
-        else                                                          // User-defined procedure call
+          end
+        else                                                          // User-defined procedure or function
           begin
           NextTok;
-          CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].Param);
           
-          if Ident[IdentIndex].IsExternal then
-            GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams, FALSE)
-          else  
-            GenerateCall(Ident[IdentIndex].Value, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
-          end// PROC
+          if Tok.Kind = ASSIGNTOK then                                // Special case: assignment to a function name
+            begin
+            if (Ident[IdentIndex].Kind <> FUNC) or (Ident[IdentIndex].ProcAsBlock <> BlockStack[BlockStackTop]) then
+              Error('Expected current function name but found ', Ident[IdentIndex].Name, -1);
+
+            ResultIdentIndex := GetIdent('RESULT');
+            PushVarPtr(Ident[ResultIdentIndex].Value, LOCAL, 0, RELOCDATA);
+            DesignatorType := Ident[ResultIdentIndex].DataType;
+
+            CompileAssignment(DesignatorType);
+            end
+          else                                                        // General rule: procedure or function call  
+            CompileCall(IdentIndex);
+            
+          end  
+            
     else
       Error('Expected statement but found ', Ident[IdentIndex].Name, -1);
-    end// case Ident[IdentIndex].Kind
-    end;
-    
+    end // case Ident[IdentIndex].Kind
+    end;    
 
   BEGINTOK:
-    CompileCompoundStatement(LoopNesting);
-    
+    CompileCompoundStatement(LoopNesting);    
 
   IFTOK:
-    begin
-    NextTok;
-    CompileExpression(ExpressionType);
-    DummyType := GetCompatibleType(ExpressionType, BOOLEANTYPEINDEX);
-    EatTok(THENTOK);
-
-    GenerateIfCondition;              // Satisfied if expression is not zero
-    GenerateIfProlog;
-    CompileStatement(LoopNesting);
-
-    if Tok.Kind = ELSETOK then
-      begin
-      NextTok;
-      GenerateElseProlog;                 
-      CompileStatement(LoopNesting);
-      end;
-
-    GenerateIfElseEpilog;
-    end;
-    
+    CompileIfStatement(LoopNesting);    
 
   CASETOK:
-    begin
-    NextTok;
-    CompileExpression(SelectorType);
-    if not IsOrdinalType(Types[SelectorType]) then
-      Error('Ordinal variable expected as CASE selector', '', -1);
-    EatTok(OFTOK);
-
-    GenerateCaseProlog;  
-
-    NumCaseStatements := 0;
-
-    repeat       // Loop over all cases
-
-      repeat     // Loop over all constants for the current case
-        CompileConstExpression(ConstVal, ConstValType);
-        DummyType := GetCompatibleType(ConstValType, SelectorType);
-
-        if Tok.Kind = RANGETOK then                                      // Range check
-          begin
-          NextTok;
-          CompileConstExpression(ConstVal2, ConstValType);
-          DummyType := GetCompatibleType(ConstValType, SelectorType);
-          GenerateCaseRangeCheck(ConstVal.Value, ConstVal2.Value);
-          end
-        else
-          GenerateCaseEqualityCheck(ConstVal.Value);                     // Equality check
-
-        if Tok.Kind <> COMMATOK then Break;
-        NextTok;
-      until FALSE;
-
-      EatTok(COLONTOK);
-
-      GenerateCaseStatementProlog;
-      CompileStatement(LoopNesting);
-      GenerateCaseStatementEpilog;
-
-      Inc(NumCaseStatements);
-
-      if Tok.Kind <> SEMICOLONTOK then
-        begin
-        if Tok.Kind = ELSETOK then              // Default statements
-          begin
-          NextTok;
-          CompileStatementList(LoopNesting);
-          end;          
-        Break;
-        end;
-
-      NextTok;
-    until Tok.Kind = ENDTOK;
-
-    EatTok(ENDTOK);
-
-    GenerateCaseEpilog(NumCaseStatements);
-    end;
-  
+    CompileCaseStatement(LoopNesting);  
 
   WHILETOK:
-    begin
-    Inc(CodePosStackTop);
-    CodePosStack[CodePosStackTop] := CodeSize;      // Save return address used by GenerateWhileEpilog
-
-    NextTok;
-    CompileExpression(ExpressionType);
-    DummyType := GetCompatibleType(ExpressionType, BOOLEANTYPEINDEX);
-    EatTok(DOTOK);
-
-    GenerateBreakProlog(LoopNesting + 1);
-    GenerateContinueProlog(LoopNesting + 1);
-    GenerateWhileCondition;                         // Satisfied if expression is not zero
-    GenerateWhileProlog;
-    
-    CompileStatement(LoopNesting + 1);
-    
-    GenerateContinueEpilog(LoopNesting + 1);
-    GenerateWhileEpilog;
-    GenerateBreakEpilog(LoopNesting + 1);
-    end;
-    
+    CompileWhileStatement(LoopNesting + 1);
 
   REPEATTOK:
-    begin
-    GenerateBreakProlog(LoopNesting + 1);
-    GenerateContinueProlog(LoopNesting + 1);
-    GenerateRepeatProlog;
-
-    NextTok;
-    CompileStatementList(LoopNesting + 1);
-
-    EatTok(UNTILTOK);
-    GenerateContinueEpilog(LoopNesting + 1);
-
-    CompileExpression(ExpressionType);
-    DummyType := GetCompatibleType(ExpressionType, BOOLEANTYPEINDEX);
-    GenerateRepeatCondition;
-    GenerateRepeatEpilog;
-    GenerateBreakEpilog(LoopNesting + 1);
-    end;
-    
+    CompileRepeatStatement(LoopNesting + 1);    
 
   FORTOK:
-    begin
-    NextTok;
-    AssertIdent;
-    IdentIndex := GetIdent(Tok.Name);
-
-    if (Ident[IdentIndex].Kind <> VARIABLE) or
-      ((Ident[IdentIndex].NestingLevel <> 1) and (Ident[IdentIndex].NestingLevel <> BlockStackTop)) or
-       (Ident[IdentIndex].PassMethod <> VALPASSING) then
-      Error('Simple local variable expected as FOR loop counter', '', -1);
-
-    if not IsOrdinalType(Types[Ident[IdentIndex].DataType]) then
-      Error('Ordinal variable expected as FOR loop counter', '', -1);
-
-    PushVarPtr(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, 0, RELOCDATA);
-
-    NextTok;
-    EatTok(ASSIGNTOK);
-    CompileExpression(ExpressionType);
-    DummyType := GetCompatibleType(ExpressionType, Ident[IdentIndex].DataType);
-
-    if not ((Tok.Kind = TOTOK) or (Tok.Kind = DOWNTOTOK)) then
-      Error('Expected TO or DOWNTO but found ', '', Tok.Kind);
-
-    Down := Tok.Kind = DOWNTOTOK;
-
-    NextTok;
-    CompileExpression(ExpressionType);
-    DummyType := GetCompatibleType(ExpressionType, Ident[IdentIndex].DataType);
-
-    SaveStackTopToEDX;                                        // Save final value of the counter
-    GenerateAssignment(Ident[IdentIndex].DataType);           // Assign initial value to the counter
-    RestoreStackTopFromEDX;                                   // Restore final value of the counter
-
-    Inc(CodePosStackTop);
-    CodePosStack[CodePosStackTop] := CodeSize;                // Save return address used by GenerateForEpilog
-
-    GenerateForCondition(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, TypeSize(Ident[IdentIndex].DataType), Down);  // Satisfied if counter does not reach the second expression value
-
-    EatTok(DOTOK);
-    
-    GenerateBreakProlog(LoopNesting + 1);
-    GenerateContinueProlog(LoopNesting + 1);
-    GenerateForProlog;
-    
-    CompileStatement(LoopNesting + 1);    
-    
-    GenerateContinueEpilog(LoopNesting + 1);
-    GenerateForEpilog(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, TypeSize(Ident[IdentIndex].DataType), Down);
-    GenerateBreakEpilog(LoopNesting + 1);
-    SaveStackTopToEDX;                                        // Pop and discard final value of the counter
-    end;
+    CompileForStatement(LoopNesting + 1);
 
 end;// case
 
@@ -1694,7 +1769,7 @@ procedure CompileType{(var DataType: Integer)};
   procedure CompileSubrangeType(var DataType: Integer);
   var
     ConstVal: TConst;
-    LowBoundType, HighBoundType, DummyType: Integer;
+    LowBoundType, HighBoundType: Integer;
   begin
   // Add new anonymous type
   Inc(NumTypes);
@@ -1716,7 +1791,7 @@ procedure CompileType{(var DataType: Integer)};
     Error('Ordinal type expected', '', -1);
   Types[DataType].High := ConstVal.Value;
 
-  DummyType := GetCompatibleType(LowBoundType, HighBoundType);
+  GetCompatibleType(LowBoundType, HighBoundType);
 
   if Types[DataType].High < Types[DataType].Low then
     Error('Illegal subrange bounds', '', -1);
@@ -2363,7 +2438,7 @@ if BlockStack[BlockStackTop] = 1 then          // Main program
   GenerateProgramEpilog;
   LibProcIdentIndex := GetIdent('EXITPROCESS');  
   PushConst(0);
-  GenerateExternalCall(Ident[LibProcIdentIndex].Value, Ident[LibProcIdentIndex].NumParams, FALSE);
+  GenerateExternalCall(Ident[LibProcIdentIndex].Value, Ident[LibProcIdentIndex].NumParams);
   end
 else
   begin

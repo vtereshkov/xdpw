@@ -81,7 +81,6 @@ var
   wc: WNDCLASSA;
   hInstance, hWnd: LongInt;
   message: MSG;
-  res: Integer;
   ClassName: string; 
 
  
@@ -104,7 +103,7 @@ wc.hbrBackground := 0;
 wc.lpszMenuName  := nil;
 wc.lpszClassName := @ClassName;  
 
-res := RegisterClassA(wc);
+RegisterClassA(wc);
 
 hWnd := CreateWindowExA(0,                      // optional styles
                         ClassName,              // class
@@ -119,12 +118,12 @@ hWnd := CreateWindowExA(0,                      // optional styles
                         hInstance,              // handle
                         nil);                   // additional application data                       
 
-res := ShowWindow(hWnd, SW_SHOWDEFAULT);
+ShowWindow(hWnd, SW_SHOWDEFAULT);
 
 while GetMessageA(message, 0, 0, 0) <> 0 do
   begin 
-  res := TranslateMessage(message);
-  res := DispatchMessageA(message);
+  TranslateMessage(message);
+  DispatchMessageA(message);
   end;
 
 end.

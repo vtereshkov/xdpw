@@ -41,10 +41,8 @@ end;
 
 
 procedure CustomParamStr(Index: Integer; var Str: TString);
-var
-  Count: Integer;
 begin  
-Count := ParseCmdLine(Index, Str);
+ParseCmdLine(Index, Str);
 end;
 
 

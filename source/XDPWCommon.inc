@@ -497,6 +497,7 @@ for FieldIndex := 1 to Types[RecType].NumFields do
     Exit;
     end;
 
+Result := 0;
 Error('Unknown field: ', S, -1);
 end;      
 
