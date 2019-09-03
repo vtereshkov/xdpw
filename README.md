@@ -3,7 +3,7 @@
 # XD Pascal Compiler for Windows
 
 ## Summary
-XD Pascal is a small educational self-hosting compiler for a subset of the Pascal language. The software is in the public domain. It comes with absolutely no warranty. Any comments, suggestions, or bug reports are appreciated. Feel free to contact the author on GitHub or by e-mail VTereshkov@mail.ru. Enjoy.
+XD Pascal is a small educational self-hosting compiler for a subset of the Pascal language. Any comments, suggestions, or bug reports are appreciated. Feel free to contact the author on GitHub or by e-mail VTereshkov@mail.ru. Enjoy.
 
 ### Features
 * Recursive descent parsing
