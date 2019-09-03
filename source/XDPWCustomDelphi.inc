@@ -1,7 +1,7 @@
 // XD Pascal - a 32-bit compiler for Windows
 // Developed by Vasiliy Tereshkov, 2009-2010, 2019
 
-// Wrapper for Delphi build
+// Wrapper for Delphi/Free Pascal build
 
 
 {$APPTYPE CONSOLE}

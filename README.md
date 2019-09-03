@@ -41,7 +41,7 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * Calls via procedural variables require parentheses even for empty parameter lists
 * The `external` directive is used for Windows API function declarations. It implies the `stdcall` calling convention
 * The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
-* Functions can be called like procedures (Delphi style)
+* Functions can be called as procedures (Delphi style)
 * Single-line comments (`//`) are supported (Delphi style)
 
 #### Formal grammar

@@ -289,35 +289,9 @@ end;
 
 
 
-procedure SaveStackTopToEDI;
+procedure DuplicateStackTop;
 begin
-Gen($5F);                                                         // pop edi
-end;
-
-
-
-
-procedure RestoreStackTopFromEDI;
-begin
-Gen($57);                                                         // push edi
-end;
-
-
-
-
-procedure SaveFileHandle;
-begin
-SaveStackTopToEDI;        // Pop file handle and save it to EDI
-SaveStackTopToEAX;        // Pop and discard unnecessary stream handle, i.e. 0
-SaveStackTopToEAX;        // Pop and discard unnecessary console handle, i.e. 0
-end;
-
-
-
-
-procedure RestoreFileHandle;
-begin
-RestoreStackTopFromEDI;   // Push previously saved file handle 
+Gen($FF); Gen($34); Gen($24);                                     // push dword ptr [esp]
 end;
 
 
@@ -716,10 +690,10 @@ end;
 
 
 
-procedure GenerateIndirectCall;
+procedure GenerateIndirectCall(NumParam: Integer);
 begin
-Gen($58);                                                                 // pop eax
-Gen($FF); Gen($D0);                                                       // call eax
+Gen($FF); Gen($94); Gen($24); GenDWord(SizeOf(LongInt) * NumParam);       // call dword ptr [esp + 4 * NumParam]
+Gen($59);                                                                 // pop ecx  ; pop and discard call address
 end;
 
 

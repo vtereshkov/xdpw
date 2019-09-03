@@ -305,7 +305,7 @@ case proc of
       repeat
         // 1st argument - file handle
         if FileSpecified then
-          RestoreFileHandle
+          DuplicateStackTop
         else
           PushConst(0);                  // Console handle
 
@@ -321,7 +321,6 @@ case proc of
             Error('Incompatible types', '', -1);
           FileSpecified := TRUE;
           DerefPtr(DesignatorType);
-          SaveFileHandle;
           end
         else                                                        // Any output expression
           begin
@@ -368,7 +367,7 @@ case proc of
       
       // 1st argument - file handle
       if FileSpecified then
-        RestoreFileHandle
+        DuplicateStackTop
       else
         PushConst(0);   // Console handle
         
@@ -377,6 +376,14 @@ case proc of
 
       GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
       end;
+      
+    // Remove first 3 arguments if they correspond to a file variable 
+    if FileSpecified then
+      begin
+      SaveStackTopToEAX;
+      SaveStackTopToEAX;
+      SaveStackTopToEAX;
+      end;      
 
     end;// READPROC, READLNPROC
 
@@ -392,7 +399,7 @@ case proc of
       repeat
         // 1st argument - file handle
         if FileSpecified then
-          RestoreFileHandle
+          DuplicateStackTop
         else
           PushConst(0);                  // Console handle
 
@@ -407,7 +414,6 @@ case proc of
           if not IsFirstParam then
             Error('Incompatible types', '', -1);
           FileSpecified := TRUE;
-          SaveFileHandle;
           end
         else                                                        // Any output expression
           begin
@@ -450,7 +456,7 @@ case proc of
       
       // 1st argument - file handle
       if FileSpecified then
-        RestoreFileHandle
+        DuplicateStackTop
       else
         PushConst(0);   // Console handle
         
@@ -460,6 +466,14 @@ case proc of
       GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
       end;
 
+    // Remove first 3 arguments if they correspond to a file variable 
+    if FileSpecified then
+      begin
+      SaveStackTopToEAX;
+      SaveStackTopToEAX;
+      SaveStackTopToEAX;
+      end;
+    
     end;// WRITEPROC, WRITELNPROC
 
   NEWPROC, DISPOSEPROC:
@@ -900,11 +914,9 @@ if (Types[ProcVarType].TypeKind <> PROCEDURALTYPE) or (FunctionOnly and (Types[P
 
 DerefPtr(ProcVarType);
 
-SaveStackTopToEDI;                          // Save call address
 CompileActualParameters(Types[ProcVarType].NumParams, Types[ProcVarType].Param);
-RestoreStackTopFromEDI;                     // Restore call address
 
-GenerateIndirectCall;
+GenerateIndirectCall(Types[ProcVarType].NumParams);
 end; // CompileIndirectCall  
 
 
