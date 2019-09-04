@@ -8,12 +8,12 @@
 program XDPW;
 
 
-{$I XDPWCustom.inc}
-{$I XDPWCommon.inc}
-{$I XDPWScanner.inc}
-{$I XDPWCodeGen.inc}
-{$I XDPWLinker.inc}
-{$I XDPWParser.inc}
+{$I Custom.inc}
+{$I Common.inc}
+{$I Scanner.inc}
+{$I CodeGen.inc}
+{$I Linker.inc}
+{$I Parser.inc}
 
 
 
