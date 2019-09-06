@@ -746,6 +746,30 @@ end;
 
 
 
+function CompareStrChar(const s: string; ch: Char): Integer;
+var
+  s2: string;
+begin
+s2[0] := ch;  
+s2[1] := #0;
+Result := CompareStr(s, s2);
+end;
+
+
+
+
+function CompareCharStr(ch: Char; const s: string): Integer;
+var
+  s1: string;
+begin
+s1[0] := ch;  
+s1[1] := #0;
+Result := CompareStr(s1, s);
+end;
+
+
+
+
 procedure Move(const Source; var Dest; Count: Integer);
 var
   S, D: ^string;

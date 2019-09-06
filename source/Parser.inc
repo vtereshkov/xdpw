@@ -1267,9 +1267,17 @@ if IsRelationOperator(Tok) then
     end;
     
   // Special case: string comparison
-  if (ValType = STRINGTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then
+  if (ValType = STRINGTYPEINDEX) or (RightValType = STRINGTYPEINDEX) then
     begin
-    LibProcIdentIndex := GetIdent('COMPARESTR');
+    if (ValType = CHARTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then
+      LibProcIdentIndex := GetIdent('COMPARECHARSTR')
+    else if (ValType = STRINGTYPEINDEX) and (RightValType = CHARTYPEINDEX) then
+      LibProcIdentIndex := GetIdent('COMPARESTRCHAR')
+    else if (ValType = STRINGTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then 
+      LibProcIdentIndex := GetIdent('COMPARESTR')
+    else
+      Error('Incompatible types', '', -1);  
+      
     GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
     RestoreStackTopFromEAX;
     ValType := Ident[LibProcIdentIndex].DataType;
