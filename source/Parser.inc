@@ -1243,6 +1243,8 @@ procedure CompileExpression{(var ValType: Integer)};
 var
   OpTok: TToken;
   RightValType: Integer;
+  LibProcIdentIndex: Integer;
+  
 begin
 CompileSimpleExpression(ValType);
 
@@ -1263,6 +1265,18 @@ if IsRelationOperator(Tok) then
     GenerateFloat(0);
     RightValType := REALTYPEINDEX;
     end;
+    
+  // Special case: string comparison
+  if (ValType = STRINGTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then
+    begin
+    LibProcIdentIndex := GetIdent('COMPARESTR');
+    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
+    RestoreStackTopFromEAX;
+    ValType := Ident[LibProcIdentIndex].DataType;
+    
+    PushConst(0);
+    RightValType := INTEGERTYPEINDEX;
+    end;  
 
   GetCompatibleType(ValType, RightValType);
   CheckOperator(OpTok, ValType);
@@ -1714,7 +1728,7 @@ procedure CompileType{(var DataType: Integer)};
       i: Integer;
     begin
     for i := 1 to Types[RecType].NumFields do
-      if CompareStr(Types[RecType].Field[i]^.Name, Name) = 0 then
+      if Types[RecType].Field[i]^.Name = Name then
         Error('Duplicate field', '', -1);
 
     // Add new field
@@ -2119,7 +2133,7 @@ var
     // Check if this type was forward-referenced
     for TypeIndex := 1 to NumTypes do
       if (Types[TypeIndex].TypeKind = FORWARDTYPE) and
-         (CompareStr(Types[TypeIndex].TypeIdentName, NameTok.Name) = 0) and
+         (Types[TypeIndex].TypeIdentName = NameTok.Name) and
          (Types[TypeIndex].Block = BlockStack[BlockStackTop]) then
         begin
         // Forward type reference resolution
@@ -2185,7 +2199,7 @@ var
       ImportLibName, ImportFuncName: TString;
       
     begin
-    if (CompareStr(Tok.Name, 'EXTERNAL') = 0) then      // External (Windows API) declaration  
+    if Tok.Name = 'EXTERNAL' then      // External (Windows API) declaration  
       begin
       if BlockStackTop <> 1 then
         Error('External declaration must be global', '', -1);
@@ -2196,7 +2210,7 @@ var
       EatTok(STRINGLITERALTOK);      
       
       // Read import function name
-      if (Tok.Kind <> IDENTTOK) or (CompareStr(Tok.Name, 'NAME') <> 0) then
+      if (Tok.Kind <> IDENTTOK) or (Tok.Name <> 'NAME') then
         Error('Expected NAME but found ', '', Tok.Kind);
       NextTok;
       ImportFuncName := Tok.Name;
@@ -2206,7 +2220,7 @@ var
       Ident[NumIdent].IsExternal := TRUE;
       Ident[NumIdent].Value := AddImportFunc(ImportLibName, ImportFuncName);
       end
-    else if (CompareStr(Tok.Name, 'FORWARD') = 0) then  // Forward declaration
+    else if Tok.Name = 'FORWARD' then  // Forward declaration
       begin
       Inc(NumBlocks);
       if NumBlocks > MAXBLOCKS then

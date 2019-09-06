@@ -10,10 +10,6 @@
 
 
 
-uses SysUtils;
-
-
-
 const
   STRINGFIRSTINDEX = 1;
 

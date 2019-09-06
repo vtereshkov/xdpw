@@ -190,9 +190,9 @@ case UpCase(ch) of
       ReadChar(ch);
       end;
       
-    if CompareStr(Text, 'CONSOLE') = 0 then
+    if Text = 'CONSOLE' then
       IsConsoleProgram := 1
-    else if CompareStr(Text, 'GUI') = 0 then
+    else if Text = 'GUI' then
       IsConsoleProgram := 0
     else
       Error('Unknown application type', '', -1);

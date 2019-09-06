@@ -35,7 +35,7 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * There are no unsigned integers, double-precision floating-point numbers, sets, enumerations, and variant records
 * There are no typed constants
 * Open array parameters do not have `High` and `Low` functions. Array length should be explicitly passed to a subroutine 
-* Strings are null-terminated arrays of characters (C style). String manipulation routines should be used instead of direct concatenation or comparison
+* Strings are null-terminated arrays of characters (C style). Concatenation is only possible with `AppendStr`
 * The only file type is `Text`, which is equivalent to `file`. It can be used for both text and untyped files
 * Arrays, strings and records cannot be passed to subroutines without `const` or `var`, or used as function results
 * Calls via procedural variables require parentheses even for empty parameter lists

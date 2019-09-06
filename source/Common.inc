@@ -444,11 +444,11 @@ Max := NUMKEYWORDS;
 
 repeat
   Mid := (Min + Max) div 2;
-  if CompareStr(S, Keyword[Mid]) > 0 then
+  if S > Keyword[Mid] then
     Min := Mid + 1
   else
     Max := Mid - 1;
-  Found := CompareStr(S, Keyword[Mid]) = 0;
+  Found := S = Keyword[Mid];
 until Found or (Min > Max);
 
 if Found then Result := NUMDELIMITERS + Mid;
@@ -464,7 +464,7 @@ var
 begin
 for BlockStackIndex := BlockStackTop downto 1 do
   for IdentIndex := NumIdent downto 1 do
-    if (CompareStr(Ident[IdentIndex].Name, S) = 0) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex]) then 
+    if (Ident[IdentIndex].Name = S) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex]) then 
       begin
       Result := IdentIndex;
       Exit;
@@ -491,7 +491,7 @@ var
   FieldIndex: Integer;
 begin
 for FieldIndex := 1 to Types[RecType].NumFields do
-  if CompareStr(Types[RecType].Field[FieldIndex]^.Name, S) = 0 then
+  if Types[RecType].Field[FieldIndex]^.Name = S then
     begin
     Result := FieldIndex;
     Exit;
