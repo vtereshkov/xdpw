@@ -130,7 +130,6 @@ type
 var
   Headers: THeaders;  
   ImportSection: TImportSection; 
-  NumImports: Integer;   
   
     
 

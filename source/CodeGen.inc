@@ -1067,7 +1067,7 @@ end;
 
 
 
-procedure GenerateTempStringStorageProlog;
+procedure GenerateTempStorageProlog;
 begin
 Inc(CodePosStackTop);
 CodePosStack[CodePosStackTop] := CodeSize;
@@ -1083,14 +1083,14 @@ end;
 
 
 
-procedure GenerateTempStringStorageEpilog(TotalTempStringSize: Integer);
+procedure GenerateTempStorageEpilog(TotalTempStorageSize: Integer);
 var
   CodePos: Integer;
 begin
 CodePos := CodePosStack[CodePosStackTop];
 Dec(CodePosStackTop);
 
-GenAt(CodePos, $81); GenAt(CodePos + 1, $EC); GenDWordAt(CodePos + 2, TotalTempStringSize);      // sub esp, TotalTempStringSize
+GenAt(CodePos, $81); GenAt(CodePos + 1, $EC); GenDWordAt(CodePos + 2, TotalTempStorageSize);      // sub esp, TotalTempStorageSize
 end;
 
 

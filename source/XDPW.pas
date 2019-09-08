@@ -17,30 +17,6 @@ program XDPW;
 
 
 
-
-procedure ZeroAll;
-begin
-NumIdent              := 0; 
-NumTypes              := 0; 
-NumImports            := 0; 
-NumBlocks             := 0; 
-BlockStackTop         := 0; 
-NumRelocs             := 0;
-NumTempStrings        := 0;
-ForLoopNesting        := 0;
-CodeSize              := 0; 
-CodePosStackTop       := 0;
-NumStaticStrChars     := 0;
-GlobalDataSize        := 0;
-CurBlockLocalDataSize := 0;
-ProgramEntryPoint     := 0;
-
-FillChar(ImportSection, SizeOf(ImportSection), #0);
-end;
-
-
-
-
 procedure ChangeExt(const InStr, Ext: TString; var OutStr: TString);
 var
   i, DotPos: Integer;
@@ -85,11 +61,16 @@ CustomParamStr(1, ProgramName);
 // Compile
 WriteLn('Compiling ', ProgramName);
 
-FillKeywords; 
+FillKeywords;
+FillOperatorSets;
+FillTypeSets;
+ 
 IsConsoleProgram := 1;  // Console program by default  
 DataSectionOrigin := IMAGEBASE + Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(SizeOf(TImportSection), SECTIONALIGNMENT);
 
 ZeroAll;
+FillChar(ImportSection, SizeOf(ImportSection), #0);
+
 InitializeScanner;
 CompileProgram;
 FinalizeScanner;

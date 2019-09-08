@@ -40,7 +40,9 @@ type
     Index: Integer;
   end;
 
-  PStream = ^TStream;  
+  PStream = ^TStream;
+
+  TSetStorage = array [0..255] of Boolean;  
   
 
 
@@ -963,6 +965,88 @@ if (ch >= 'a') and (ch <= 'z') then
   Result := Chr(Ord(ch) - Ord('a') + Ord('A'))
 else
   Result := ch;
+end; 
+
+
+
+
+// Set manipulation routines
+
+
+procedure InitSet(var SetStorage: TSetStorage);
+begin
+FillChar(SetStorage, SizeOf(SetStorage), #0);
+end;
+
+
+
+
+procedure AddToSet(var SetStorage: TSetStorage; FromVal, ToVal: Integer);
+var
+  i: Integer;
+begin
+SetStorage[FromVal] := TRUE;
+if ToVal > FromVal then
+  for i := FromVal + 1 to ToVal do
+    SetStorage[i] := TRUE;
+end;
+
+
+
+
+function InSet(Element: Integer; var SetStorage: TSetStorage): Boolean;
+var
+  i: Integer;
+begin
+Result := SetStorage[Element];  
+end;
+
+
+
+
+procedure SetUnion(const SetStorage1, SetStorage2: TSetStorage; var SetStorage: TSetStorage);
+var
+  i: Integer;
+begin
+for i := 0 to SizeOf(SetStorage) - 1 do
+  SetStorage[i] := SetStorage1[i] or SetStorage2[i];
+end;
+
+
+
+
+procedure SetDifference(const SetStorage1, SetStorage2: TSetStorage; var SetStorage: TSetStorage);
+var
+  i: Integer;
+begin
+for i := 0 to SizeOf(SetStorage) - 1 do
+  SetStorage[i] := SetStorage1[i] and not SetStorage2[i];
+end; 
+
+
+
+
+procedure SetIntersection(const SetStorage1, SetStorage2: TSetStorage; var SetStorage: TSetStorage);
+var
+  i: Integer;
+begin
+for i := 0 to SizeOf(SetStorage) - 1 do
+  SetStorage[i] := SetStorage1[i] and SetStorage2[i];
+end; 
+
+
+
+
+function CompareSets(const SetStorage1, SetStorage2: TSetStorage): Integer;
+var
+  i: Integer;
+begin
+Result := 0;
+for i := 0 to SizeOf(SetStorage1) - 1 do
+  if SetStorage1[i] <> SetStorage2[i] then
+    begin
+    Result := 1;
+    Exit;
+    end;
 end;  
-
-
+ 

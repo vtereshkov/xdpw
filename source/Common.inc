@@ -10,7 +10,7 @@ const
   VERSIONMINOR          = 9;
   
   NUMDELIMITERS         = 22;
-  NUMKEYWORDS           = 33;
+  NUMKEYWORDS           = 35;
 
   // Standard token codes
 
@@ -51,25 +51,27 @@ const
   FORTOK                = NUMDELIMITERS + 12;
   FUNCTIONTOK           = NUMDELIMITERS + 13;
   IFTOK                 = NUMDELIMITERS + 14;
-  MODTOK                = NUMDELIMITERS + 15;
-  NILTOK                = NUMDELIMITERS + 16;
-  NOTTOK                = NUMDELIMITERS + 17;
-  OFTOK                 = NUMDELIMITERS + 18;
-  ORTOK                 = NUMDELIMITERS + 19;
-  PROCEDURETOK          = NUMDELIMITERS + 20;
-  PROGRAMTOK            = NUMDELIMITERS + 21;
-  RECORDTOK             = NUMDELIMITERS + 22;
-  REPEATTOK             = NUMDELIMITERS + 23;
-  SHLTOK                = NUMDELIMITERS + 24;
-  SHRTOK                = NUMDELIMITERS + 25;
-  STRINGTOK             = NUMDELIMITERS + 26;
-  THENTOK               = NUMDELIMITERS + 27;
-  TOTOK                 = NUMDELIMITERS + 28;
-  TYPETOK               = NUMDELIMITERS + 29;
-  UNTILTOK              = NUMDELIMITERS + 30;
-  VARTOK                = NUMDELIMITERS + 31;
-  WHILETOK              = NUMDELIMITERS + 32;
-  XORTOK                = NUMDELIMITERS + 33;
+  INTOK                 = NUMDELIMITERS + 15;
+  MODTOK                = NUMDELIMITERS + 16;
+  NILTOK                = NUMDELIMITERS + 17;
+  NOTTOK                = NUMDELIMITERS + 18;
+  OFTOK                 = NUMDELIMITERS + 19;
+  ORTOK                 = NUMDELIMITERS + 20;
+  PROCEDURETOK          = NUMDELIMITERS + 21;
+  PROGRAMTOK            = NUMDELIMITERS + 22;
+  RECORDTOK             = NUMDELIMITERS + 23;
+  REPEATTOK             = NUMDELIMITERS + 24;
+  SETTOK                = NUMDELIMITERS + 25;
+  SHLTOK                = NUMDELIMITERS + 26;
+  SHRTOK                = NUMDELIMITERS + 27;
+  STRINGTOK             = NUMDELIMITERS + 28;
+  THENTOK               = NUMDELIMITERS + 29;
+  TOTOK                 = NUMDELIMITERS + 30;
+  TYPETOK               = NUMDELIMITERS + 31;
+  UNTILTOK              = NUMDELIMITERS + 32;
+  VARTOK                = NUMDELIMITERS + 33;
+  WHILETOK              = NUMDELIMITERS + 34;
+  XORTOK                = NUMDELIMITERS + 35;
 
   // Non-standard token codes
 
@@ -100,8 +102,9 @@ const
   FILETYPE              = 9;
   ARRAYTYPE             = 10;
   RECORDTYPE            = 11;
-  SUBRANGETYPE          = 12;
-  PROCEDURALTYPE        = 13;
+  SETTYPE               = 12;
+  SUBRANGETYPE          = 13;
+  PROCEDURALTYPE        = 14;
   FORWARDTYPE           = 101;
 
   // Predefined type indices
@@ -151,6 +154,7 @@ const
   // Compiler parameters
              
   MAXSTRLENGTH          = 80;
+  MAXSETELEMENTS        = 256;
   MAXIDENTS             = 1000;
   MAXTYPES              = 1000;
   MAXBLOCKS             = 1000;
@@ -216,7 +220,7 @@ type
     HostType: Integer;
     Low, High: Integer;    
     
-    // For pointers and arrays 
+    // For pointers, arrays and sets 
     BaseType, IndexType: Integer;
     IsOpenArray: Boolean;
       
@@ -298,9 +302,13 @@ var
   ExitCall: TBreakContinueExitCallList;
 
   Tok: TToken;
+  
+  MultiplicativeOperators, AdditiveOperators, UnaryOperators, RelationOperators,
+  OperatorsForIntegers, OperatorsForReals, OperatorsForBooleans,
+  IntegerTypes, OrdinalTypes, NumericTypes, StructuredTypes, CastableTypes: set of Byte;
 
-  NumIdent, NumTypes, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, NumTempStrings, ForLoopNesting,
-  CodeSize, CodePosStackTop, GlobalDataSize, CurBlockLocalDataSize,
+  NumIdent, NumTypes, NumImports, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, ForLoopNesting,
+  CodeSize, CodePosStackTop, GlobalDataSize, CurBlockLocalDataSize, CurBlockTempStorageSize,
   DataSectionOrigin, ProgramEntryPoint,
   UnitStackTop, Line: Integer;
   
@@ -308,6 +316,28 @@ var
   
   InFile: TInFile;
   
+
+
+
+procedure ZeroAll;
+begin
+NumIdent                := 0; 
+NumTypes                := 0; 
+NumImports              := 0; 
+NumBlocks               := 0; 
+BlockStackTop           := 0; 
+NumRelocs               := 0;
+ForLoopNesting          := 0;
+CodeSize                := 0; 
+CodePosStackTop         := 0;
+NumStaticStrChars       := 0;
+GlobalDataSize          := 0;
+CurBlockLocalDataSize   := 0;
+CurBlockTempStorageSize := 0;
+ProgramEntryPoint       := 0;
+end;
+
+
 
   
 procedure FillKeywords;
@@ -326,26 +356,55 @@ Keyword[11] := 'FILE';
 Keyword[12] := 'FOR';
 Keyword[13] := 'FUNCTION';
 Keyword[14] := 'IF';
-Keyword[15] := 'MOD';
-Keyword[16] := 'NIL';
-Keyword[17] := 'NOT';
-Keyword[18] := 'OF';
-Keyword[19] := 'OR';
-Keyword[20] := 'PROCEDURE';
-Keyword[21] := 'PROGRAM';
-Keyword[22] := 'RECORD';
-Keyword[23] := 'REPEAT';
-Keyword[24] := 'SHL';
-Keyword[25] := 'SHR';
-Keyword[26] := 'STRING';
-Keyword[27] := 'THEN';
-Keyword[28] := 'TO';
-Keyword[29] := 'TYPE';
-Keyword[30] := 'UNTIL';
-Keyword[31] := 'VAR';
-Keyword[32] := 'WHILE';
-Keyword[33] := 'XOR';
+Keyword[15] := 'IN';
+Keyword[16] := 'MOD';
+Keyword[17] := 'NIL';
+Keyword[18] := 'NOT';
+Keyword[19] := 'OF';
+Keyword[20] := 'OR';
+Keyword[21] := 'PROCEDURE';
+Keyword[22] := 'PROGRAM';
+Keyword[23] := 'RECORD';
+Keyword[24] := 'REPEAT';
+Keyword[25] := 'SET';
+Keyword[26] := 'SHL';
+Keyword[27] := 'SHR';
+Keyword[28] := 'STRING';
+Keyword[29] := 'THEN';
+Keyword[30] := 'TO';
+Keyword[31] := 'TYPE';
+Keyword[32] := 'UNTIL';
+Keyword[33] := 'VAR';
+Keyword[34] := 'WHILE';
+Keyword[35] := 'XOR';
 end;  
+
+
+
+
+procedure FillOperatorSets;
+begin
+MultiplicativeOperators := [MULTOK, DIVTOK, IDIVTOK, MODTOK, SHLTOK, SHRTOK, ANDTOK];
+AdditiveOperators       := [PLUSTOK, MINUSTOK, ORTOK, XORTOK];
+UnaryOperators          := [PLUSTOK, MINUSTOK];
+RelationOperators       := [EQTOK, NETOK, LTTOK, LETOK, GTTOK, GETOK];
+
+OperatorsForIntegers    := MultiplicativeOperators - [DIVTOK] + AdditiveOperators + RelationOperators + [NOTTOK];
+OperatorsForReals       := [MULTOK, DIVTOK, PLUSTOK, MINUSTOK] + RelationOperators;
+OperatorsForBooleans    := [ANDTOK, ORTOK, XORTOK, NOTTOK] + RelationOperators;
+end;
+
+
+
+
+procedure FillTypeSets;
+begin
+IntegerTypes     := [INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE];
+OrdinalTypes     := IntegerTypes + [CHARTYPE, BOOLEANTYPE, SUBRANGETYPE];
+NumericTypes     := IntegerTypes + [REALTYPE];
+StructuredTypes  := [ARRAYTYPE, RECORDTYPE, SETTYPE];
+CastableTypes    := OrdinalTypes + [FILETYPE, POINTERTYPE, PROCEDURALTYPE];
+end; 
 
 
 
@@ -372,7 +431,6 @@ for i := 1 to NumTypes do
       Dispose(Types[i].Field[j]);
   end;    
 end;
-
 
 
 
@@ -504,125 +562,6 @@ end;
 
 
 
-function IsMultiplicativeOperator(const Tok: TToken): Boolean;
-begin
-Result := (Tok.Kind = MULTOK) or 
-          (Tok.Kind = DIVTOK) or (Tok.Kind = IDIVTOK) or (Tok.Kind = MODTOK) or 
-          (Tok.Kind = SHLTOK) or (Tok.Kind = SHRTOK) or
-          (Tok.Kind = ANDTOK);
-end;
-
-
-
-          
-
-function IsAdditiveOperator(const Tok: TToken): Boolean;
-begin
-Result := (Tok.Kind = PLUSTOK) or (Tok.Kind = MINUSTOK) or
-          (Tok.Kind = ORTOK) or (Tok.Kind = XORTOK);
-end;
-
-
-
-
-
-function IsUnaryOperator(const Tok: TToken): Boolean;
-begin
-Result := (Tok.Kind = PLUSTOK) or (Tok.Kind = MINUSTOK);
-end;  
-
-
-
-
-
-function IsRelationOperator(const Tok: TToken): Boolean;
-begin
-Result := (Tok.Kind = EQTOK) or (Tok.Kind = NETOK) or 
-          (Tok.Kind = LTTOK) or (Tok.Kind = LETOK) or 
-          (Tok.Kind = GTTOK) or (Tok.Kind = GETOK);
-end;
-
-
-
-
-
-function IsOperatorForIntegers(const Tok: TToken): Boolean;
-begin
-Result := (IsMultiplicativeOperator(Tok) and (Tok.Kind <> DIVTOK)) or
-           IsAdditiveOperator(Tok) or
-           IsRelationOperator(Tok) or
-           (Tok.Kind = NOTTOK);
-end;
-
-
-
-
-           
-function IsOperatorForReals(const Tok: TToken): Boolean;
-begin
-Result := (Tok.Kind = MULTOK) or (Tok.Kind = DIVTOK) or
-          (Tok.Kind = PLUSTOK) or (Tok.Kind = MINUSTOK) or
-          IsRelationOperator(Tok);
-end;
-
-
-
-
-
-function IsOperatorForBooleans(const Tok: TToken): Boolean;
-begin
-Result := (Tok.Kind = ANDTOK) or (Tok.Kind = ORTOK) or (Tok.Kind = XORTOK) or (Tok.Kind = NOTTOK) or
-          IsRelationOperator(Tok);
-end;
-
-
-
-
-function IsIntegerType(const T: TType): Boolean;
-begin
-Result := (T.TypeKind = INTEGERTYPE) or (T.TypeKind = SMALLINTTYPE) or (T.TypeKind = SHORTINTTYPE);
-end;
-
-
-
-
-
-function IsOrdinalType(const T: TType): Boolean;
-begin
-Result := IsIntegerType(T) or (T.TypeKind = CHARTYPE) or (T.TypeKind = BOOLEANTYPE) or (T.TypeKind = SUBRANGETYPE);
-end;
-
-
-
-
-
-function IsNumericType(const T: TType): Boolean;
-begin
-Result := IsIntegerType(T) or (T.TypeKind = REALTYPE);
-end;
-
-
-
-
-
-function IsStructuredType(const T: TType): Boolean;
-begin
-Result := (T.TypeKind = ARRAYTYPE) or (T.TypeKind = RECORDTYPE);
-end;
-
-
-
-
-
-function IsCastableType(const T: TType): Boolean;
-begin
-Result := IsOrdinalType(T) or (T.TypeKind = FILETYPE) or (T.TypeKind = POINTERTYPE) or (T.TypeKind = PROCEDURALTYPE);
-end;
-
-
-
-
-
 procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
 var
   i: Integer;
@@ -646,7 +585,6 @@ end;
 
 
 
-
 function LowBound(DataType: Integer): Integer;
 begin
 Result := 0;
@@ -661,7 +599,6 @@ else
   Error('Ordinal type expected', '', -1)
 end;// case
 end;
-
                         
 
 
@@ -680,7 +617,6 @@ else
   Error('Ordinal type expected', '', -1)
 end;// case
 end;
-
 
 
 
@@ -709,6 +645,7 @@ case Types[DataType].TypeKind of
                   for i := 1 to Types[DataType].NumFields do
                     Result := Result + TypeSize(Types[DataType].Field[i]^.DataType);
                   end;
+  SETTYPE:        Result := MAXSETELEMENTS;                
   PROCEDURALTYPE: Result := SizeOf(Pointer)               
 else
   Error('Illegal type', '', -1)
@@ -726,6 +663,13 @@ if LeftType = RightType then                 // General rule
   Result := LeftType
 else                                         // Special cases
   begin
+  // Sets are compatible with other sets having a compatible base type
+  if (Types[LeftType].TypeKind = SETTYPE) and (Types[RightType].TypeKind = SETTYPE) then
+    begin
+    GetCompatibleType(Types[LeftType].BaseType, Types[RightType].BaseType);
+    Result := LeftType;
+    end;
+    
   // Untyped pointers are compatible with any other pointers
   if (Types[LeftType].TypeKind = POINTERTYPE) and (Types[RightType].TypeKind = POINTERTYPE) and
      ((Types[LeftType].BaseType = ANYTYPE) or (Types[RightType].BaseType = ANYTYPE)) then
@@ -743,7 +687,7 @@ else                                         // Special cases
     Result := GetCompatibleType(LeftType, Types[RightType].HostType);
 
   // Integers
-  if IsIntegerType(Types[LeftType]) and IsIntegerType(Types[RightType]) then
+  if (Types[LeftType].TypeKind in IntegerTypes) and (Types[RightType].TypeKind in IntegerTypes) then
     Result := LeftType;
 
   // Booleans
@@ -768,10 +712,9 @@ function ConversionIsPossible(SrcType, DestType: Integer): Boolean;
 begin
 // Implicit type conversion is possible if DestType is real and SrcType is integer or a subrange of integer
 Result := (Types[DestType].TypeKind = REALTYPE) and
-          (IsIntegerType(Types[SrcType]) or
-           ((Types[SrcType].TypeKind = SUBRANGETYPE) and IsIntegerType(Types[Types[SrcType].HostType])));
+          ((Types[SrcType].TypeKind in IntegerTypes) or
+           ((Types[SrcType].TypeKind = SUBRANGETYPE) and (Types[Types[SrcType].HostType].TypeKind in IntegerTypes)));
 end;
-
 
 
 
@@ -791,19 +734,19 @@ if Types[DataType].TypeKind = SUBRANGETYPE then
   CheckOperator(Tok, Types[DataType].HostType)
 else 
   begin
-  if not IsOrdinalType(Types[DataType]) and 
+  if not (Types[DataType].TypeKind in OrdinalTypes) and 
     (Types[DataType].TypeKind <> REALTYPE) and 
     (Types[DataType].TypeKind <> POINTERTYPE) and
     (Types[DataType].TypeKind <> PROCEDURALTYPE) 
   then
     Error('Operator is not applicable', '', -1);
    
-  if (IsIntegerType(Types[DataType]) and not IsOperatorForIntegers(Tok)) or
-    ((Types[DataType].TypeKind = REALTYPE) and not IsOperatorForReals(Tok)) or   
-    ((Types[DataType].TypeKind = CHARTYPE) and not IsRelationOperator(Tok)) or
-    ((Types[DataType].TypeKind = BOOLEANTYPE) and not IsOperatorForBooleans(Tok)) or
-    ((Types[DataType].TypeKind = POINTERTYPE) and not IsRelationOperator(Tok)) or
-    ((Types[DataType].TypeKind = PROCEDURALTYPE) and not IsRelationOperator(Tok)) 
+  if ((Types[DataType].TypeKind in IntegerTypes)  and not (Tok.Kind in OperatorsForIntegers)) or
+     ((Types[DataType].TypeKind = REALTYPE)       and not (Tok.Kind in OperatorsForReals)) or   
+     ((Types[DataType].TypeKind = CHARTYPE)       and not (Tok.Kind in RelationOperators)) or
+     ((Types[DataType].TypeKind = BOOLEANTYPE)    and not (Tok.Kind in OperatorsForBooleans)) or
+     ((Types[DataType].TypeKind = POINTERTYPE)    and not (Tok.Kind in RelationOperators)) or
+     ((Types[DataType].TypeKind = PROCEDURALTYPE) and not (Tok.Kind in RelationOperators)) 
   then
     Error('Operator is not applicable', '', -1);
   end;  
