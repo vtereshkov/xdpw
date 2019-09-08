@@ -1207,7 +1207,7 @@ procedure CompileSimpleExpression(var ValType: Integer);
   else if (ValType = CHARTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then 
     Result := GetIdent('CONCATCHARSTR')
   else if (ValType = CHARTYPEINDEX) and (RightValType = CHARTYPEINDEX) then
-    Result := GetIdent('CONCATCHARCHAR')
+    Result := GetIdent('CONCATCHAR')
   else
     Result := 0;
   end; // GetConcatStrProcIdent

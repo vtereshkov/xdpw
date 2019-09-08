@@ -764,7 +764,7 @@ end;
 
 
 
-procedure ConcatCharChar(ch1, ch2: Char; var s: string);
+procedure ConcatChar(ch1, ch2: Char; var s: string);
 var
   s1, s2: string;
 begin
