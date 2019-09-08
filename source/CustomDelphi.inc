@@ -21,22 +21,6 @@ type
   
   TInFile = file;
   TOutFile = file;
-  
-
-
-
-procedure CustomAppendStr(var s1: TString; const s2: TString);
-begin
-s1 := s1 + s2;
-end;
-
-
-  
-
-procedure CustomAppendStrChar(var s: TString; ch: Char);
-begin
-s := s + ch;
-end;
 
 
 

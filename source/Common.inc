@@ -299,8 +299,8 @@ var
 
   Tok: TToken;
 
-  NumIdent, NumTypes, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, ForLoopNesting,
-  CodeSize, CodePosStackTop, GlobalDataSize,
+  NumIdent, NumTypes, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, NumTempStrings, ForLoopNesting,
+  CodeSize, CodePosStackTop, GlobalDataSize, CurBlockLocalDataSize,
   DataSectionOrigin, ProgramEntryPoint,
   UnitStackTop, Line: Integer;
   

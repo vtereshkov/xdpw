@@ -1196,10 +1196,31 @@ end;// CompileTerm
 
 
 procedure CompileSimpleExpression(var ValType: Integer);
+
+
+  function GetConcatStrProcIdent(ValType, RightValType: Integer): Integer;
+  begin
+  if (ValType = STRINGTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then 
+    Result := GetIdent('CONCATSTR') 
+  else if (ValType = STRINGTYPEINDEX) and (RightValType = CHARTYPEINDEX) then
+    Result := GetIdent('CONCATSTRCHAR') 
+  else if (ValType = CHARTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then 
+    Result := GetIdent('CONCATCHARSTR')
+  else if (ValType = CHARTYPEINDEX) and (RightValType = CHARTYPEINDEX) then
+    Result := GetIdent('CONCATCHARCHAR')
+  else
+    Result := 0;
+  end; // GetConcatStrProcIdent
+  
+
 var
   UnaryOpTok, OpTok: TToken;
   RightValType: Integer;
-begin
+  LibProcIdentIndex: Integer;
+  TempStringStorageAddr: Integer;
+  
+  
+begin // CompileSimpleExpression
 UnaryOpTok := Tok;
 if IsUnaryOperator(UnaryOpTok) then
   NextTok;
@@ -1228,10 +1249,28 @@ while IsAdditiveOperator(Tok) do
     GenerateFloat(0);
     RightValType := REALTYPEINDEX;
     end;
-
-  ValType := GetCompatibleType(ValType, RightValType);
-  CheckOperator(OpTok, ValType);
-  GenerateBinaryOperator(OpTok.Kind, ValType);
+      
+  LibProcIdentIndex := GetConcatStrProcIdent(ValType, RightValType);
+  
+  // Special case: string concatenation
+  if (OpTok.Kind = PLUSTOK) and (LibProcIdentIndex <> 0) then
+    begin
+    Inc(NumTempStrings);    
+    TempStringStorageAddr := -CurBlockLocalDataSize - NumTempStrings * TypeSize(STRINGTYPEINDEX);
+    PushVarPtr(TempStringStorageAddr, LOCAL, 0, RELOCNONE);
+    
+    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);    
+    PushVarPtr(TempStringStorageAddr, LOCAL, 0, RELOCNONE);
+    ValType := STRINGTYPEINDEX;
+    end
+  // General rule
+  else
+    begin
+    ValType := GetCompatibleType(ValType, RightValType);
+    CheckOperator(OpTok, ValType);
+    GenerateBinaryOperator(OpTok.Kind, ValType);
+    end;
+  
   end;// while
 
 end;// CompileSimpleExpression
@@ -1240,12 +1279,28 @@ end;// CompileSimpleExpression
 
 
 procedure CompileExpression{(var ValType: Integer)};
+
+
+  function GetCompareStrProcIdent(ValType, RightValType: Integer): Integer;
+  begin
+  if (ValType = STRINGTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then 
+    Result := GetIdent('COMPARESTR')
+  else if (ValType = STRINGTYPEINDEX) and (RightValType = CHARTYPEINDEX) then
+    Result := GetIdent('COMPARESTRCHAR')  
+  else if (ValType = CHARTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then
+    Result := GetIdent('COMPARECHARSTR')
+  else
+    Result := 0;  
+  end; // GetCompareStrProcIdent
+  
+
 var
   OpTok: TToken;
   RightValType: Integer;
   LibProcIdentIndex: Integer;
+
   
-begin
+begin // CompileExpression
 CompileSimpleExpression(ValType);
 
 if IsRelationOperator(Tok) then
@@ -1266,18 +1321,11 @@ if IsRelationOperator(Tok) then
     RightValType := REALTYPEINDEX;
     end;
     
+  LibProcIdentIndex := GetCompareStrProcIdent(ValType, RightValType);
+  
   // Special case: string comparison
-  if (ValType = STRINGTYPEINDEX) or (RightValType = STRINGTYPEINDEX) then
-    begin
-    if (ValType = CHARTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then
-      LibProcIdentIndex := GetIdent('COMPARECHARSTR')
-    else if (ValType = STRINGTYPEINDEX) and (RightValType = CHARTYPEINDEX) then
-      LibProcIdentIndex := GetIdent('COMPARESTRCHAR')
-    else if (ValType = STRINGTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then 
-      LibProcIdentIndex := GetIdent('COMPARESTR')
-    else
-      Error('Incompatible types', '', -1);  
-      
+  if LibProcIdentIndex <> 0 then
+    begin    
     GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
     RestoreStackTopFromEAX;
     ValType := Ident[LibProcIdentIndex].DataType;
@@ -2436,20 +2484,28 @@ if BlockIdentIndex = 0 then
   BlockStack[BlockStackTop] := 1
 else
   BlockStack[BlockStackTop] := Ident[BlockIdentIndex].ProcAsBlock;
-
+  
 CompileDeclarations;
 
 if BlockStack[BlockStackTop] = 1 then          // Main program
   begin
   ProgramEntryPoint := CodeSize;
   GenerateProgramProlog;
+  GenerateTempStringStorageProlog;
   
   // Initialize heap and console I/O
   LibProcIdentIndex := GetIdent('INITSYSTEM');
   GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);  
   end
 else
-  GenerateStackFrameProlog(LocalDataSize);     // Procedure or function 
+  begin
+  GenerateStackFrameProlog(LocalDataSize);     // Procedure or function
+  GenerateTempStringStorageProlog;
+  end;
+
+// Initialize variables needed to access temporary strings used for concatenation
+CurBlockLocalDataSize := LocalDataSize;
+NumTempStrings := 0; 
 
 // Block body
 GenerateExitProlog;
@@ -2466,10 +2522,12 @@ if (BlockStack[BlockStackTop] <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) the
   DerefPtr(Ident[BlockIdentIndex].DataType);
   SaveStackTopToEAX;
   end;
+  
+GenerateTempStringStorageEpilog(NumTempStrings * TypeSize(STRINGTYPEINDEX));
 
 if BlockStack[BlockStackTop] = 1 then          // Main program
   begin
-  GenerateProgramEpilog;
+  GenerateProgramEpilog;    
   LibProcIdentIndex := GetIdent('EXITPROCESS');  
   PushConst(0);
   GenerateExternalCall(Ident[LibProcIdentIndex].Value, Ident[LibProcIdentIndex].NumParams);

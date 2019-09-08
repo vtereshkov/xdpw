@@ -639,8 +639,6 @@ end;
 
 procedure GenerateStructuredAssignment(DesignatorType: Integer);
 begin
-Gen($89); Gen($FB);                                                     // mov ebx, edi   ; edi is used in Write, Read, etc. and should be preserved
-
 // Source address
 Gen($5E);                                                               // pop esi
 // Destination address
@@ -650,8 +648,6 @@ Gen($5F);                                                               // pop e
 Gen($B9); GenDWord(TypeSize(DesignatorType));                           // mov ecx, TypeSize(DesignatorType)
 Gen($FC);                                                               // cld          ; increment esi, edi after each step
 Gen($F3); Gen($A4);                                                     // rep movsb
-
-Gen($89); Gen($DF);                                                     // mov edi, ebx
 end;
 
 
@@ -751,6 +747,7 @@ procedure GenerateWhileCondition;
 begin
 GenerateIfCondition;
 end;
+
 
 
 
@@ -1065,6 +1062,35 @@ procedure GenerateStackFrameEpilog;
 begin
 Gen($8B); Gen($E5);                                           // mov esp, ebp
 Gen($5D);                                                     // pop ebp
+end;
+
+
+
+
+procedure GenerateTempStringStorageProlog;
+begin
+Inc(CodePosStackTop);
+CodePosStack[CodePosStackTop] := CodeSize;
+
+Gen($90);                                                     // nop   ; actual stack storage size will be inserted here 
+Gen($90);                                                     // nop
+Gen($90);                                                     // nop
+Gen($90);                                                     // nop
+Gen($90);                                                     // nop
+Gen($90);                                                     // nop
+end;
+
+
+
+
+procedure GenerateTempStringStorageEpilog(TotalTempStringSize: Integer);
+var
+  CodePos: Integer;
+begin
+CodePos := CodePosStack[CodePosStackTop];
+Dec(CodePosStackTop);
+
+GenAt(CodePos, $81); GenAt(CodePos + 1, $EC); GenDWordAt(CodePos + 2, TotalTempStringSize);      // sub esp, TotalTempStringSize
 end;
 
 

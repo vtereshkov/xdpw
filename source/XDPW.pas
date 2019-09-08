@@ -20,18 +20,20 @@ program XDPW;
 
 procedure ZeroAll;
 begin
-NumIdent          := 0; 
-NumTypes          := 0; 
-NumImports        := 0; 
-NumBlocks         := 0; 
-BlockStackTop     := 0; 
-NumRelocs         := 0;
-ForLoopNesting    := 0;
-CodeSize          := 0; 
-CodePosStackTop   := 0;
-NumStaticStrChars := 0;
-GlobalDataSize    := 0;
-ProgramEntryPoint := 0;
+NumIdent              := 0; 
+NumTypes              := 0; 
+NumImports            := 0; 
+NumBlocks             := 0; 
+BlockStackTop         := 0; 
+NumRelocs             := 0;
+NumTempStrings        := 0;
+ForLoopNesting        := 0;
+CodeSize              := 0; 
+CodePosStackTop       := 0;
+NumStaticStrChars     := 0;
+GlobalDataSize        := 0;
+CurBlockLocalDataSize := 0;
+ProgramEntryPoint     := 0;
 
 FillChar(ImportSection, SizeOf(ImportSection), #0);
 end;
@@ -54,7 +56,7 @@ for i := STRINGFIRSTINDEX + Length(InStr) - 1 downto STRINGFIRSTINDEX do
 
 OutStr := InStr;
 if DotPos >= 0 then SetLength(OutStr, DotPos - STRINGFIRSTINDEX + 1);  
-CustomAppendStr(OutStr, Ext);
+OutStr := OutStr + Ext;
 end;
 
 

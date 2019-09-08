@@ -96,7 +96,7 @@ procedure AppendStrSafe(var s: TString; ch: Char);
 begin
 if Length(s) >= MAXSTRLENGTH - 1 then
   Error('String is too long', '', -1);
-CustomAppendStrChar(s, ch);  
+s := s + ch;  
 end;
 
 

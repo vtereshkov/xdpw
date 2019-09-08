@@ -731,6 +731,53 @@ end;
 
 
 
+procedure ConcatStr(const s1, s2: string; var s: string);
+begin
+s := s1;
+AppendStr(s, s2);
+end;
+
+
+
+
+procedure ConcatStrChar(const s1: string; ch: Char; var s: string);
+var
+  s2: string;
+begin
+s2[0] := ch;  
+s2[1] := #0;
+ConcatStr(s1, s2, s);
+end;
+
+
+
+
+procedure ConcatCharStr(ch: Char; const s2: string; var s: string);
+var
+  s1: string;
+begin
+s1[0] := ch;  
+s1[1] := #0;
+ConcatStr(s1, s2, s);
+end;
+
+
+
+
+procedure ConcatCharChar(ch1, ch2: Char; var s: string);
+var
+  s1, s2: string;
+begin
+s1[0] := ch1;  
+s1[1] := #0;
+s2[0] := ch2;  
+s2[1] := #0;
+ConcatStr(s1, s2, s);
+end;
+
+
+
+
 function CompareStr(const s1, s2: string): Integer;
 var
   i: Integer;
