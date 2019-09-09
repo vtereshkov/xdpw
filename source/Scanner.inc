@@ -6,6 +6,7 @@
 
 
 var
+  Letters, Digits, HexDigits, Spaces, AlphaNums: set of Char;
   ProgramName: TString;
   EndOfProgram: Boolean;
   ch, ch2: Char;
@@ -26,9 +27,16 @@ end;
 
 procedure InitializeScanner;
 begin
+Letters   := ['A'..'Z'];
+Digits    := ['0'..'9'];
+HexDigits := Digits + ['A'..'F'];
+Spaces    := [#1..#31, ' '];
+AlphaNums := Letters + Digits + ['_'];
+
 EndOfProgram := FALSE;
 UnitStackTop := 1;
 UnitStack[UnitStackTop].FileName := ProgramName;
+
 CustomReset(InFile, ProgramName);
 
 if IOResult <> 0 then
@@ -214,9 +222,9 @@ begin
 Num := 0;
 
 NumFound := FALSE;
-while ch in ['0'..'9', 'A'..'F'] do
+while ch in HexDigits do
   begin
-  if ch in ['0'..'9'] then
+  if ch in Digits then
     Num := 16 * Num + Ord(ch) - Ord('0')
   else
     Num := 16 * Num + Ord(ch) - Ord('A') + 10;
@@ -245,7 +253,7 @@ Frac := 0;
 Expon := 0;
 NegExpon := FALSE;
 
-while ch in ['0'..'9'] do
+while ch in Digits do
   begin
   Num := 10 * Num + Ord(ch) - Ord('0');
   ReadValidChar(ch);
@@ -282,7 +290,7 @@ else
       FracWeight := 0.1;
       ReadValidChar(ch);
 
-      while ch in ['0'..'9'] do
+      while ch in Digits do
         begin
         Frac := Frac + FracWeight * (Ord(ch) - Ord('0'));
         FracWeight := FracWeight / 10;
@@ -305,7 +313,7 @@ else
         end;
 
       ExponFound := FALSE;
-      while ch in ['0'..'9'] do
+      while ch in Digits do
         begin
         Expon := 10 * Expon + Ord(ch) - Ord('0');
         ReadValidChar(ch);
@@ -345,7 +353,7 @@ procedure ReadCharCode;
 begin
 ReadValidChar(ch);
 
-if not (ch in ['0'..'9', '$']) then
+if not (ch in Digits + ['$']) then
   Error('Character code is not found', '', -1);
 
 ReadNumber;
@@ -368,7 +376,7 @@ Text := '';
 repeat
   AppendStrSafe(Text, ch);
   ReadValidChar(ch);
-until not (ch in ['A'..'Z', '_', '0'..'9']);
+until not (ch in AlphaNums);
 
 CurToken := GetKeyword(Text);
 if CurToken <> 0 then               // Keyword found
@@ -435,7 +443,7 @@ Tok.Kind := 0;
 
 // Skip spaces, comments, directives
 DivFound := FALSE;
-while (ch in [#1..#31, ' ', '{']) or ((ch = '/') and not DivFound) do
+while (ch in Spaces) or (ch = '{') or ((ch = '/') and not DivFound) do
   begin
   if ch = '{' then                                                      // Multi-line comment or directive
     begin
