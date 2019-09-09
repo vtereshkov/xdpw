@@ -79,6 +79,7 @@ IdentList = Ident {"," Ident} .
 Type = "^" TypeIdent |
        "array" "[" Type {"," Type} "]" "of" Type |
        "record" IdentList ":" Type {";" IdentList ":" Type} [";"] "end" |
+       "set" "of" Type |
        ConstExpression ".." ConstExpression |
        ("procedure" | "function") [FormalParams] [":" TypeIdent] |
        Ident .
@@ -117,7 +118,7 @@ CaseLabel = ConstExpression [".." ConstExpression] .
 
 ConstExpression = Expression .
 
-Expression = SimpleExpression [("="|"<>"|"<"|"<="|">"|">=") SimpleExpression] .
+Expression = SimpleExpression [("="|"<>"|"<"|"<="|">"|">="|"in") SimpleExpression] .
 
 SimpleExpression = ["+"|"-"] Term {("+"|"-"|"or"|"xor") Term}.
 
@@ -131,8 +132,12 @@ Factor = (Designator | Ident) [ActualParams] |
          StringLiteral |  
          "(" Expression ")" | 
          "not" Factor |
+         SetConstructor |
          "nil" |
          Ident "(" Expression ")" .
+         
+SetConstructor = "[" [Expression [".." Expression] 
+                     {"," Expression [".." Expression]}] "]" .         
 
 Ident = (Letter | "_") {Letter | "_" | Digit}.
 

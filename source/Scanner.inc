@@ -214,9 +214,9 @@ begin
 Num := 0;
 
 NumFound := FALSE;
-while ((ch >= '0') and (ch <= '9')) or ((ch >= 'A') and (ch <= 'F')) do
+while ch in ['0'..'9', 'A'..'F'] do
   begin
-  if (ch  >= '0') and (ch <= '9') then
+  if ch in ['0'..'9'] then
     Num := 16 * Num + Ord(ch) - Ord('0')
   else
     Num := 16 * Num + Ord(ch) - Ord('A') + 10;
@@ -245,7 +245,7 @@ Frac := 0;
 Expon := 0;
 NegExpon := FALSE;
 
-while (ch >= '0') and (ch <= '9') do
+while ch in ['0'..'9'] do
   begin
   Num := 10 * Num + Ord(ch) - Ord('0');
   ReadValidChar(ch);
@@ -282,7 +282,7 @@ else
       FracWeight := 0.1;
       ReadValidChar(ch);
 
-      while (ch >= '0') and (ch <= '9') do
+      while ch in ['0'..'9'] do
         begin
         Frac := Frac + FracWeight * (Ord(ch) - Ord('0'));
         FracWeight := FracWeight / 10;
@@ -305,7 +305,7 @@ else
         end;
 
       ExponFound := FALSE;
-      while (ch >= '0') and (ch <= '9') do
+      while ch in ['0'..'9'] do
         begin
         Expon := 10 * Expon + Ord(ch) - Ord('0');
         ReadValidChar(ch);
@@ -345,7 +345,7 @@ procedure ReadCharCode;
 begin
 ReadValidChar(ch);
 
-if not (((ch >= '0') and (ch <= '9')) or (ch = '$')) then
+if not (ch in ['0'..'9', '$']) then
   Error('Character code is not found', '', -1);
 
 ReadNumber;
@@ -368,7 +368,7 @@ Text := '';
 repeat
   AppendStrSafe(Text, ch);
   ReadValidChar(ch);
-until not (((ch >= 'A') and (ch <= 'Z')) or (ch = '_') or ((ch >= '0') and (ch <= '9')));
+until not (ch in ['A'..'Z', '_', '0'..'9']);
 
 CurToken := GetKeyword(Text);
 if CurToken <> 0 then               // Keyword found
@@ -435,7 +435,7 @@ Tok.Kind := 0;
 
 // Skip spaces, comments, directives
 DivFound := FALSE;
-while ((ch >= #1) and (ch <= #31)) or (ch = ' ') or (ch = '{') or ((ch = '/') and not DivFound) do
+while (ch in [#1..#31, ' ', '{']) or ((ch = '/') and not DivFound) do
   begin
   if ch = '{' then                                                      // Multi-line comment or directive
     begin

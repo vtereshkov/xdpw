@@ -663,21 +663,28 @@ if LeftType = RightType then                 // General rule
   Result := LeftType
 else                                         // Special cases
   begin
-  // Sets are compatible with other sets having a compatible base type
+  // Sets are compatible with other sets having a compatible base type, or with an empty set constructor
   if (Types[LeftType].TypeKind = SETTYPE) and (Types[RightType].TypeKind = SETTYPE) then
     begin
-    GetCompatibleType(Types[LeftType].BaseType, Types[RightType].BaseType);
-    Result := LeftType;
+    if Types[RightType].BaseType = ANYTYPEINDEX then
+      Result := LeftType
+    else if Types[LeftType].BaseType = ANYTYPEINDEX then
+      Result := RightType
+    else
+      begin  
+      GetCompatibleType(Types[LeftType].BaseType, Types[RightType].BaseType);
+      Result := LeftType;
+      end;
     end;
     
   // Untyped pointers are compatible with any other pointers
   if (Types[LeftType].TypeKind = POINTERTYPE) and (Types[RightType].TypeKind = POINTERTYPE) and
-     ((Types[LeftType].BaseType = ANYTYPE) or (Types[RightType].BaseType = ANYTYPE)) then
+     ((Types[LeftType].BaseType = ANYTYPEINDEX) or (Types[RightType].BaseType = ANYTYPEINDEX)) then
     Result := LeftType;
     
   // Procedural types are compatible with any untyped pointers
-  if ((Types[LeftType].TypeKind = PROCEDURALTYPE) and (Types[RightType].TypeKind = POINTERTYPE) and (Types[RightType].BaseType = ANYTYPE)) or
-     ((Types[LeftType].TypeKind = POINTERTYPE) and (Types[LeftType].BaseType = ANYTYPE) and (Types[RightType].TypeKind = PROCEDURALTYPE)) then
+  if ((Types[LeftType].TypeKind = PROCEDURALTYPE) and (Types[RightType].TypeKind = POINTERTYPE) and (Types[RightType].BaseType = ANYTYPEINDEX)) or
+     ((Types[LeftType].TypeKind = POINTERTYPE) and (Types[LeftType].BaseType = ANYTYPEINDEX) and (Types[RightType].TypeKind = PROCEDURALTYPE)) then
     Result := RightType;    
 
   // Subranges are compatible with their host types

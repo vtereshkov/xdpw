@@ -1010,7 +1010,7 @@ if NumTypes > MAXTYPES then
 
 Types[NumTypes].TypeKind := SETTYPE;
 Types[NumTypes].Block := BlockStack[BlockStackTop];
-Types[NumTypes].BaseType := 0;
+Types[NumTypes].BaseType := ANYTYPEINDEX;
 ValType := NumTypes;
 
 // Allocate temporary storage
@@ -1025,19 +1025,17 @@ GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIde
 LibProcIdentIndex := GetIdent('ADDTOSET');
 NextTok;
 
-if Tok.Kind = CBRACKETTOK then
-  Types[NumTypes].BaseType := CHARTYPEINDEX
-else  
+if Tok.Kind <> CBRACKETTOK then
   repeat
     PushVarPtr(TempStorageAddr, LOCAL, 0, RELOCNONE);
     
     CompileExpression(ElementType);
     
-    if Types[ValType].BaseType = 0 then
+    if Types[ValType].BaseType = ANYTYPEINDEX then
       begin
       if not (Types[ElementType].TypeKind in OrdinalTypes) then
-        Error('Ordinal type expected', '', -1);
-      Types[ValType].BaseType := ElementType;  
+        Error('Ordinal type expected', '', -1);        
+      Types[ValType].BaseType := ElementType;
       end  
     else  
       GetCompatibleType(ElementType, Types[ValType].BaseType);
@@ -1474,8 +1472,12 @@ else if Tok.Kind = INTOK then
   CompileSimpleExpression(RightValType);
   
   if Types[RightValType].TypeKind <> SETTYPE then
-    Error('Set expected', '', -1);  
-  GetCompatibleType(ValType, Types[RightValType].BaseType);
+    Error('Set expected', '', -1);
+  
+  if Types[RightValType].BaseType <> ANYTYPEINDEX then
+    GetCompatibleType(ValType, Types[RightValType].BaseType)
+  else if not (Types[ValType].TypeKind in OrdinalTypes) then
+    Error('Ordinal type expected', '', -1);   
 
   LibProcIdentIndex := GetIdent('INSET');
   GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
@@ -2012,7 +2014,7 @@ procedure CompileType{(var DataType: Integer)};
   if (HighBound(NestedDataType) > MAXSETELEMENTS - 1) then
     Error('Too many set elements', '', -1);
   
-  Types[DataType].BaseType := NestedDataType;  
+  Types[DataType].BaseType := NestedDataType; 
   end; // CompileSetType
 
 
