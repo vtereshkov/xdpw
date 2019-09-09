@@ -193,7 +193,8 @@ const
 type
   TUnit = record
     FileName: TString;
-    Pos, Line: Integer;
+    Buffer: PChar;
+    Size, Pos, Line: Integer;
   end;  
   
   TParam = record
@@ -310,17 +311,19 @@ var
   NumIdent, NumTypes, NumImports, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, ForLoopNesting,
   CodeSize, CodePosStackTop, GlobalDataSize, CurBlockLocalDataSize, CurBlockTempStorageSize,
   DataSectionOrigin, ProgramEntryPoint,
-  UnitStackTop, Line: Integer;
+  UnitStackTop: Integer;
   
   IsConsoleProgram: Integer;                                              // More convenient than Boolean
-  
-  InFile: TInFile;
   
 
 
 
 procedure ZeroAll;
 begin
+FillChar(Ident, SizeOf(Ident), #0);
+FillChar(Types, SizeOf(Types), #0);
+FillChar(UnitStack, SizeOf(UnitStack), #0);
+
 NumIdent                := 0; 
 NumTypes                := 0; 
 NumImports              := 0; 
@@ -411,15 +414,17 @@ end;
 
 procedure DisposeAll;
 var
+  Buffer: Pointer;
   i, j: Integer;
+  
 begin
-// Dispose dynamically allocated parameter data
+// Dispose of dynamically allocated parameter data
 for i := 1 to NumIdent do
   if (Ident[i].Kind = PROC) or (Ident[i].Kind = FUNC) then
     for j := 1 to Ident[i].NumParams do
       Dispose(Ident[i].Param[j]);
 
-// Dispose dynamically allocated parameter and field data
+// Dispose of dynamically allocated parameter and field data
 for i := 1 to NumTypes do
   begin
   if Types[i].TypeKind = PROCEDURALTYPE then
@@ -429,7 +434,14 @@ for i := 1 to NumTypes do
   if Types[i].TypeKind = RECORDTYPE then
     for j := 1 to Types[i].NumFields do
       Dispose(Types[i].Field[j]);
-  end;    
+  end;
+
+// Dispose of unit input buffers
+for i := UnitStackTop downto 1 do
+  begin
+  Buffer := UnitStack[i].Buffer;
+  FreeMem(Buffer, UnitStack[i].Size);
+  end;  
 end;
 
 
@@ -476,12 +488,11 @@ end;
   
 procedure Error(const Msg, Name: TString; TokKind: Integer);
 begin
-Write('Error ', UnitStack[UnitStackTop].FileName, ' ', Line, ': ', Msg, Name);
+Write('Error ', UnitStack[UnitStackTop].FileName, ' ', UnitStack[UnitStackTop].Line, ': ', Msg, Name);
 if TokKind > -1 then WriteToken(TokKind);
 WriteLn;
 
 DisposeAll;
-Close(InFile);
 Halt(1);
 end;
 

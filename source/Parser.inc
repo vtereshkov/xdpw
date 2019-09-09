@@ -1100,7 +1100,7 @@ case Tok.Kind of
           ValType := Types[ValType].ResultType;
           end       
         else                                           // Usual variable
-          if not (Types[ValType].TypeKind in StructuredTypes) then // Factors of type 'array' or 'record' should contain a pointer to them
+          if not (Types[ValType].TypeKind in StructuredTypes) then // Factors of type 'array', 'record', 'set' should contain a pointer to them
             DerefPtr(ValType);
    
         end;

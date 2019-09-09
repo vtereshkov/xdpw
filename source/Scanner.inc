@@ -7,25 +7,82 @@
 
 var
   Letters, Digits, HexDigits, Spaces, AlphaNums: set of Char;
-  ProgramName: TString;
   EndOfProgram: Boolean;
   ch, ch2: Char;
   
   
 
   
-procedure ReadCharSafe(var F: TInFile; var ch: Char);
+procedure ReadCharSafe(var ch: Char);
 var
-  LenRead: Integer;
+  Ptr: PChar;
 begin
-BlockRead(F, ch, 1, LenRead);
-if LenRead = 0 then ch := #0;
+ch := #0;
+if UnitStack[UnitStackTop].Pos < UnitStack[UnitStackTop].Size then
+  begin
+  Ptr := PChar(Integer(UnitStack[UnitStackTop].Buffer) + UnitStack[UnitStackTop].Pos);
+  ch := Ptr^;
+  Inc(UnitStack[UnitStackTop].Pos);
+  end 
 end;
   
 
 
 
-procedure InitializeScanner;
+procedure EnterIncludedFile(const Name: TString);
+var
+  F: TInFile;
+  Buffer: Pointer;
+  ActualSize: Integer;
+  
+begin
+CustomReset(F, Name);
+if IOResult <> 0 then
+  Error('Unable to open source file ', Name, -1);
+
+Inc(UnitStackTop);
+UnitStack[UnitStackTop].FileName := Name;
+UnitStack[UnitStackTop].Size := FileSize(F);
+UnitStack[UnitStackTop].Pos := 0;
+UnitStack[UnitStackTop].Line := 1;
+
+GetMem(Buffer, UnitStack[UnitStackTop].Size);
+UnitStack[UnitStackTop].Buffer := Buffer;
+
+ActualSize := 0;
+BlockRead(F, UnitStack[UnitStackTop].Buffer^, UnitStack[UnitStackTop].Size, ActualSize);
+Close(F);
+
+if ActualSize <> UnitStack[UnitStackTop].Size then
+  Error('Unable to read source file ', Name, -1);
+end;
+
+
+
+
+procedure LeaveIncludedFile(var ch: Char);
+var
+  Buffer: Pointer;
+begin
+Buffer := UnitStack[UnitStackTop].Buffer;
+FreeMem(Buffer, UnitStack[UnitStackTop].Size);
+
+if UnitStackTop > 1 then 
+  begin  
+  Dec(UnitStackTop);
+  ReadCharSafe(ch);
+  end
+else
+  begin
+  EndOfProgram := TRUE;
+  ch := #0;
+  end;
+end;
+
+
+
+
+procedure InitializeScanner(const Name: TString);
 begin
 Letters   := ['A'..'Z'];
 Digits    := ['0'..'9'];
@@ -33,19 +90,13 @@ HexDigits := Digits + ['A'..'F'];
 Spaces    := [#1..#31, ' '];
 AlphaNums := Letters + Digits + ['_'];
 
-EndOfProgram := FALSE;
-UnitStackTop := 1;
-UnitStack[UnitStackTop].FileName := ProgramName;
-
-CustomReset(InFile, ProgramName);
-
-if IOResult <> 0 then
-  Error('Unable to open source file ', ProgramName, -1);
-
-Line := 1;
-
 ch  := ' ';
 ch2 := ' ';
+
+EndOfProgram := FALSE;
+
+UnitStackTop := 0;
+EnterIncludedFile(Name);
 end;
 
 
@@ -53,48 +104,7 @@ end;
 
 procedure FinalizeScanner;
 begin
-Close(InFile);
-IOResult;
-end;
-
-
-
-
-procedure EnterIncludedFile(const Name: TString);
-begin
-UnitStack[UnitStackTop].Pos := FilePos(InFile);
-UnitStack[UnitStackTop].Line := Line;
-
-Close(InFile);
-CustomReset(InFile, Name);
-
-if IOResult <> 0 then
-  Error('Unable to open source file ', Name, -1);
-
-Inc(UnitStackTop);
-UnitStack[UnitStackTop].FileName := Name;
-
-Line := 1;
-end;
-
-
-
-
-procedure LeaveIncludedFile(var ch: Char);
-begin
-if UnitStackTop > 1 then 
-  begin
-  Dec(UnitStackTop);
-  CustomReset(InFile, UnitStack[UnitStackTop].FileName);
-  Seek(InFile, UnitStack[UnitStackTop].Pos);
-  Line := UnitStack[UnitStackTop].Line;
-  ReadCharSafe(InFile, ch);
-  end
-else
-  begin
-  EndOfProgram := TRUE;
-  ch := #0;
-  end;
+LeaveIncludedFile(ch);
 end;
 
 
@@ -115,15 +125,12 @@ begin
 if EndOfProgram then
   ch := #0
 else
-  if EOF(InFile) then
-    begin
-    Close(InFile);
-    LeaveIncludedFile(ch);
-    end
+  if UnitStack[UnitStackTop].Pos >= UnitStack[UnitStackTop].Size then
+    LeaveIncludedFile(ch)
   else
-    ReadCharSafe(InFile, ch);
+    ReadCharSafe(ch);
 
-if ch = #10 then Inc(Line);                            // End of line found
+if ch = #10 then Inc(UnitStack[UnitStackTop].Line);  // End of line found
 end;
 
 
@@ -278,7 +285,7 @@ else
       Tok.Value := Num;
       RangeFound := TRUE;
       end;
-    if not EndOfProgram then Seek(InFile, FilePos(InFile) - 1);
+    if not EndOfProgram then Dec(UnitStack[UnitStackTop].Pos);
     end; // if ch = '.'
     
   if not RangeFound then                                              // Fractional number
@@ -405,12 +412,12 @@ repeat
     AppendStrSafe(Text, ch)
   else
     begin
-    ReadCharSafe(InFile, ch2);
+    ReadCharSafe(ch2);
     if ch2 = '''' then                                                      // Apostrophe character found
       AppendStrSafe(Text, ch)
     else
       begin
-      if not EndOfProgram then Seek(InFile, FilePos(InFile) - 1);           // Discard ch2
+      if not EndOfProgram then Dec(UnitStack[UnitStackTop].Pos);            // Discard ch2
       EndOfLiteral := TRUE;
       end;
     end;
@@ -457,7 +464,11 @@ while (ch in Spaces) or (ch = '{') or ((ch = '/') and not DivFound) do
       ReadSingleLineComment                                             // Single-line comment
     else
       begin
-      if not EndOfProgram then Seek(InFile, FilePos(InFile) - 2);       // Discard ch and ch2
+      if not EndOfProgram then                                          // Discard ch and ch2
+        begin
+        Dec(UnitStack[UnitStackTop].Pos);
+        Dec(UnitStack[UnitStackTop].Pos);
+        end;       
       DivFound := TRUE;
       end;
     end;

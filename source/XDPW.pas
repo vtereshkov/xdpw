@@ -39,7 +39,7 @@ end;
 
 
 var
-  ExeName: TString;
+  ProgramName, ExeName: TString;
   OutFile: TOutFile;
 
 
@@ -71,7 +71,7 @@ DataSectionOrigin := IMAGEBASE + Align(SizeOf(Headers), SECTIONALIGNMENT) + Alig
 ZeroAll;
 FillChar(ImportSection, SizeOf(ImportSection), #0);
 
-InitializeScanner;
+InitializeScanner(ProgramName);
 CompileProgram;
 FinalizeScanner;
 
