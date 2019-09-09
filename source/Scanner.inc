@@ -18,12 +18,13 @@ var
   Ptr: PChar;
 begin
 ch := #0;
-if UnitStack[UnitStackTop].Pos < UnitStack[UnitStackTop].Size then
-  begin
-  Ptr := PChar(Integer(UnitStack[UnitStackTop].Buffer) + UnitStack[UnitStackTop].Pos);
-  ch := Ptr^;
-  Inc(UnitStack[UnitStackTop].Pos);
-  end 
+if UnitStackTop > 0 then
+  if UnitStack[UnitStackTop].Pos < UnitStack[UnitStackTop].Size then
+    begin
+    Ptr := PChar(Integer(UnitStack[UnitStackTop].Buffer) + UnitStack[UnitStackTop].Pos);
+    ch := Ptr^;
+    Inc(UnitStack[UnitStackTop].Pos);
+    end; 
 end;
   
 
@@ -64,18 +65,13 @@ procedure LeaveIncludedFile(var ch: Char);
 var
   Buffer: Pointer;
 begin
-if UnitStackTop > 1 then
-  begin    
-  Buffer := UnitStack[UnitStackTop].Buffer;
-  FreeMem(Buffer, UnitStack[UnitStackTop].Size);
-  Dec(UnitStackTop);  
-  ReadCharSafe(ch);  
-  end  
-else
-  begin
-  EndOfProgram := TRUE;
-  ch := #0;
-  end;
+Buffer := UnitStack[UnitStackTop].Buffer;
+FreeMem(Buffer, UnitStack[UnitStackTop].Size);
+Dec(UnitStackTop);
+  
+ReadCharSafe(ch);  
+
+if UnitStackTop = 0 then EndOfProgram := TRUE;
 end;
 
 
