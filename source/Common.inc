@@ -720,7 +720,40 @@ else                                         // Special cases
   if (Types[LeftType].TypeKind = CHARTYPE) and
      (Types[RightType].TypeKind = CHARTYPE) then
     Result := LeftType;
-  end;// if
+  end; // if
+
+if Result = 0 then
+  Error('Incompatible types', '', -1);  
+end;
+
+
+
+
+function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
+begin
+// This function is asymmetric and implies Variable(LeftType) := Variable(RightType)
+Result := 0;
+
+if LeftType = RightType then                 // General rule
+  Result := RightType
+else                                         // Special cases
+  begin
+  // Open arrays are compatible with any other arrays of the same base type
+  if (Types[LeftType].TypeKind = ARRAYTYPE) and (Types[RightType].TypeKind = ARRAYTYPE) and 
+      Types[LeftType].IsOpenArray and (Types[LeftType].BaseType = Types[RightType].BaseType) 
+  then       
+    Result := RightType;
+
+  // Untyped pointers are compatible with any other pointers 
+  if (Types[LeftType].TypeKind = POINTERTYPE) and (Types[RightType].TypeKind = POINTERTYPE) and
+     (Types[LeftType].BaseType = ANYTYPEINDEX) 
+  then  
+    Result := RightType;
+    
+  // Untyped parameters are compatible with any type
+  if Types[LeftType].TypeKind = ANYTYPE then
+    Result := RightType;
+  end; // if  
 
 if Result = 0 then
   Error('Incompatible types', '', -1);  

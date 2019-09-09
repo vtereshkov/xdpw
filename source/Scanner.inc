@@ -33,7 +33,6 @@ end;
 procedure EnterIncludedFile(const Name: TString);
 var
   F: TInFile;
-  Buffer: Pointer;
   ActualSize: Integer;
   
 begin
@@ -47,8 +46,7 @@ UnitStack[UnitStackTop].Size := FileSize(F);
 UnitStack[UnitStackTop].Pos := 0;
 UnitStack[UnitStackTop].Line := 1;
 
-GetMem(Buffer, UnitStack[UnitStackTop].Size);
-UnitStack[UnitStackTop].Buffer := Buffer;
+GetMem(UnitStack[UnitStackTop].Buffer, UnitStack[UnitStackTop].Size);
 
 ActualSize := 0;
 BlockRead(F, UnitStack[UnitStackTop].Buffer^, UnitStack[UnitStackTop].Size, ActualSize);
@@ -62,11 +60,8 @@ end;
 
 
 procedure LeaveIncludedFile(var ch: Char);
-var
-  Buffer: Pointer;
 begin
-Buffer := UnitStack[UnitStackTop].Buffer;
-FreeMem(Buffer, UnitStack[UnitStackTop].Size);
+FreeMem(UnitStack[UnitStackTop].Buffer, UnitStack[UnitStackTop].Size);
 Dec(UnitStackTop);
   
 ReadCharSafe(ch);  
@@ -146,7 +141,6 @@ ReadChar(ch);
 if (ch = #0) or (ch = #10) then
   Error('Unterminated string', '', -1);
 end;
-
 
 
 
@@ -552,7 +546,6 @@ end; // NextTok
 
 
 
-
 procedure CheckTok(ExpectedTokKind: Byte);
 begin
 if Tok.Kind <> ExpectedTokKind then
@@ -567,7 +560,5 @@ begin
 CheckTok(ExpectedTokKind);
 NextTok;
 end;
-
-
 
 

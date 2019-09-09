@@ -875,16 +875,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
         end;
       
       if IsRefParam then  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
-        begin    
-        if (CurParam^.DataType <> ActualParamType) then
-          if (Types[CurParam^.DataType].TypeKind = ARRAYTYPE) and Types[CurParam^.DataType].IsOpenArray then
-            begin
-            if (Types[ActualParamType].TypeKind <> ARRAYTYPE) or (Types[ActualParamType].BaseType <> Types[CurParam^.DataType].BaseType) then
-              Error('Incompatible types', '', -1);
-            end  
-          else if Types[CurParam^.DataType].TypeKind <> ANYTYPE then
-            Error('Incompatible types', '', -1);
-        end
+        GetCompatibleRefType(CurParam^.DataType, ActualParamType)
       else                // Relaxed type checking for parameters passed by value      
         GetCompatibleType(CurParam^.DataType, ActualParamType);
         
