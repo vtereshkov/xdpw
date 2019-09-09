@@ -441,7 +441,7 @@ for i := UnitStackTop downto 1 do
   begin
   Buffer := UnitStack[i].Buffer;
   FreeMem(Buffer, UnitStack[i].Size);
-  end;  
+  end; 
 end;
 
 
@@ -488,7 +488,10 @@ end;
   
 procedure Error(const Msg, Name: TString; TokKind: Integer);
 begin
-Write('Error ', UnitStack[UnitStackTop].FileName, ' ', UnitStack[UnitStackTop].Line, ': ', Msg, Name);
+if UnitStackTop >= 1 then
+  Write('Error ', UnitStack[UnitStackTop].FileName, ' ', UnitStack[UnitStackTop].Line, ': ', Msg, Name)
+else
+  Write('Error: ', Msg, Name);  
 if TokKind > -1 then WriteToken(TokKind);
 WriteLn;
 

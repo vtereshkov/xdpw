@@ -64,14 +64,13 @@ procedure LeaveIncludedFile(var ch: Char);
 var
   Buffer: Pointer;
 begin
-Buffer := UnitStack[UnitStackTop].Buffer;
-FreeMem(Buffer, UnitStack[UnitStackTop].Size);
-
-if UnitStackTop > 1 then 
-  begin  
-  Dec(UnitStackTop);
-  ReadCharSafe(ch);
-  end
+if UnitStackTop > 1 then
+  begin    
+  Buffer := UnitStack[UnitStackTop].Buffer;
+  FreeMem(Buffer, UnitStack[UnitStackTop].Size);
+  Dec(UnitStackTop);  
+  ReadCharSafe(ch);  
+  end  
 else
   begin
   EndOfProgram := TRUE;
