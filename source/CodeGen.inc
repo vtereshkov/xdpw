@@ -611,7 +611,7 @@ end;
 
 procedure GenerateAssignment(DesignatorType: Integer);
 begin
-// EDX should be preserved
+// edx should be preserved
 
 // Source value
 Gen($58);                                                               // pop eax
@@ -759,53 +759,11 @@ end;
 
 
 
-procedure GenerateForCondition(CounterAddress: Integer; Scope, CounterSize: Byte; Down: Boolean);
+procedure GenerateForCondition(CounterType: Integer; Down: Boolean);
 begin
-Gen($59);                                                   // pop ecx
-Gen($51);                                                   // push ecx             ; The final value of the counter will be removed from stack by GenerateForEpilog  
-case Scope of
-  GLOBAL:
-    begin
-    case CounterSize of
-      1: begin
-         Gen($A0);                                          // mov al, [...]
-         end;
-      2: begin
-         Gen($66); Gen($A1);                                // mov ax, [...]
-         end;
-      4: begin
-         Gen($A1);                                          // mov eax, [...]
-         end;
-      end;
-    GenRelocDWord(CounterAddress, RELOCDATA);               // ... CounterAddress ...  ; relocatable
-    end; 
-
-  LOCAL:
-    begin
-    case CounterSize of
-      1: begin
-         Gen($8A); Gen($85);                                // mov al, [ebp + ...]
-         end;
-      2: begin
-         Gen($66); Gen($8B); Gen($85);                      // mov ax, [ebp + ...]
-         end;
-      4: begin
-         Gen($8B); Gen($85);                                // mov eax, [ebp + ...]
-         end;
-      end;
-    GenDWord(CounterAddress);                               // ... CounterAddress ...  
-    end;
-    
-  end;  
-    
-if CounterSize < 2 then
-  begin
-  Gen($66); Gen($98);                                       // cbw
-  end;                                        
-if CounterSize < 4 then
-  begin
-  Gen($98);                                                 // cwde
-  end;
+Gen($58);                                                   // pop eax         ; current value of the counter
+Gen($59);                                                   // pop ecx         ; final value of the counter
+Gen($51);                                                   // push ecx        ; final value of the counter will be removed from stack and the end of FOR loop  
 
 Gen($3B); Gen($C1);                                         // cmp eax, ecx
 if Down then
@@ -999,13 +957,12 @@ end;
 
 
 
-procedure GenerateForEpilog(CounterAddress: Integer; Scope, CounterSize: Byte; Down: Boolean);
+procedure GenerateForEpilog(CounterType: Integer; Down: Boolean);
 begin
-PushVarPtr(CounterAddress, Scope, 0, RELOCDATA);
 if Down then
-  GenerateIncDec(DECPROC, CounterSize)
+  GenerateIncDec(DECPROC, TypeSize(CounterType))
 else
-  GenerateIncDec(INCPROC, CounterSize);
+  GenerateIncDec(INCPROC, TypeSize(CounterType));
 GenerateWhileEpilog;
 
 Dec(ForLoopNesting);

@@ -1700,7 +1700,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
   
   procedure CompileForStatement(LoopNesting: Integer);
   var
-    IdentIndex: Integer;
+    CounterIndex: Integer;
     ExpressionType: Integer;
     Down: Boolean;
       
@@ -1708,23 +1708,23 @@ procedure CompileStatement{(LoopNesting: Integer)};
   NextTok;
   
   AssertIdent;
-  IdentIndex := GetIdent(Tok.Name);
+  CounterIndex := GetIdent(Tok.Name);
 
-  if (Ident[IdentIndex].Kind <> VARIABLE) or
-    ((Ident[IdentIndex].NestingLevel <> 1) and (Ident[IdentIndex].NestingLevel <> BlockStackTop)) or
-     (Ident[IdentIndex].PassMethod <> VALPASSING) then
+  if (Ident[CounterIndex].Kind <> VARIABLE) or
+    ((Ident[CounterIndex].NestingLevel <> 1) and (Ident[CounterIndex].NestingLevel <> BlockStackTop)) or
+     (Ident[CounterIndex].PassMethod <> VALPASSING) then
     Error('Simple local variable expected as FOR loop counter', '', -1);
 
-  if not (Types[Ident[IdentIndex].DataType].TypeKind in OrdinalTypes) then
+  if not (Types[Ident[CounterIndex].DataType].TypeKind in OrdinalTypes) then
     Error('Ordinal variable expected as FOR loop counter', '', -1);
 
-  PushVarPtr(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, 0, RELOCDATA);
+  PushVarPtr(Ident[CounterIndex].Value, Ident[CounterIndex].Scope, 0, RELOCDATA);
 
   NextTok;
   EatTok(ASSIGNTOK);
   
   CompileExpression(ExpressionType);
-  GetCompatibleType(ExpressionType, Ident[IdentIndex].DataType);
+  GetCompatibleType(ExpressionType, Ident[CounterIndex].DataType);
 
   if not (Tok.Kind in [TOTOK, DOWNTOTOK]) then
     Error('Expected TO or DOWNTO but found ', '', Tok.Kind);
@@ -1733,16 +1733,18 @@ procedure CompileStatement{(LoopNesting: Integer)};
 
   NextTok;
   CompileExpression(ExpressionType);
-  GetCompatibleType(ExpressionType, Ident[IdentIndex].DataType);
+  GetCompatibleType(ExpressionType, Ident[CounterIndex].DataType);
 
   SaveStackTopToEDX;                                        // Save final value of the counter
-  GenerateAssignment(Ident[IdentIndex].DataType);           // Assign initial value to the counter
+  GenerateAssignment(Ident[CounterIndex].DataType);         // Assign initial value to the counter
   RestoreStackTopFromEDX;                                   // Restore final value of the counter
 
   Inc(CodePosStackTop);
   CodePosStack[CodePosStackTop] := CodeSize;                // Save return address used by GenerateForEpilog
 
-  GenerateForCondition(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, TypeSize(Ident[IdentIndex].DataType), Down);  // Satisfied if counter does not reach the second expression value
+  PushVarPtr(Ident[CounterIndex].Value, Ident[CounterIndex].Scope, 0, RELOCDATA);
+  DerefPtr(Ident[CounterIndex].DataType);
+  GenerateForCondition(Ident[CounterIndex].DataType, Down); // Satisfied if counter does not reach the second expression value
 
   EatTok(DOTOK);
   
@@ -1753,7 +1755,8 @@ procedure CompileStatement{(LoopNesting: Integer)};
   CompileStatement(LoopNesting);    
   
   GenerateContinueEpilog(LoopNesting);
-  GenerateForEpilog(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, TypeSize(Ident[IdentIndex].DataType), Down);
+  PushVarPtr(Ident[CounterIndex].Value, Ident[CounterIndex].Scope, 0, RELOCDATA);
+  GenerateForEpilog(Ident[CounterIndex].DataType, Down);
   GenerateBreakEpilog(LoopNesting);
   
   SaveStackTopToEDX;                                        // Pop and discard final value of the counter
