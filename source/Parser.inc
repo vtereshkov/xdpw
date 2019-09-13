@@ -389,9 +389,9 @@ case proc of
     // Remove first 3 arguments if they correspond to a file variable 
     if FileSpecified then
       begin
-      SaveStackTopToEAX;
-      SaveStackTopToEAX;
-      SaveStackTopToEAX;
+      DiscardStackTop;
+      DiscardStackTop;
+      DiscardStackTop;
       end;      
 
     end;// READPROC, READLNPROC
@@ -478,9 +478,9 @@ case proc of
     // Remove first 3 arguments if they correspond to a file variable 
     if FileSpecified then
       begin
-      SaveStackTopToEAX;
-      SaveStackTopToEAX;
-      SaveStackTopToEAX;
+      DiscardStackTop;
+      DiscardStackTop;
+      DiscardStackTop;
       end;
     
     end;// WRITEPROC, WRITELNPROC
@@ -565,7 +565,7 @@ case func of
     else
       begin
       CompileDesignator(ValType);
-      SaveStackTopToEDX;                        // Save result to EDX just to discard it
+      DiscardStackTop;
       PushConst(TypeSize(ValType));
       end;
     ValType := INTEGERTYPEINDEX;
@@ -1718,13 +1718,11 @@ procedure CompileStatement{(LoopNesting: Integer)};
   if not (Types[Ident[CounterIndex].DataType].TypeKind in OrdinalTypes) then
     Error('Ordinal variable expected as FOR loop counter', '', -1);
 
-  PushVarPtr(Ident[CounterIndex].Value, Ident[CounterIndex].Scope, 0, RELOCDATA);
-
   NextTok;
-  EatTok(ASSIGNTOK);
+  CheckTok(ASSIGNTOK);
   
-  CompileExpression(ExpressionType);
-  GetCompatibleType(ExpressionType, Ident[CounterIndex].DataType);
+  PushVarPtr(Ident[CounterIndex].Value, Ident[CounterIndex].Scope, 0, RELOCDATA);  
+  CompileAssignment(Ident[CounterIndex].DataType);         // Assign initial value to the counter
 
   if not (Tok.Kind in [TOTOK, DOWNTOTOK]) then
     Error('Expected TO or DOWNTO but found ', '', Tok.Kind);
@@ -1734,10 +1732,6 @@ procedure CompileStatement{(LoopNesting: Integer)};
   NextTok;
   CompileExpression(ExpressionType);
   GetCompatibleType(ExpressionType, Ident[CounterIndex].DataType);
-
-  SaveStackTopToEDX;                                        // Save final value of the counter
-  GenerateAssignment(Ident[CounterIndex].DataType);         // Assign initial value to the counter
-  RestoreStackTopFromEDX;                                   // Restore final value of the counter
 
   Inc(CodePosStackTop);
   CodePosStack[CodePosStackTop] := CodeSize;                // Save return address used by GenerateForEpilog
@@ -1759,7 +1753,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
   GenerateForEpilog(Ident[CounterIndex].DataType, Down);
   GenerateBreakEpilog(LoopNesting);
   
-  SaveStackTopToEDX;                                        // Pop and discard final value of the counter
+  DiscardStackTop;                                          // Pop and discard final value of the counter
   end; // CompileForStatement
 
 

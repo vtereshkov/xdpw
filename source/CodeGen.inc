@@ -273,17 +273,9 @@ end;
 
 
 
-procedure SaveStackTopToEDX;
+procedure DiscardStackTop;
 begin
-Gen($5A);                                                         // pop edx
-end;
-
-
-
-
-procedure RestoreStackTopFromEDX;
-begin
-Gen($52);                                                         // push edx
+SaveStackTopToEAX;
 end;
 
 
@@ -611,8 +603,6 @@ end;
 
 procedure GenerateAssignment(DesignatorType: Integer);
 begin
-// edx should be preserved
-
 // Source value
 Gen($58);                                                               // pop eax
 // Destination address
