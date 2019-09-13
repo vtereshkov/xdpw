@@ -285,11 +285,92 @@ end;// CompileConstExpression
 
 
 procedure CompilePredefinedProc(proc: Byte; LoopNesting: Integer);
+
+
+  function GetReadProcIdent(DataType: Integer): Integer;
+  begin
+  Result := 0;
+
+  if (Types[DataType].TypeKind = INTEGERTYPE) or
+    ((Types[DataType].TypeKind = SUBRANGETYPE) and (Types[Types[DataType].HostType].TypeKind = INTEGERTYPE)) then
+        Result := GetIdent('READINT')                 // Integer argument
+        
+  else if (Types[DataType].TypeKind = SMALLINTTYPE) or
+    ((Types[DataType].TypeKind = SUBRANGETYPE) and (Types[Types[DataType].HostType].TypeKind = SMALLINTTYPE)) then
+        Result := GetIdent('READSMALLINT')            // Small integer argument
+        
+  else if (Types[DataType].TypeKind = SHORTINTTYPE) or
+    ((Types[DataType].TypeKind = SUBRANGETYPE) and (Types[Types[DataType].HostType].TypeKind = SHORTINTTYPE)) then
+        Result := GetIdent('READSHORTINT')            // Short integer argument
+        
+  else if (Types[DataType].TypeKind = WORDTYPE) or
+    ((Types[DataType].TypeKind = SUBRANGETYPE) and (Types[Types[DataType].HostType].TypeKind = WORDTYPE)) then
+        Result := GetIdent('READWORD')                // Word argument
+
+  else if (Types[DataType].TypeKind = BYTETYPE) or
+    ((Types[DataType].TypeKind = SUBRANGETYPE) and (Types[Types[DataType].HostType].TypeKind = BYTETYPE)) then
+        Result := GetIdent('READBYTE')                // Byte argument
+       
+  else if (Types[DataType].TypeKind = BOOLEANTYPE) or
+    ((Types[DataType].TypeKind = SUBRANGETYPE) and (Types[Types[DataType].HostType].TypeKind = BOOLEANTYPE)) then
+        Result := GetIdent('READBOOLEAN')             // Boolean argument
+  
+  else if (Types[DataType].TypeKind = CHARTYPE) or
+    ((Types[DataType].TypeKind = SUBRANGETYPE) and (Types[Types[DataType].HostType].TypeKind = CHARTYPE)) then
+        Result := GetIdent('READCH')                  // Character argument
+        
+  else if Types[DataType].TypeKind = REALTYPE then
+        Result := GetIdent('READREAL')                // Real argument
+        
+  else if (Types[DataType].TypeKind = ARRAYTYPE) and (Types[DataType].BaseType = CHARTYPEINDEX) then
+        Result := GetIdent('READSTRING')              // String argument
+        
+  else
+    Error('Incompatible types', '', -1);
+ 
+  end; // GetReadProcIdent
+  
+  
+  
+  function GetWriteProcIdent(DataType: Integer): Integer;
+  begin
+  Result := 0;
+  
+  if (Types[DataType].TypeKind in IntegerTypes) or
+    ((Types[DataType].TypeKind = SUBRANGETYPE) and (Types[Types[DataType].HostType].TypeKind in IntegerTypes)) then
+        Result := GetIdent('WRITEINT')                 // Integer argument
+        
+  else if (Types[DataType].TypeKind = BOOLEANTYPE) or
+    ((Types[DataType].TypeKind = SUBRANGETYPE) and (Types[Types[DataType].HostType].TypeKind = BOOLEANTYPE)) then
+        Result := GetIdent('WRITEBOOLEAN')             // Boolean argument
+        
+  else if (Types[DataType].TypeKind = CHARTYPE) or
+    ((Types[DataType].TypeKind = SUBRANGETYPE) and (Types[Types[DataType].HostType].TypeKind = CHARTYPE)) then
+        Result := GetIdent('WRITECH')                  // Character argument
+        
+  else if Types[DataType].TypeKind = REALTYPE then
+        Result := GetIdent('WRITEREAL')                // Real argument
+        
+  else if Types[DataType].TypeKind = POINTERTYPE then
+        Result := GetIdent('WRITEPOINTER')             // Pointer argument
+        
+  else if (Types[DataType].TypeKind = ARRAYTYPE) and (Types[DataType].BaseType = CHARTYPEINDEX) then
+        Result := GetIdent('WRITESTRING')              // String argument
+        
+  else
+    Error('Incompatible types', '', -1);
+  
+  end; // GetWriteProcIdentIndex
+  
+ 
+
 var
   DesignatorType, ExpressionType: Integer;
   LibProcIdentIndex: Integer;
   IsFirstParam, FileSpecified: Boolean;
-begin
+  
+  
+begin // CompilePredefinedProc
 NextTok;
 
 case proc of
@@ -333,31 +414,8 @@ case proc of
           end
         else                                                        // Any output expression
           begin
-          LibProcIdentIndex := 0;
-
-          if (Types[DesignatorType].TypeKind = INTEGERTYPE) or
-            ((Types[DesignatorType].TypeKind = SUBRANGETYPE) and (Types[Types[DesignatorType].HostType].TypeKind = INTEGERTYPE)) then
-                LibProcIdentIndex := GetIdent('READINT')                 // Integer argument
-          else if (Types[DesignatorType].TypeKind = SMALLINTTYPE) or
-            ((Types[DesignatorType].TypeKind = SUBRANGETYPE) and (Types[Types[DesignatorType].HostType].TypeKind = SMALLINTTYPE)) then
-                LibProcIdentIndex := GetIdent('READSMALLINT')            // Small integer argument
-          else if (Types[DesignatorType].TypeKind = SHORTINTTYPE) or
-            ((Types[DesignatorType].TypeKind = SUBRANGETYPE) and (Types[Types[DesignatorType].HostType].TypeKind = SHORTINTTYPE)) then
-                LibProcIdentIndex := GetIdent('READSHORTINT')            // Short integer argument
-          else if (Types[DesignatorType].TypeKind = BOOLEANTYPE) or
-            ((Types[DesignatorType].TypeKind = SUBRANGETYPE) and (Types[Types[DesignatorType].HostType].TypeKind = BOOLEANTYPE)) then
-                LibProcIdentIndex := GetIdent('READBOOLEAN')             // Boolean argument          
-          else if (Types[DesignatorType].TypeKind = CHARTYPE) or
-            ((Types[DesignatorType].TypeKind = SUBRANGETYPE) and (Types[Types[DesignatorType].HostType].TypeKind = CHARTYPE)) then
-                LibProcIdentIndex := GetIdent('READCH')                  // Character argument
-          else if Types[DesignatorType].TypeKind = REALTYPE then
-                LibProcIdentIndex := GetIdent('READREAL')                // Real argument
-          else if (Types[DesignatorType].TypeKind = ARRAYTYPE) and (Types[DesignatorType].BaseType = CHARTYPEINDEX) then
-                LibProcIdentIndex := GetIdent('READSTRING')              // String argument
-          else
-            Error('Incompatible types', '', -1);
-
           // Call the specific output subroutine. Interface: FileHandle; StreamHandle; var Designator
+          LibProcIdentIndex := GetReadProcIdent(DesignatorType);          
           GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
           end; // else
 
@@ -426,27 +484,8 @@ case proc of
           end
         else                                                        // Any output expression
           begin
-          LibProcIdentIndex := 0;
-          
-          if (Types[ExpressionType].TypeKind in IntegerTypes) or
-            ((Types[ExpressionType].TypeKind = SUBRANGETYPE) and (Types[Types[ExpressionType].HostType].TypeKind in IntegerTypes)) then
-                LibProcIdentIndex := GetIdent('WRITEINT')                 // Integer argument
-          else if (Types[ExpressionType].TypeKind = BOOLEANTYPE) or
-            ((Types[ExpressionType].TypeKind = SUBRANGETYPE) and (Types[Types[ExpressionType].HostType].TypeKind = BOOLEANTYPE)) then
-                LibProcIdentIndex := GetIdent('WRITEBOOLEAN')             // Boolean argument
-          else if (Types[ExpressionType].TypeKind = CHARTYPE) or
-            ((Types[ExpressionType].TypeKind = SUBRANGETYPE) and (Types[Types[ExpressionType].HostType].TypeKind = CHARTYPE)) then
-                LibProcIdentIndex := GetIdent('WRITECH')                  // Character argument
-          else if Types[ExpressionType].TypeKind = REALTYPE then
-                LibProcIdentIndex := GetIdent('WRITEREAL')                // Real argument
-          else if Types[ExpressionType].TypeKind = POINTERTYPE then
-                LibProcIdentIndex := GetIdent('WRITEPOINTER')             // Pointer argument
-          else if (Types[ExpressionType].TypeKind = ARRAYTYPE) and (Types[ExpressionType].BaseType = CHARTYPEINDEX) then
-                LibProcIdentIndex := GetIdent('WRITESTRING')              // String argument
-          else
-            Error('Incompatible types', '', -1);
-
           // Call the specific output subroutine. Interface: FileHandle; StreamHandle; Expression
+          LibProcIdentIndex := GetWriteProcIdent(ExpressionType);
           GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
           end; // else
 
@@ -1999,7 +2038,7 @@ procedure CompileType{(var DataType: Integer)};
 
   CompileType(NestedDataType);
   
-  if (HighBound(NestedDataType) > MAXSETELEMENTS - 1) then
+  if (LowBound(NestedDataType) < 0) or (HighBound(NestedDataType) > MAXSETELEMENTS - 1) then
     Error('Too many set elements', '', -1);
   
   Types[DataType].BaseType := NestedDataType; 
@@ -2219,6 +2258,8 @@ var
   DeclareId('INTEGER',  USERTYPE, 0, INTEGERTYPEINDEX,  VALPASSING, 0, 0.0, 0);
   DeclareId('SMALLINT', USERTYPE, 0, SMALLINTTYPEINDEX, VALPASSING, 0, 0.0, 0);
   DeclareId('SHORTINT', USERTYPE, 0, SHORTINTTYPEINDEX, VALPASSING, 0, 0.0, 0);
+  DeclareId('WORD',     USERTYPE, 0, WORDTYPEINDEX,     VALPASSING, 0, 0.0, 0);
+  DeclareId('BYTE',     USERTYPE, 0, BYTETYPEINDEX,     VALPASSING, 0, 0.0, 0);  
   DeclareId('CHAR',     USERTYPE, 0, CHARTYPEINDEX,     VALPASSING, 0, 0.0, 0);
   DeclareId('BOOLEAN',  USERTYPE, 0, BOOLEANTYPEINDEX,  VALPASSING, 0, 0.0, 0);
   DeclareId('REAL',     USERTYPE, 0, REALTYPEINDEX,     VALPASSING, 0, 0.0, 0);
@@ -2267,6 +2308,8 @@ var
   Types[INTEGERTYPEINDEX].TypeKind  := INTEGERTYPE;
   Types[SMALLINTTYPEINDEX].TypeKind := SMALLINTTYPE;
   Types[SHORTINTTYPEINDEX].TypeKind := SHORTINTTYPE;
+  Types[WORDTYPEINDEX].TypeKind     := WORDTYPE;  
+  Types[BYTETYPEINDEX].TypeKind     := BYTETYPE;  
   Types[CHARTYPEINDEX].TypeKind     := CHARTYPE;
   Types[BOOLEANTYPEINDEX].TypeKind  := BOOLEANTYPE;
   Types[REALTYPEINDEX].TypeKind     := REALTYPE;

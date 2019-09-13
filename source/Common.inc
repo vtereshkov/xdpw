@@ -95,16 +95,18 @@ const
   INTEGERTYPE           = 2;
   SMALLINTTYPE          = 3;
   SHORTINTTYPE          = 4;
-  CHARTYPE              = 5;
-  BOOLEANTYPE           = 6;
-  REALTYPE              = 7;
-  POINTERTYPE           = 8;
-  FILETYPE              = 9;
-  ARRAYTYPE             = 10;
-  RECORDTYPE            = 11;
-  SETTYPE               = 12;
-  SUBRANGETYPE          = 13;
-  PROCEDURALTYPE        = 14;
+  WORDTYPE              = 5;
+  BYTETYPE              = 6;
+  CHARTYPE              = 7;
+  BOOLEANTYPE           = 8;
+  REALTYPE              = 9;
+  POINTERTYPE           = 10;
+  FILETYPE              = 11;
+  ARRAYTYPE             = 12;
+  RECORDTYPE            = 13;
+  SETTYPE               = 14;
+  SUBRANGETYPE          = 15;
+  PROCEDURALTYPE        = 16;
   FORWARDTYPE           = 101;
 
   // Predefined type indices
@@ -113,12 +115,14 @@ const
   INTEGERTYPEINDEX      = 2;
   SMALLINTTYPEINDEX     = 3;
   SHORTINTTYPEINDEX     = 4;
-  CHARTYPEINDEX         = 5;
-  BOOLEANTYPEINDEX      = 6;
-  REALTYPEINDEX         = 7;
-  POINTERTYPEINDEX      = 8;      // Untyped pointer, compatible with any other
-  FILETYPEINDEX         = 9;      // Universal file type
-  STRINGTYPEINDEX       = 10;
+  WORDTYPEINDEX         = 5;
+  BYTETYPEINDEX         = 6;  
+  CHARTYPEINDEX         = 7;
+  BOOLEANTYPEINDEX      = 8;
+  REALTYPEINDEX         = 9;
+  POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other
+  FILETYPEINDEX         = 11;     // Universal file type
+  STRINGTYPEINDEX       = 12;
 
   // Predefined routine codes
 
@@ -306,7 +310,7 @@ var
   
   MultiplicativeOperators, AdditiveOperators, UnaryOperators, RelationOperators,
   OperatorsForIntegers, OperatorsForReals, OperatorsForBooleans,
-  IntegerTypes, OrdinalTypes, NumericTypes, StructuredTypes, CastableTypes: set of Byte;
+  IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of Byte;
 
   NumIdent, NumTypes, NumImports, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, ForLoopNesting,
   CodeSize, CodePosStackTop, GlobalDataSize, CurBlockLocalDataSize, CurBlockTempStorageSize,
@@ -402,8 +406,9 @@ end;
 
 procedure FillTypeSets;
 begin
-IntegerTypes     := [INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE];
+IntegerTypes     := [INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE];
 OrdinalTypes     := IntegerTypes + [CHARTYPE, BOOLEANTYPE, SUBRANGETYPE];
+UnsignedTypes    := [WORDTYPE, BYTETYPE, CHARTYPE];
 NumericTypes     := IntegerTypes + [REALTYPE];
 StructuredTypes  := [ARRAYTYPE, RECORDTYPE, SETTYPE];
 CastableTypes    := OrdinalTypes + [FILETYPE, POINTERTYPE, PROCEDURALTYPE];
@@ -606,6 +611,8 @@ case Types[DataType].TypeKind of
   INTEGERTYPE:  Result := -2147483648;
   SMALLINTTYPE: Result := -32768;
   SHORTINTTYPE: Result := -128;
+  WORDTYPE:     Result :=  0;
+  BYTETYPE:     Result :=  0;
   CHARTYPE:     Result :=  0;
   BOOLEANTYPE:  Result := -1;
   SUBRANGETYPE: Result :=  Types[DataType].Low
@@ -624,6 +631,8 @@ case Types[DataType].TypeKind of
   INTEGERTYPE:  Result := 2147483647;
   SMALLINTTYPE: Result := 32767;
   SHORTINTTYPE: Result := 127;
+  WORDTYPE:     Result := 65535;
+  BYTETYPE:     Result := 255;  
   CHARTYPE:     Result := 255;
   BOOLEANTYPE:  Result := 0;
   SUBRANGETYPE: Result := Types[DataType].High
@@ -644,6 +653,8 @@ case Types[DataType].TypeKind of
   INTEGERTYPE:    Result := SizeOf(Integer);
   SMALLINTTYPE:   Result := SizeOf(SmallInt);
   SHORTINTTYPE:   Result := SizeOf(ShortInt);
+  WORDTYPE:       Result := SizeOf(Word);
+  BYTETYPE:       Result := SizeOf(Byte);  
   CHARTYPE:       Result := SizeOf(Char);
   BOOLEANTYPE:    Result := SizeOf(Boolean);
   REALTYPE:       Result := SizeOf(Single);

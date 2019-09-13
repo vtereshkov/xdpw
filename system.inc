@@ -31,8 +31,6 @@ const
 
 
 type
-  Byte = ShortInt;
-  Word = SmallInt;
   LongInt = Integer;  
   Single = Real;
   Text = file;  
@@ -573,6 +571,28 @@ end;
 
 
 procedure ReadShortInt(F: Text; P: PStream; var Number: ShortInt);
+var
+  IntNumber: Integer;
+begin
+ReadInt(F, P, IntNumber);
+Number := IntNumber;
+end;
+
+
+
+
+procedure ReadWord(F: Text; P: PStream; var Number: Word);
+var
+  IntNumber: Integer;
+begin
+ReadInt(F, P, IntNumber);
+Number := IntNumber;
+end;
+
+
+
+
+procedure ReadByte(F: Text; P: PStream; var Number: Byte);
 var
   IntNumber: Integer;
 begin

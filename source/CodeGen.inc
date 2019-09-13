@@ -165,26 +165,42 @@ end;
 
 procedure DerefPtr(DataType: Integer);
 begin
-Gen($5E);                                                       // pop esi
+Gen($5E);                                                         // pop esi
 
 case TypeSize(DataType) of
-  1: begin
-     Gen($8A); Gen($06);                                        // mov al, [esi]
-     Gen($66); Gen($98);                                        // cbw
-     Gen($98);                                                  // cwde
-     end;
-  2: begin
-     Gen($66); Gen($8B); Gen($06);                              // mov ax, [esi]
-     Gen($98);                                                  // cwde
-     end;
+
+  1: if DataType in UnsignedTypes then
+       begin
+       Gen($31); Gen($C0);                                        // xor eax, eax
+       Gen($8A); Gen($06);                                        // mov al, [esi]
+       end
+     else  
+       begin
+       Gen($8A); Gen($06);                                        // mov al, [esi]
+       Gen($66); Gen($98);                                        // cbw
+       Gen($98);                                                  // cwde
+       end;
+       
+  2: if DataType in UnsignedTypes then
+       begin
+       Gen($31); Gen($C0);                                        // xor eax, eax
+       Gen($66); Gen($8B); Gen($06);                              // mov ax, [esi]
+       end
+     else  
+       begin
+       Gen($66); Gen($8B); Gen($06);                              // mov ax, [esi]
+       Gen($98);                                                  // cwde
+       end;
+     
   4: begin
-     Gen($8B); Gen($06);                                        // mov eax, [esi]
+     Gen($8B); Gen($06);                                          // mov eax, [esi]
      end
+     
 else
   Error('Internal fault: Illegal designator size', '', -1);
 end;
 
-Gen($50);                                                       // push eax
+Gen($50);                                                         // push eax
 end;
 
 

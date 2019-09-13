@@ -32,7 +32,7 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * Object-oriented programming is not supported
 * There are no units. Source file inclusion directives should be used instead 
 * There are no labels, `goto` and `with` statements
-* There are no unsigned integers, double-precision floating-point numbers, enumerations, variant records, typed files
+* There are no double-precision floating-point numbers, enumerations, variant records, typed files
 * There are no typed constants
 * Open array parameters do not have `High` and `Low` functions. Array length should be explicitly passed to a subroutine 
 * Strings are null-terminated arrays of characters (C style)
