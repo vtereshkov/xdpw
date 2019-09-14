@@ -1757,27 +1757,33 @@ procedure CompileStatement{(LoopNesting: Integer)};
   if not (Types[Ident[CounterIndex].DataType].TypeKind in OrdinalTypes) then
     Error('Ordinal variable expected as FOR loop counter', '', -1);
 
+  // Assign initial value to the counter
   NextTok;
   CheckTok(ASSIGNTOK);
   
   PushVarPtr(Ident[CounterIndex].Value, Ident[CounterIndex].Scope, 0, RELOCDATA);  
-  CompileAssignment(Ident[CounterIndex].DataType);         // Assign initial value to the counter
+  CompileAssignment(Ident[CounterIndex].DataType);
 
   if not (Tok.Kind in [TOTOK, DOWNTOTOK]) then
     Error('Expected TO or DOWNTO but found ', '', Tok.Kind);
 
   Down := Tok.Kind = DOWNTOTOK;
-
   NextTok;
-  CompileExpression(ExpressionType);
-  GetCompatibleType(ExpressionType, Ident[CounterIndex].DataType);
-
-  Inc(CodePosStackTop);
-  CodePosStack[CodePosStackTop] := CodeSize;                // Save return address used by GenerateForEpilog
-
+  
+  // Compute and save the total number of iterations
   PushVarPtr(Ident[CounterIndex].Value, Ident[CounterIndex].Scope, 0, RELOCDATA);
   DerefPtr(Ident[CounterIndex].DataType);
-  GenerateForCondition(Ident[CounterIndex].DataType, Down); // Satisfied if counter does not reach the second expression value
+  
+  CompileExpression(ExpressionType);
+  GetCompatibleType(ExpressionType, Ident[CounterIndex].DataType);
+  GenerateForNumberOfIterations(Down);
+  
+  // Save return address used by GenerateForEpilog
+  Inc(CodePosStackTop);
+  CodePosStack[CodePosStackTop] := CodeSize;
+
+  // Check the remaining number of iterations
+  GenerateForCondition;
 
   EatTok(DOTOK);
   
@@ -1792,7 +1798,8 @@ procedure CompileStatement{(LoopNesting: Integer)};
   GenerateForEpilog(Ident[CounterIndex].DataType, Down);
   GenerateBreakEpilog(LoopNesting);
   
-  DiscardStackTop;                                          // Pop and discard final value of the counter
+  // Pop and discard the remaining number of iterations (i.e. zero)
+  DiscardStackTop;                                          
   end; // CompileForStatement
 
 

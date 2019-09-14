@@ -749,42 +749,6 @@ end;
 
 
 
-procedure GenerateWhileCondition;
-begin
-GenerateIfCondition;
-end;
-
-
-
-
-procedure GenerateRepeatCondition;
-begin
-GenerateIfCondition;
-end;
-
-
-
-
-procedure GenerateForCondition(CounterType: Integer; Down: Boolean);
-begin
-Gen($58);                                                   // pop eax         ; current value of the counter
-Gen($59);                                                   // pop ecx         ; final value of the counter
-Gen($51);                                                   // push ecx        ; final value of the counter will be removed from stack and the end of FOR loop  
-
-Gen($3B); Gen($C1);                                         // cmp eax, ecx
-if Down then
-  begin
-  Gen($7D); Gen($05);                                       // jge +5
-  end
-else
-  begin
-  Gen($7E); Gen($05);                                       // jle +5
-  end;
-end;
-
-
-
-
 procedure GenerateIfProlog;
 begin
 Inc(CodePosStackTop);
@@ -901,6 +865,14 @@ end;
 
 
 
+procedure GenerateWhileCondition;
+begin
+GenerateIfCondition;
+end;
+
+
+
+
 procedure GenerateWhileProlog;
 begin
 GenerateIfProlog;
@@ -929,6 +901,14 @@ end;
 
 
 
+procedure GenerateRepeatCondition;
+begin
+GenerateIfCondition;
+end;
+
+
+
+
 procedure GenerateRepeatProlog;
 begin
 Inc(CodePosStackTop);
@@ -947,7 +927,39 @@ Dec(CodePosStackTop);
 
 CurPos := CodeSize;
 
-Gen($E9); GenDWord(ReturnPos - (CurPos + 5));                // jmp ReturnPos
+Gen($E9); GenDWord(ReturnPos - (CurPos + 5));               // jmp ReturnPos
+end;
+
+
+
+
+procedure GenerateForNumberOfIterations(Down: Boolean);
+begin
+if Down then
+  begin
+  Gen($59);                                                 // pop ecx       ; final value
+  Gen($58);                                                 // pop eax       ; initial value  
+  end
+else
+  begin  
+  Gen($58);                                                 // pop eax       ; final value
+  Gen($59);                                                 // pop ecx       ; initial value
+  end;    
+  
+Gen($2B); Gen($C1);                                         // sub eax, ecx
+Gen($40);                                                   // inc eax
+Gen($50);                                                   // push eax  
+end;
+
+
+
+
+procedure GenerateForCondition;
+begin
+Gen($58);                                                   // pop eax       ; remaining number of iterations
+Gen($50);                                                   // push eax
+Gen($83); Gen($F8); Gen($00);                               // cmp eax, 0
+Gen($7F); Gen($05);                                         // jg +5
 end;
 
 
@@ -962,13 +974,19 @@ end;
 
 
 
-
 procedure GenerateForEpilog(CounterType: Integer; Down: Boolean);
 begin
+// Increment/decrement counter variable
 if Down then
   GenerateIncDec(DECPROC, TypeSize(CounterType))
 else
   GenerateIncDec(INCPROC, TypeSize(CounterType));
+  
+// Decrement remaining number of iterations
+Gen($58);                                                   // pop eax
+Gen($48);                                                   // dec eax
+Gen($50);                                                   // push eax
+  
 GenerateWhileEpilog;
 
 Dec(ForLoopNesting);
@@ -1152,7 +1170,7 @@ var
   i: Integer;
 begin
 for i := 1 to ForLoopNesting do
-  Gen($59);                                                    // pop ecx    ; Remove the final value of the counter from the stack
+  Gen($59);                                                    // pop ecx    ; remove the remaining number of iterations
 
 Inc(ExitCall.NumCalls);
 ExitCall.Pos[ExitCall.NumCalls] := CodeSize;
