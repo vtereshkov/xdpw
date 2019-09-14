@@ -37,6 +37,7 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * Open array parameters do not have `High` and `Low` functions. Array length should be explicitly passed to a subroutine 
 * Strings are null-terminated arrays of characters (C style)
 * The only file type is `Text`, which is equivalent to `file`. It can be used for both text and untyped files
+* There is no `Assign` procedure. File names should be passed directly to `Reset` or `Rewrite` (Apple Pascal style)
 * Arrays, strings and records cannot be passed to subroutines without `const` or `var`, or used as function results
 * Calls via procedural variables require parentheses even for empty parameter lists
 * The `external` directive is used for Windows API function declarations. It implies the `stdcall` calling convention
