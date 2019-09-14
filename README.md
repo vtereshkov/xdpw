@@ -25,25 +25,30 @@ The source file should be specified with its extension (.pas).
  
 ### Language
 
-#### Overview
-XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal with the following enhancements, differences and limitations:
+XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal with the following changes:
+
+#### Enhancements
 * The target operating system is Windows
 * The compiler is self-hosting
-* Object-oriented programming is not supported
-* There is no `uses` clause. The `$I` directive should be used instead (Turbo Pascal 3 style) 
-* There are no labels, `goto` and `with` statements
-* There are no double-precision floating-point numbers, enumerations, variant records, typed files
-* There are no typed constants
-* Open array parameters do not have `High` and `Low` functions. Array length should be explicitly passed to a subroutine 
-* Strings are null-terminated arrays of characters (C style)
-* The only file type is `Text`, which is equivalent to `file`. It can be used for both text and untyped files
-* There is no `Assign` procedure. File names should be passed directly to `Reset` or `Rewrite` (Apple Pascal style)
-* Arrays, strings and records cannot be passed to subroutines without `const` or `var`, or used as function results
-* Calls via procedural variables require parentheses even for empty parameter lists
-* The `external` directive is used for Windows API function declarations. It implies the `stdcall` calling convention
 * The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
 * Functions can be called as procedures (Delphi style)
 * Single-line comments (`//`) are supported (Delphi style)
+
+#### Differences
+* Strings are null-terminated arrays of characters (C style)
+* There is no `Assign` procedure. File names should be passed directly to `Reset` or `Rewrite` (Apple Pascal style)
+* Calls via procedural variables require parentheses even for empty parameter lists
+* The `external` directive implies the `stdcall` calling convention
+
+#### Limitations
+* No object-oriented programming
+* No `uses` clause. The `$I` directive should be used instead (Turbo Pascal 3 style) 
+* No labels, `goto` and `with` statements
+* No typed constants
+* No double-precision floating-point numbers, enumerations, variant records, typed files
+* No `High` and `Low` functions for open arrays. Array length should be explicitly passed to a subroutine 
+* The `Text` type is equivalent to `file`. It can be used for both text and untyped files
+* Arrays, strings and records cannot be passed to subroutines without `const` or `var`, or used as function results
 
 #### Formal grammar
 ```
