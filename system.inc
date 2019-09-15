@@ -249,7 +249,7 @@ end;
 
 procedure Reset(var F: file; const Name: string);
 begin
-F := CreateFileA(Name, GENERIC_READ, 0, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+F := CreateFileA(Name, GENERIC_READ or GENERIC_WRITE, 0, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 if Integer(F) = INVALID_HANDLE_VALUE then IOError := -2;
 end;
 

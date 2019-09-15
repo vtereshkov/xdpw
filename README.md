@@ -45,9 +45,9 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * No labels, `goto` and `with` statements
 * No typed constants
 * No double-precision floating-point numbers, enumerations, variant records, typed files
-* No `High` and `Low` functions for open arrays. Array length should be explicitly passed to a subroutine 
+* No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * The `Text` type is equivalent to `file`. It can be used for both text and untyped files
-* Arrays, strings and records cannot be passed to subroutines without `const` or `var`, or used as function results
+* Arrays, records and sets cannot be passed to subroutines without `const` or `var`, or used as function results
 
 #### Formal grammar
 ```
