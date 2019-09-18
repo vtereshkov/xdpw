@@ -33,7 +33,8 @@ hdc := BeginPaint(hWnd, ps);
 
 FillRect(hdc, ps.rcPaint, COLOR_WINDOW + 1);
 for i := 1 to NumPoints do
-  Ellipse(hdc, Points[i].x - 2, Points[i].y - 2, Points[i].x + 2, Points[i].y + 2);
+  with Points[i] do
+    Ellipse(hdc, x - 2, y - 2, x + 2, y + 2);
  
 EndPaint(hWnd, ps);
 end;
@@ -56,8 +57,12 @@ case uMsg of
       if (wParam and MK_LBUTTON <> 0) and (NumPoints < MAX_POINTS) then
         begin
         Inc(NumPoints);
-        Points[NumPoints].x := lParam and $FFFF;
-        Points[NumPoints].y := (lParam shr 16) and $FFFF;
+        
+        with Points[NumPoints] do
+          begin
+          x := lParam and $FFFF;
+          y := (lParam shr 16) and $FFFF;
+          end;
          
         InvalidateRect(hWnd, nil, 0);
         end;
@@ -79,7 +84,7 @@ end;
  
 var
   wc: WNDCLASSA;
-  hInstance, hWnd: LongInt;
+  hInst, hWnd: LongInt;
   message: MSG;
   ClassName: string; 
 
@@ -89,19 +94,22 @@ var
 begin
 NumPoints := 0;
 
-hInstance := GetModuleHandleA(nil);
+hInst := GetModuleHandleA(nil);
 ClassName := 'Main Window Class';
 
-wc.style         := 0;
-wc.lpfnWndProc   := @WindowProc;
-wc.cbClsExtra    := 0;
-wc.cbWndExtra    := 0;
-wc.hInstance     := hInstance;
-wc.hIcon         := 0;
-wc.hCursor       := LoadCursorA(0, Pointer(IDC_ARROW));
-wc.hbrBackground := 0;
-wc.lpszMenuName  := nil;
-wc.lpszClassName := @ClassName;  
+with wc do
+  begin
+  style         := 0;
+  lpfnWndProc   := @WindowProc;
+  cbClsExtra    := 0;
+  cbWndExtra    := 0;
+  hInstance     := hInst;
+  hIcon         := 0;
+  hCursor       := LoadCursorA(0, Pointer(IDC_ARROW));
+  hbrBackground := 0;
+  lpszMenuName  := nil;
+  lpszClassName := @ClassName;
+  end;  
 
 RegisterClassA(wc);
 
@@ -115,7 +123,7 @@ hWnd := CreateWindowExA(0,                      // optional styles
                         480,                    // height
                         0,                      // parent window
                         0,                      // menu
-                        hInstance,              // handle
+                        hInst,                  // handle
                         nil);                   // additional application data                       
 
 ShowWindow(hWnd, SW_SHOWDEFAULT);

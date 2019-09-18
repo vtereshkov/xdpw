@@ -523,6 +523,7 @@ case proc of
       end;
     
     end;// WRITEPROC, WRITELNPROC
+    
 
   NEWPROC, DISPOSEPROC:
     begin
@@ -543,22 +544,26 @@ case proc of
     EatTok(CPARTOK);
     end;
     
+    
   BREAKPROC:
     begin
     if LoopNesting < 1 then
       Error('BREAK outside of loop is not allowed', '', -1);
     GenerateBreakCall(LoopNesting);
-    end;  
+    end;
+  
 
   CONTINUEPROC:
     begin
     if LoopNesting < 1 then
       Error('CONTINUE outside of loop is not allowed', '', -1);
     GenerateContinueCall(LoopNesting);
-    end;    
+    end;
+    
     
   EXITPROC:
-    GenerateExitCall;  
+    GenerateExitCall;
+  
 
   HALTPROC:
     begin
@@ -592,23 +597,34 @@ NextTok;
 EatTok(OPARTOK);
 
 case func of
+
   SIZEOFFUNC:
     begin
     AssertIdent;
-    IdentIndex := GetIdent(Tok.Name);
-    if Ident[IdentIndex].Kind = USERTYPE then
-      begin
-      NextTok;
-      PushConst(TypeSize(Ident[IdentIndex].DataType));
-      end
-    else
+    if FieldInsideWithFound(Tok.Name) then                // Record field inside a WITH block
       begin
       CompileDesignator(ValType);
       DiscardStackTop;
-      PushConst(TypeSize(ValType));
+      PushConst(TypeSize(ValType));      
+      end
+    else                                                  // Ordinary identifier
+      begin  
+      IdentIndex := GetIdent(Tok.Name);
+      if Ident[IdentIndex].Kind = USERTYPE then
+        begin
+        NextTok;
+        PushConst(TypeSize(Ident[IdentIndex].DataType));
+        end
+      else
+        begin
+        CompileDesignator(ValType);
+        DiscardStackTop;
+        PushConst(TypeSize(ValType));
+        end;
       end;
     ValType := INTEGERTYPEINDEX;
     end;
+    
 
   ROUNDFUNC, TRUNCFUNC:
     begin
@@ -625,6 +641,7 @@ case func of
     GenerateRound(func = TRUNCFUNC);
     ValType := INTEGERTYPEINDEX;
     end;
+    
 
   ORDFUNC:
     begin
@@ -633,6 +650,7 @@ case func of
       Error('Ordinal type expected', '', -1);
     ValType := INTEGERTYPEINDEX;
     end;
+    
 
   CHRFUNC:
     begin
@@ -640,6 +658,7 @@ case func of
     GetCompatibleType(ValType, INTEGERTYPEINDEX);
     ValType := CHARTYPEINDEX;
     end;
+    
 
   PREDFUNC, SUCCFUNC:
     begin
@@ -652,6 +671,7 @@ case func of
       PushConst(-1);
     GenerateBinaryOperator(PLUSTOK, INTEGERTYPEINDEX);
     end;
+    
 
   ABSFUNC, SQRFUNC, SINFUNC, COSFUNC, ARCTANFUNC, EXPFUNC, LNFUNC, SQRTFUNC:
     begin
@@ -677,6 +697,7 @@ case func of
 
     GenerateMathFunction(func, ValType);
     end;
+    
 end;// case
 
 EatTok(CPARTOK);
@@ -963,7 +984,7 @@ end; // CompileIndirectCall
 
 procedure CompileFieldInsideWith(var ValType: Integer);
 var
-  FieldIndex, WithIndex: Integer;
+  FieldIndex: Integer;
   RecType: Integer;
   TempStorageAddr: Integer;
 begin 
@@ -1149,9 +1170,7 @@ procedure CompileFactor(var ValType: Integer);
   
   
 var
-  IdentIndex, FieldIndex: Integer;
-  RecType: Integer;
-  RecPointer: Integer;
+  IdentIndex: Integer;
   FictitiousIntegerPtr: ^Integer;
   NotOpTok: TToken;
 
@@ -1160,10 +1179,7 @@ begin // CompileFactor
 case Tok.Kind of
 
   IDENTTOK:
-    begin
-    FieldIndex := GetFieldInsideWith(RecPointer, RecType, Tok.Name);
-    
-    if FieldIndex <> 0 then                                                             // Record field inside a WITH block
+    if FieldInsideWithFound(Tok.Name) then                                              // Record field inside a WITH block
       begin
       CompileDesignator(ValType);
       CompileDereferenceOrCall(ValType);
@@ -1223,25 +1239,30 @@ case Tok.Kind of
       else
         Error('Internal fault: Illegal identifier', '', -1);  
       end; // case Ident[IdentIndex].Kind
-      end; // else 
-    end;  
+      end; // else  
 
 
   ADDRESSTOK:
     begin
     NextTok;
-    IdentIndex := GetIdent(Tok.Name);
     
-    if Ident[IdentIndex].Kind in [PROC, FUNC] then
-      begin
-      if (Ident[IdentIndex].PredefIndex <> 0) or (Ident[IdentIndex].Block <> 1) then
-        Error('Procedure or function cannot be predefined or nested', '', -1);
-        
-      PushRelocConst(Ident[IdentIndex].Value, RELOCCODE); // To be resolved later when code section origin is known
-      NextTok;
-      end
-    else  
-      CompileDesignator(ValType);
+    if FieldInsideWithFound(Tok.Name) then                  // Record field inside a WITH block
+      CompileDesignator(ValType)
+    else                                                    // Ordinary identifier
+      begin  
+      IdentIndex := GetIdent(Tok.Name);
+      
+      if Ident[IdentIndex].Kind in [PROC, FUNC] then
+        begin
+        if (Ident[IdentIndex].PredefIndex <> 0) or (Ident[IdentIndex].Block <> 1) then
+          Error('Procedure or function cannot be predefined or nested', '', -1);
+          
+        PushRelocConst(Ident[IdentIndex].Value, RELOCCODE); // To be resolved later when code section origin is known
+        NextTok;
+        end
+      else  
+        CompileDesignator(ValType);
+      end;  
       
     ValType := POINTERTYPEINDEX;
     end;
@@ -1924,19 +1945,16 @@ procedure CompileStatement{(LoopNesting: Integer)};
 
   
 var
-  IdentIndex, FieldIndex, ResultIdentIndex: Integer;
-  DesignatorType, RecType: Integer;
-  RecPointer: Integer;
+  IdentIndex, ResultIdentIndex: Integer;
+  DesignatorType: Integer;
 
   
 begin // CompileStatement
 case Tok.Kind of
 
   IDENTTOK:
-    begin
-    FieldIndex := GetFieldInsideWith(RecPointer, RecType, Tok.Name);
-    
-    if FieldIndex <> 0 then                                             // Record field inside a WITH block
+    begin   
+    if FieldInsideWithFound(Tok.Name) then                              // Record field inside a WITH block
       begin
       CompileDesignator(DesignatorType);
       CompileAssignmentOrCall(DesignatorType);

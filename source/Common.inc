@@ -591,8 +591,6 @@ end;
 
 
 function GetField(RecType: Integer; const S: TString): Integer;
-var
-  FieldIndex: Integer;
 begin
 Result := GetFieldUnsafe(RecType, S);
 if Result = 0 then
@@ -620,7 +618,18 @@ for WithIndex := WithNesting downto 1 do
   end;
 
 Result := 0;  
-end;        
+end;
+
+
+
+
+function FieldInsideWithFound(const S: TString): Boolean;
+var
+  RecPointer: Integer; 
+  RecType: Integer;        
+begin
+Result := GetFieldInsideWith(RecPointer, RecType, S) <> 0;
+end;
 
 
 

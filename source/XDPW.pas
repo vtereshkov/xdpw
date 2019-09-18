@@ -66,7 +66,7 @@ FillOperatorSets;
 FillTypeSets;
  
 IsConsoleProgram := 1;  // Console program by default  
-DataSectionOrigin := IMAGEBASE + Align(SizeOf(Headers), SECTIONALIGNMENT) + Align(SizeOf(TImportSection), SECTIONALIGNMENT);
+DataSectionOrigin := IMGBASE + Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN);
 
 ZeroAll;
 FillChar(ImportSection, SizeOf(ImportSection), #0);
@@ -76,8 +76,8 @@ CompileProgram;
 FinalizeScanner;
 
 FillHeaders(CodeSize, NumStaticStrChars, GlobalDataSize);
-Relocate(IMAGEBASE + Headers.CodeSectionHeader.VirtualAddress, 
-         IMAGEBASE + Headers.DataSectionHeader.VirtualAddress + NumStaticStrChars);
+Relocate(IMGBASE + Headers.CodeSectionHeader.VirtualAddress, 
+         IMGBASE + Headers.DataSectionHeader.VirtualAddress + NumStaticStrChars);
 
 
 // Write output file
@@ -88,16 +88,16 @@ if IOResult <> 0 then
   Error('Unable to open output file ', ExeName, -1);
   
 BlockWrite(OutFile, Headers, SizeOf(Headers));
-Pad(OutFile, SizeOf(Headers), FILEALIGNMENT);
+Pad(OutFile, SizeOf(Headers), FILEALIGN);
 
 BlockWrite(OutFile, ImportSection, SizeOf(ImportSection));
-Pad(OutFile, SizeOf(ImportSection), FILEALIGNMENT);
+Pad(OutFile, SizeOf(ImportSection), FILEALIGN);
 
 BlockWrite(OutFile, StaticStringData, NumStaticStrChars);
-Pad(OutFile, NumStaticStrChars, FILEALIGNMENT);
+Pad(OutFile, NumStaticStrChars, FILEALIGN);
 
 BlockWrite(OutFile, Code, CodeSize);
-Pad(OutFile, CodeSize, FILEALIGNMENT);
+Pad(OutFile, CodeSize, FILEALIGN);
   
 Close(OutFile);
 

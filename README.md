@@ -7,7 +7,7 @@ XD Pascal is a small educational self-hosting compiler for a subset of the Pasca
 
 ### Features
 * Recursive descent parsing
-* Native x86 code generation (Windows executables)
+* Native x86 code generation (32 bit Windows executables)
 * Support for both console and GUI applications
 * No external assembler or linker needed
 * Floating-point arithmetic using the x87 FPU
@@ -35,7 +35,8 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 
 #### Differences
 * Strings are null-terminated arrays of characters (C style)
-* There is no `Assign` procedure. File names should be passed directly to `Reset` or `Rewrite` (Apple Pascal style)
+* No `Assign` procedure. File names should be passed directly to `Reset` or `Rewrite` (Apple Pascal style)
+* The `Text` type is equivalent to `file`. It can be used for both text and untyped files
 * Calls via procedural variables require parentheses even for empty parameter lists
 * The `external` directive implies the `stdcall` calling convention
 
@@ -46,7 +47,6 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * No typed constants
 * No double-precision floating-point numbers, enumerations, variant records, typed files
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
-* The `Text` type is equivalent to `file`. It can be used for both text and untyped files
 * Arrays, records and sets cannot be passed to subroutines without `const` or `var`, or used as function results
 
 #### Formal grammar
