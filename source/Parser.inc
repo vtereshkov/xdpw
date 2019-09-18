@@ -956,7 +956,30 @@ DerefPtr(ProcVarType);
 CompileActualParameters(Types[ProcVarType].NumParams, Types[ProcVarType].Param);
 
 GenerateIndirectCall(Types[ProcVarType].NumParams);
-end; // CompileIndirectCall  
+end; // CompileIndirectCall
+
+
+
+
+procedure CompileFieldInsideWith(var ValType: Integer);
+var
+  FieldIndex, WithIndex: Integer;
+  RecType: Integer;
+  TempStorageAddr: Integer;
+begin 
+ValType := 0;
+
+FieldIndex := GetFieldInsideWith(TempStorageAddr, RecType, Tok.Name);
+  
+if FieldIndex <> 0 then
+  begin
+  PushVarPtr(TempStorageAddr, LOCAL, 0, RELOCNONE);
+  DerefPtr(POINTERTYPEINDEX);
+  
+  GetFieldPtr(RecType, FieldIndex);
+  ValType := Types[RecType].Field[FieldIndex]^.DataType;    
+  end;
+end; // CompileFieldInsideWith  
 
 
 
@@ -966,61 +989,76 @@ var
   IdentIndex, FieldIndex: Integer;
   ArrayIndexType: Integer;
   IsRefParam: Boolean;
+  
 begin
 AssertIdent;
 
-IdentIndex := GetIdent(Tok.Name);
+// First search among records in WITH blocks
+CompileFieldInsideWith(ValType);
 
-if Ident[IdentIndex].Kind <> VARIABLE then
-  Error('Expected variable but found ', '', Tok.Kind);
+// If unsuccessful, search among ordinary variables
+if ValType = 0 then
+  begin
+  IdentIndex := GetIdent(Tok.Name);
 
-PushVarPtr(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, BlockStackTop - Ident[IdentIndex].NestingLevel, RELOCDATA);
-ValType := Ident[IdentIndex].DataType;
+  if Ident[IdentIndex].Kind <> VARIABLE then
+    Error('Expected variable but found ', '', Tok.Kind);
 
+  PushVarPtr(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, BlockStackTop - Ident[IdentIndex].NestingLevel, RELOCDATA);
+  ValType := Ident[IdentIndex].DataType;
 
-if Types[Ident[IdentIndex].DataType].TypeKind in StructuredTypes + [ANYTYPE] then
-  IsRefParam := Ident[IdentIndex].PassMethod in [CONSTPASSING, VARPASSING]    // For structured parameters, CONST is equivalent to VAR
-else
-  IsRefParam := Ident[IdentIndex].PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
+  if Types[Ident[IdentIndex].DataType].TypeKind in StructuredTypes + [ANYTYPE] then
+    IsRefParam := Ident[IdentIndex].PassMethod in [CONSTPASSING, VARPASSING]    // For structured parameters, CONST is equivalent to VAR
+  else
+    IsRefParam := Ident[IdentIndex].PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
 
-if IsRefParam then DerefPtr(POINTERTYPEINDEX);                                // Parameter is passed by reference
+  if IsRefParam then DerefPtr(POINTERTYPEINDEX);                                // Parameter is passed by reference
+  end; // if
 
-
+  
+// Apply dereferencing, indexing, field accessing
 NextTok;
 
 while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK] do
-  if Tok.Kind = DEREFERENCETOK then                           // Pointer dereferencing
-    begin
-    if (Types[ValType].TypeKind <> POINTERTYPE) or (Types[ValType].BaseType = ANYTYPEINDEX) then
-      Error('Typed pointer expected', '', -1);
-    DerefPtr(ValType);
-    ValType := Types[ValType].BaseType;
-    NextTok;
-    end
-  else if Tok.Kind = OBRACKETTOK then                         // Array element access
-    begin
-    repeat
-      if Types[ValType].TypeKind <> ARRAYTYPE then
-        Error('Array expected', '', -1);
-      NextTok;
-      CompileExpression(ArrayIndexType);                        // Array index
-      GetCompatibleType(ArrayIndexType, Types[ValType].IndexType);
-      GetArrayElementPtr(ValType);
+  case Tok.Kind of
+  
+    DEREFERENCETOK:                           // Pointer dereferencing
+      begin
+      if (Types[ValType].TypeKind <> POINTERTYPE) or (Types[ValType].BaseType = ANYTYPEINDEX) then
+        Error('Typed pointer expected', '', -1);
+      DerefPtr(ValType);
       ValType := Types[ValType].BaseType;
-    until Tok.Kind <> COMMATOK;
-    EatTok(CBRACKETTOK);
-    end
-  else if Tok.Kind = PERIODTOK then                           // Record field access
-    begin
-    if Types[ValType].TypeKind <> RECORDTYPE then
-      Error('Record expected', '', -1);
-    NextTok;
-    AssertIdent;
-    FieldIndex := GetField(ValType, Tok.Name);
-    GetFieldPtr(ValType, FieldIndex);
-    ValType := Types[ValType].Field[FieldIndex]^.DataType;
-    NextTok;   
-    end;
+      NextTok;
+      end;
+    
+    OBRACKETTOK:                              // Array element access
+      begin
+      repeat
+        if Types[ValType].TypeKind <> ARRAYTYPE then
+          Error('Array expected', '', -1);
+        NextTok;
+        CompileExpression(ArrayIndexType);    // Array index
+        GetCompatibleType(ArrayIndexType, Types[ValType].IndexType);
+        GetArrayElementPtr(ValType);
+        ValType := Types[ValType].BaseType;
+      until Tok.Kind <> COMMATOK;
+      EatTok(CBRACKETTOK);
+      end;
+      
+    PERIODTOK:                                // Record field access
+      begin
+      if Types[ValType].TypeKind <> RECORDTYPE then
+        Error('Record expected', '', -1);
+      NextTok;
+      AssertIdent;
+      FieldIndex := GetField(ValType, Tok.Name);
+      GetFieldPtr(ValType, FieldIndex);
+      ValType := Types[ValType].Field[FieldIndex]^.DataType;
+      NextTok;   
+      end;
+    
+  end; // case
+  
 end; // CompileDesignator
 
 
@@ -1094,77 +1132,98 @@ end; // CompileSetConstructor
 
 
 procedure CompileFactor(var ValType: Integer);
+
+
+  procedure CompileDereferenceOrCall(var ValType: Integer);
+  begin
+  if Tok.Kind = OPARTOK then                     // Procedural variable call - parentheses required even for empty parameter list
+    begin
+    CompileIndirectCall(ValType, TRUE);
+    RestoreStackTopFromEAX;
+    ValType := Types[ValType].ResultType;
+    end       
+  else                                           // Usual variable
+    if not (Types[ValType].TypeKind in StructuredTypes) then // Factors of type 'array', 'record', 'set' should contain a pointer to them
+      DerefPtr(ValType);
+  end; // CompileDereferenceOrCall
+  
+  
 var
-  IdentIndex: Integer;
-  NotOpTok: TToken;
+  IdentIndex, FieldIndex: Integer;
+  RecType: Integer;
+  RecPointer: Integer;
   FictitiousIntegerPtr: ^Integer;
-begin
+  NotOpTok: TToken;
+
+  
+begin // CompileFactor
 case Tok.Kind of
+
   IDENTTOK:
     begin
-    IdentIndex := GetIdent(Tok.Name);
+    FieldIndex := GetFieldInsideWith(RecPointer, RecType, Tok.Name);
     
-    case Ident[IdentIndex].Kind of
-      PROC:
-        Error('Expected expression but found procedure ', Ident[IdentIndex].Name, -1);
-        
-      FUNC:                                                                           // Function call
-        if Ident[IdentIndex].PredefIndex <> 0 then                                    // Predefined function call
-          CompilePredefinedFunc(Ident[IdentIndex].PredefIndex, ValType)
-        else                                                                          // User-defined function call
+    if FieldIndex <> 0 then                                                             // Record field inside a WITH block
+      begin
+      CompileDesignator(ValType);
+      CompileDereferenceOrCall(ValType);
+      end      
+    else                                                                                // Ordinary identifier
+      begin
+      IdentIndex := GetIdent(Tok.Name);
+
+      case Ident[IdentIndex].Kind of
+        PROC:
+          Error('Expected expression but found procedure ', Ident[IdentIndex].Name, -1);
+          
+        FUNC:                                                                           // Function call
+          if Ident[IdentIndex].PredefIndex <> 0 then                                    // Predefined function call
+            CompilePredefinedFunc(Ident[IdentIndex].PredefIndex, ValType)
+          else                                                                          // User-defined function call
+            begin
+            NextTok;
+            CompileCall(IdentIndex);
+            RestoreStackTopFromEAX;
+            ValType := Ident[IdentIndex].DataType;
+            end;
+            
+        VARIABLE:                                                                       // Designator
           begin
-          NextTok;
-          CompileCall(IdentIndex);
-          RestoreStackTopFromEAX;
-          ValType := Ident[IdentIndex].DataType;
+          CompileDesignator(ValType);
+          CompileDereferenceOrCall(ValType);   
           end;
           
-      VARIABLE:                                                                       // Designator
-        begin
-        CompileDesignator(ValType);
-       
-        if Tok.Kind = OPARTOK then                     // Procedural variable call - parentheses required even for empty parameter list
+        CONSTANT:                                                                       // Constant
           begin
-          CompileIndirectCall(ValType, TRUE);
-          RestoreStackTopFromEAX;
-          ValType := Types[ValType].ResultType;
-          end       
-        else                                           // Usual variable
-          if not (Types[ValType].TypeKind in StructuredTypes) then // Factors of type 'array', 'record', 'set' should contain a pointer to them
-            DerefPtr(ValType);
-   
-        end;
-        
-      CONSTANT:                                                                       // Constant
-        begin
-        ValType := Ident[IdentIndex].DataType;
-        if ValType = REALTYPE then
-          begin
-          FictitiousIntegerPtr := Pointer(@Ident[IdentIndex].FracValue);
-          PushConst(Integer(FictitiousIntegerPtr^));
+          ValType := Ident[IdentIndex].DataType;
+          if ValType = REALTYPE then
+            begin
+            FictitiousIntegerPtr := Pointer(@Ident[IdentIndex].FracValue);
+            PushConst(Integer(FictitiousIntegerPtr^));
+            end
+          else
+            PushConst(Ident[IdentIndex].Value);
+          NextTok;
+          end;
+          
+        USERTYPE:                                                                       // Type cast
+          begin                                                                      
+          NextTok;
+          EatTok(OPARTOK);
+          CompileExpression(ValType);
+          EatTok(CPARTOK);
+
+          if not ((Types[Ident[IdentIndex].DataType].TypeKind in CastableTypes) and 
+                  (Types[ValType].TypeKind in CastableTypes)) then
+            Error('Invalid typecast', '', -1);
+
+          ValType := Ident[IdentIndex].DataType;
           end
-        else
-          PushConst(Ident[IdentIndex].Value);
-        NextTok;
-        end;
-        
-      USERTYPE:                                                                       // Type cast
-        begin                                                                      
-        NextTok;
-        EatTok(OPARTOK);
-        CompileExpression(ValType);
-        EatTok(CPARTOK);
-
-        if not ((Types[Ident[IdentIndex].DataType].TypeKind in CastableTypes) and 
-                (Types[ValType].TypeKind in CastableTypes)) then
-          Error('Invalid typecast', '', -1);
-
-        ValType := Ident[IdentIndex].DataType;
-        end
-        
+          
       else
         Error('Internal fault: Illegal identifier', '', -1);  
-      end; // case Ident[IdentIndex].Kind      
+      end; // case Ident[IdentIndex].Kind
+      end; // else 
     end;  
 
 
@@ -1581,6 +1640,20 @@ procedure CompileStatement{(LoopNesting: Integer)};
   
   end; // CompileAssignment
   
+  
+  
+  
+  procedure CompileAssignmentOrCall(DesignatorType: Integer);
+  begin 
+  if Tok.Kind = ASSIGNTOK then                                    // Assignment
+    CompileAssignment(DesignatorType)
+  else                                                            // Procedural variable call                                                              
+    begin
+    CheckTok(OPARTOK);                                            // Parentheses required even for empty parameter list         
+    CompileIndirectCall(DesignatorType, FALSE);
+    end;  
+  end; // CompileAssignmentOrCall
+  
 
   
   
@@ -1801,12 +1874,59 @@ procedure CompileStatement{(LoopNesting: Integer)};
   // Pop and discard the remaining number of iterations (i.e. zero)
   DiscardStackTop;                                          
   end; // CompileForStatement
+  
+  
+  
+  
+  procedure CompileWithStatement(LoopNesting: Integer);
+  var
+    DesignatorType: Integer;
+    DeltaWithNesting: Integer;
+    TempStorageAddr: Integer;
+    
+  begin
+  NextTok;  
+  DeltaWithNesting := 0; 
+
+  repeat   
+    // Save designator pointer to temporary storage
+    TempStorageAddr := AllocateTempStorage(TypeSize(POINTERTYPEINDEX));    
+    PushVarPtr(TempStorageAddr, LOCAL, 0, RELOCNONE);
+    
+    CompileDesignator(DesignatorType);
+    if Types[DesignatorType].TypeKind <> RECORDTYPE then
+      Error('Record expected', '', -1);
+      
+    GenerateAssignment(POINTERTYPEINDEX);
+
+    // Save designator info
+    Inc(DeltaWithNesting);
+    Inc(WithNesting);
+    
+    if WithNesting > MAXWITHNESTING then
+      Error('Maximum WITH block nesting exceeded', '', -1);
+    
+    WithStack[WithNesting].TempPointer := TempStorageAddr;
+    WithStack[WithNesting].DataType := DesignatorType;    
+    
+    if Tok.Kind <> COMMATOK then Break;
+    NextTok;
+  until FALSE;
+  
+  EatTok(DOTOK);
+  
+  CompileStatement(LoopNesting);
+  
+  WithNesting := WithNesting - DeltaWithNesting;
+  end; // CompileWithStatement
+
 
 
   
 var
-  IdentIndex, ResultIdentIndex: Integer;
-  DesignatorType: Integer;
+  IdentIndex, FieldIndex, ResultIdentIndex: Integer;
+  DesignatorType, RecType: Integer;
+  RecPointer: Integer;
 
   
 begin // CompileStatement
@@ -1814,53 +1934,56 @@ case Tok.Kind of
 
   IDENTTOK:
     begin
-    IdentIndex := GetIdent(Tok.Name);
-    case Ident[IdentIndex].Kind of
-
-      VARIABLE:                                                         // Assignment or procedural variable call
-        begin
-        CompileDesignator(DesignatorType);
-
-        if Tok.Kind = ASSIGNTOK then                                    // Assignment
-          CompileAssignment(DesignatorType)
-        else                                                            // Procedural variable call                                                              
+    FieldIndex := GetFieldInsideWith(RecPointer, RecType, Tok.Name);
+    
+    if FieldIndex <> 0 then                                             // Record field inside a WITH block
+      begin
+      CompileDesignator(DesignatorType);
+      CompileAssignmentOrCall(DesignatorType);
+      end 
+    else                                                                // Ordinary identifier                                                                                
+      begin  
+      IdentIndex := GetIdent(Tok.Name);
+      
+      case Ident[IdentIndex].Kind of
+      
+        VARIABLE:                                                       // Assignment or procedural variable call
           begin
-          CheckTok(OPARTOK);                                            // Parentheses required even for empty parameter list         
-          CompileIndirectCall(DesignatorType, FALSE);
-          end;  
-  
-        end; // VARIABLE        
+          CompileDesignator(DesignatorType);
+          CompileAssignmentOrCall(DesignatorType); 
+          end; // VARIABLE        
 
-      PROC, FUNC:                                                     // Procedure or function call (returned result discarded)
-        if Ident[IdentIndex].PredefIndex <> 0 then                    // Predefined procedure
-          begin
-          if Ident[IdentIndex].Kind <> PROC then
-            Error('Expected procedure but found predefined function ', Ident[IdentIndex].Name, -1);            
-          CompilePredefinedProc(Ident[IdentIndex].PredefIndex, LoopNesting)
-          end
-        else                                                          // User-defined procedure or function
-          begin
-          NextTok;
-          
-          if Tok.Kind = ASSIGNTOK then                                // Special case: assignment to a function name
+        PROC, FUNC:                                                     // Procedure or function call (returned result discarded)
+          if Ident[IdentIndex].PredefIndex <> 0 then                    // Predefined procedure
             begin
-            if (Ident[IdentIndex].Kind <> FUNC) or (Ident[IdentIndex].ProcAsBlock <> BlockStack[BlockStackTop]) then
-              Error('Expected current function name but found ', Ident[IdentIndex].Name, -1);
-
-            ResultIdentIndex := GetIdent('RESULT');
-            PushVarPtr(Ident[ResultIdentIndex].Value, LOCAL, 0, RELOCDATA);
-            DesignatorType := Ident[ResultIdentIndex].DataType;
-
-            CompileAssignment(DesignatorType);
+            if Ident[IdentIndex].Kind <> PROC then
+              Error('Expected procedure but found predefined function ', Ident[IdentIndex].Name, -1);            
+            CompilePredefinedProc(Ident[IdentIndex].PredefIndex, LoopNesting)
             end
-          else                                                        // General rule: procedure or function call  
-            CompileCall(IdentIndex);
+          else                                                          // User-defined procedure or function
+            begin
+            NextTok;
             
-          end  
-            
-    else
-      Error('Expected statement but found ', Ident[IdentIndex].Name, -1);
-    end // case Ident[IdentIndex].Kind
+            if Tok.Kind = ASSIGNTOK then                                // Special case: assignment to a function name
+              begin
+              if (Ident[IdentIndex].Kind <> FUNC) or (Ident[IdentIndex].ProcAsBlock <> BlockStack[BlockStackTop]) then
+                Error('Expected current function name but found ', Ident[IdentIndex].Name, -1);
+
+              ResultIdentIndex := GetIdent('RESULT');
+              PushVarPtr(Ident[ResultIdentIndex].Value, LOCAL, 0, RELOCDATA);
+              DesignatorType := Ident[ResultIdentIndex].DataType;
+
+              CompileAssignment(DesignatorType);
+              end
+            else                                                        // General rule: procedure or function call  
+              CompileCall(IdentIndex);
+              
+            end  
+              
+      else
+        Error('Expected statement but found ', Ident[IdentIndex].Name, -1);
+      end // case Ident[IdentIndex].Kind
+      end; // else
     end;    
 
   BEGINTOK:
@@ -1880,6 +2003,9 @@ case Tok.Kind of
 
   FORTOK:
     CompileForStatement(LoopNesting + 1);
+
+  WITHTOK:
+    CompileWithStatement(LoopNesting);
 
 end;// case
 

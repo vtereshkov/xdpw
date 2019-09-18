@@ -42,7 +42,7 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 #### Limitations
 * No object-oriented programming
 * No `uses` clause. The `$I` directive should be used instead (Turbo Pascal 3 style) 
-* No labels, `goto` and `with` statements
+* No labels and the `goto` statement
 * No typed constants
 * No double-precision floating-point numbers, enumerations, variant records, typed files
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
@@ -100,7 +100,8 @@ Statement = [ (Designator | Ident) ":=" Expression |
               CaseStatement |
               WhileStatement |
               RepeatStatement | 
-              ForStatement ] .
+              ForStatement |
+              WithStatement] .
 
 StatementList = Statement {";" Statement} .
 
@@ -115,7 +116,9 @@ WhileStatement = "while" Expression "do" Statement .
 
 RepeatStatement = "repeat" StatementList "until" Expression .
 
-ForStatement = "for" Ident ":=" Expression ("to" | "downto") Expression "do" Statement.                    
+ForStatement = "for" Ident ":=" Expression ("to" | "downto") Expression "do" Statement.
+
+WithStatement = "with" Designator {"," Designator} "do" Statement .                    
  
 CaseElement = CaseLabel {"," CaseLabel} ":" Statement .
 

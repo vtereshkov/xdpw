@@ -10,7 +10,7 @@ const
   VERSIONMINOR          = 9;
   
   NUMDELIMITERS         = 22;
-  NUMKEYWORDS           = 35;
+  NUMKEYWORDS           = 36;
 
   // Standard token codes
 
@@ -71,7 +71,8 @@ const
   UNTILTOK              = NUMDELIMITERS + 32;
   VARTOK                = NUMDELIMITERS + 33;
   WHILETOK              = NUMDELIMITERS + 34;
-  XORTOK                = NUMDELIMITERS + 35;
+  WITHTOK               = NUMDELIMITERS + 35;
+  XORTOK                = NUMDELIMITERS + 36;
 
   // Non-standard token codes
 
@@ -162,12 +163,13 @@ const
   MAXIDENTS             = 1000;
   MAXTYPES              = 1000;
   MAXBLOCKS             = 1000;
-  MAXNESTING            = 10;
+  MAXBLOCKNESTING       = 10;
   MAXPARAMS             = 20;
   MAXUNITNESTING        = 5;
   MAXFIELDS             = 100;
   MAXRELOCS             = 20000;
   MAXLOOPNESTING        = 20;
+  MAXWITHNESTING        = 20;
   MAXBREAKCALLS         = 100;
   MAXEXITCALLS          = 100;
 
@@ -291,7 +293,12 @@ type
     Pos: array [1..MAXBREAKCALLS] of LongInt;
   end;  
   
+  TWithDesignator = record
+    TempPointer: Integer;
+    DataType: Integer;
+  end;
 
+ 
 
 var
   Keyword: array [1..NUMKEYWORDS] of TKeyName;
@@ -301,10 +308,11 @@ var
   Code: array [0..MAXCODESIZE - 1] of Byte;
   StaticStringData: array [0..MAXSTATICSTRDATASIZE - 1] of Char;
   CodePosStack: array [0..1023] of Integer;
-  BlockStack: array [1..MAXNESTING] of Integer;
+  BlockStack: array [1..MAXBLOCKNESTING] of Integer;
   Reloc: array [1..MAXRELOCS] of TRelocatable;
   BreakCall, ContinueCall: array [1..MAXLOOPNESTING] of TBreakContinueExitCallList;
   ExitCall: TBreakContinueExitCallList;
+  WithStack: array [1..MAXWITHNESTING] of TWithDesignator;
 
   Tok: TToken;
   
@@ -312,7 +320,7 @@ var
   OperatorsForIntegers, OperatorsForReals, OperatorsForBooleans,
   IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of Byte;
 
-  NumIdent, NumTypes, NumImports, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, ForLoopNesting,
+  NumIdent, NumTypes, NumImports, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, ForLoopNesting, WithNesting,
   CodeSize, CodePosStackTop, GlobalDataSize, CurBlockLocalDataSize, CurBlockTempStorageSize,
   DataSectionOrigin, ProgramEntryPoint,
   UnitStackTop: Integer;
@@ -335,6 +343,7 @@ NumBlocks               := 0;
 BlockStackTop           := 0; 
 NumRelocs               := 0;
 ForLoopNesting          := 0;
+WithNesting             := 0;
 CodeSize                := 0; 
 CodePosStackTop         := 0;
 NumStaticStrChars       := 0;
@@ -383,7 +392,8 @@ Keyword[31] := 'TYPE';
 Keyword[32] := 'UNTIL';
 Keyword[33] := 'VAR';
 Keyword[34] := 'WHILE';
-Keyword[35] := 'XOR';
+Keyword[35] := 'WITH';
+Keyword[36] := 'XOR';
 end;  
 
 
@@ -563,7 +573,7 @@ end;
 
 
 
-function GetField(RecType: Integer; const S: TString): Integer;
+function GetFieldUnsafe(RecType: Integer; const S: TString): Integer;
 var
   FieldIndex: Integer;
 begin
@@ -575,8 +585,42 @@ for FieldIndex := 1 to Types[RecType].NumFields do
     end;
 
 Result := 0;
-Error('Unknown field: ', S, -1);
-end;      
+end;
+
+
+
+
+function GetField(RecType: Integer; const S: TString): Integer;
+var
+  FieldIndex: Integer;
+begin
+Result := GetFieldUnsafe(RecType, S);
+if Result = 0 then
+  Error('Unknown field: ', S, -1);
+end;
+
+
+
+
+function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const S: TString): Integer;
+var
+  FieldIndex, WithIndex: Integer;
+begin 
+for WithIndex := WithNesting downto 1 do
+  begin
+  RecType := WithStack[WithIndex].DataType;
+  FieldIndex := GetFieldUnsafe(RecType, S);
+  
+  if FieldIndex <> 0 then
+    begin
+    RecPointer := WithStack[WithIndex].TempPointer;
+    Result := FieldIndex;
+    Exit;
+    end;
+  end;
+
+Result := 0;  
+end;        
 
 
 
