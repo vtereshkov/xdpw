@@ -446,11 +446,7 @@ case proc of
       
     // Remove first 3 arguments if they correspond to a file variable 
     if FileSpecified then
-      begin
-      DiscardStackTop;
-      DiscardStackTop;
-      DiscardStackTop;
-      end;      
+      DiscardStackTop(3);
 
     end;// READPROC, READLNPROC
 
@@ -516,11 +512,7 @@ case proc of
 
     // Remove first 3 arguments if they correspond to a file variable 
     if FileSpecified then
-      begin
-      DiscardStackTop;
-      DiscardStackTop;
-      DiscardStackTop;
-      end;
+      DiscardStackTop(3);
     
     end;// WRITEPROC, WRITELNPROC
     
@@ -604,7 +596,7 @@ case func of
     if FieldInsideWithFound(Tok.Name) then                // Record field inside a WITH block
       begin
       CompileDesignator(ValType);
-      DiscardStackTop;
+      DiscardStackTop(1);
       PushConst(TypeSize(ValType));      
       end
     else                                                  // Ordinary identifier
@@ -618,7 +610,7 @@ case func of
       else
         begin
         CompileDesignator(ValType);
-        DiscardStackTop;
+        DiscardStackTop(1);
         PushConst(TypeSize(ValType));
         end;
       end;
@@ -1189,6 +1181,10 @@ case Tok.Kind of
       IdentIndex := GetIdent(Tok.Name);
 
       case Ident[IdentIndex].Kind of
+      
+        GOTOLABEL:
+          Error('Expected expression but found label ', Ident[IdentIndex].Name, -1);
+      
         PROC:
           Error('Expected expression but found procedure ', Ident[IdentIndex].Name, -1);
           
@@ -1627,6 +1623,33 @@ procedure CompileStatement{(LoopNesting: Integer)};
 
 
 
+  procedure CompileLabel;
+  var
+    LabelIndex: Integer;
+  begin
+  if Tok.Kind = IDENTTOK then
+    begin
+    LabelIndex := GetIdentUnsafe(Tok.Name);
+    
+    if LabelIndex <> 0 then
+      if Ident[LabelIndex].Kind = GOTOLABEL then
+        begin
+        if Ident[LabelIndex].Block <> BlockStack[BlockStackTop] then
+          Error('Label is not declared in current procedure', '', -1);
+        
+        Ident[LabelIndex].Value := CodeSize;        
+        Ident[LabelIndex].IsUnresolvedForward := FALSE;
+        Ident[LabelIndex].ForLoopNesting := ForLoopNesting;
+        
+        NextTok;
+        EatTok(COLONTOK);
+        end;      
+    end;
+  end; // CompileLabel
+  
+  
+  
+  
   procedure CompileAssignment(DesignatorType: Integer);
   var
     ExpressionType: Integer;
@@ -1893,11 +1916,35 @@ procedure CompileStatement{(LoopNesting: Integer)};
   GenerateBreakEpilog(LoopNesting);
   
   // Pop and discard the remaining number of iterations (i.e. zero)
-  DiscardStackTop;                                          
+  DiscardStackTop(1);                                          
   end; // CompileForStatement
+
   
   
   
+  procedure CompileGotoStatement(LoopNesting: Integer);
+  var
+    LabelIndex: Integer;
+    
+  begin
+  NextTok;
+  
+  AssertIdent;
+  LabelIndex := GetIdent(Tok.Name);
+  
+  if Ident[LabelIndex].Kind <> GOTOLABEL then
+    Error('Label expected', '', -1);
+    
+  if Ident[LabelIndex].Block <> BlockStack[BlockStackTop] then
+    Error('Label is not declared in current procedure', '', -1);
+    
+  GenerateGoto(LabelIndex);
+
+  NextTok;
+  end; // CompileGotoStatement
+
+
+
   
   procedure CompileWithStatement(LoopNesting: Integer);
   var
@@ -1950,6 +1997,8 @@ var
 
   
 begin // CompileStatement
+CompileLabel;
+
 case Tok.Kind of
 
   IDENTTOK:
@@ -2021,6 +2070,9 @@ case Tok.Kind of
 
   FORTOK:
     CompileForStatement(LoopNesting + 1);
+    
+  GOTOTOK:
+    CompileGotoStatement(LoopNesting);
 
   WITHTOK:
     CompileWithStatement(LoopNesting);
@@ -2335,6 +2387,7 @@ var
   Ident[NumIdent].PassMethod := PassMethod;
   Ident[NumIdent].IsUnresolvedForward := FALSE;
   Ident[NumIdent].IsExternal := FALSE;
+  Ident[NumIdent].ForLoopNesting := 0;
 
   case Kind of
     PROC, FUNC:
@@ -2381,6 +2434,10 @@ var
         Ident[NumIdent].FracValue := FracConstValue                     // Real constant value
       else
         Ident[NumIdent].Value := ConstValue;                            // Ordinal constant value
+        
+        
+    GOTOLABEL:
+      Ident[NumIdent].IsUnresolvedForward := TRUE;
 
   end;// case
 
@@ -2501,7 +2558,25 @@ var
   end; // CheckForwardResolutions
   
   
+ 
+
+  procedure CompileLabelDeclarations;
+  begin
+  repeat
+    AssertIdent;
+    
+    DeclareId(Tok.Name, GOTOLABEL, 0, 0, VALPASSING, 0, 0.0, 0);
+    
+    NextTok;
+    if Tok.Kind <> COMMATOK then Break;
+    NextTok;
+  until FALSE;
   
+  EatTok(SEMICOLONTOK);
+  end; // CompileLabelDeclarations
+
+
+ 
   
   procedure CompileConstDeclarations;
   var
@@ -2746,12 +2821,15 @@ var
     
 
   // Local declarations
-  while Tok.Kind in [CONSTTOK, TYPETOK, VARTOK, PROCEDURETOK, FUNCTIONTOK] do
+  while Tok.Kind in [LABELTOK, CONSTTOK, TYPETOK, VARTOK, PROCEDURETOK, FUNCTIONTOK] do
     begin
     DeclTok := Tok;
     NextTok;
     
     case DeclTok.Kind of
+      LABELTOK:
+        CompileLabelDeclarations;
+        
       CONSTTOK:     
         CompileConstDeclarations;
         
@@ -2783,6 +2861,23 @@ var
   end; // CompileDeclarations
   
   
+  
+  
+  procedure CheckUnresolvedDeclarations;
+  var
+    IdentIndex: Integer;
+  begin
+  IdentIndex := NumIdent;
+  
+  while (IdentIndex > 0) and (Ident[IdentIndex].Block = BlockStack[BlockStackTop]) do
+    begin
+    if (Ident[IdentIndex].Kind in [GOTOLABEL, PROC, FUNC]) and Ident[IdentIndex].IsUnresolvedForward then
+      Error('Unresolved declaration of ', Ident[IdentIndex].Name, -1);
+    Dec(IdentIndex);
+    end;
+  end; // CheckUnresolvedDeclarations  
+  
+  
 
 
   procedure DeleteDeclarations;
@@ -2792,16 +2887,11 @@ var
   begin  
   // Delete local identifiers to save space
   while (NumIdent > 0) and (Ident[NumIdent].Block = BlockStack[BlockStackTop]) do
-    begin
+    begin 
     // If procedure or function, delete parameters first
     if Ident[NumIdent].Kind in [PROC, FUNC] then
-      begin   
-      if Ident[NumIdent].IsUnresolvedForward then
-        Error('Unresolved forward declaration of ', Ident[NumIdent].Name, -1);
-
       for ParamIndex := 1 to Ident[NumIdent].NumParams do
         Dispose(Ident[NumIdent].Param[ParamIndex]);
-      end; 
 
     // Delete identifier itself
     Dec(NumIdent);
@@ -2859,14 +2949,20 @@ else
   GenerateTempStorageProlog;
   end;
 
-// Initialize variables needed to access temporary strings used for concatenation
+// Initialize variables needed to access temporary strings, sets and WITH designators
 CurBlockLocalDataSize := LocalDataSize;
 CurBlockTempStorageSize := 0; 
 
 // Block body
+GenerateGotoProlog;
 GenerateExitProlog;
+
 CompileCompoundStatement(0);
+
+CheckUnresolvedDeclarations;
+
 GenerateExitEpilog;                            // Direct all Exit procedure calls here
+GenerateGotoEpilog;
 
 if ForLoopNesting <> 0 then
   Error('Internal fault: Illegal FOR loop nesting', '', -1);

@@ -42,12 +42,12 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 
 #### Limitations
 * No object-oriented programming
-* No `uses` clause. The `$I` directive should be used instead (Turbo Pascal 3 style) 
-* No labels and the `goto` statement
+* No `uses` clause. The `$I` directive should be used instead (Turbo Pascal 3 style)
+* No double-precision floating-point numbers, enumerations, variant records, typed files 
 * No typed constants
-* No double-precision floating-point numbers, enumerations, variant records, typed files
-* No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Arrays, records and sets cannot be passed to subroutines without `const` or `var`, or used as function results
+* No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
+* Statement labels cannot be numerical
 
 #### Formal grammar
 ```
@@ -55,10 +55,13 @@ Program = "program" Ident ";" Block "." .
 
 Block = { Declarations } CompoundStatement .
 
-Declarations = ConstDeclarations | 
+Declarations = LabelDeclarations |
+               ConstDeclarations | 
                TypeDeclarations |
                VarDeclarations |
                ProcFuncDeclarations .
+               
+LabelDeclarations = "label" Ident {"," Ident} ";"               
              
 ConstDeclarations = "const" Ident "=" ConstExpression ";"
                    {Ident "=" ConstExpression ";"} .
@@ -93,15 +96,18 @@ TypeIdent = "string" | "file" | Ident .
 
 Designator = Ident {"^" | ("[" Expression {"," Expression} "]") | ("." Ident)} .
 
-Statement = [ (Designator | Ident) ":=" Expression | 
-              (Designator | Ident) [ActualParams] |
-              CompoundStatement |
-              IfStatement |
-              CaseStatement |
-              WhileStatement |
-              RepeatStatement | 
-              ForStatement |
-              WithStatement] .
+Statement = [Label ":"] [ (Designator | Ident) ":=" Expression | 
+                          (Designator | Ident) [ActualParams] |
+                          CompoundStatement |
+                          IfStatement |
+                          CaseStatement |
+                          WhileStatement |
+                          RepeatStatement | 
+                          ForStatement |
+                          GotoStatement |
+                          WithStatement ] .
+                          
+Label = Ident .                          
 
 StatementList = Statement {";" Statement} .
 
@@ -117,6 +123,8 @@ WhileStatement = "while" Expression "do" Statement .
 RepeatStatement = "repeat" StatementList "until" Expression .
 
 ForStatement = "for" Ident ":=" Expression ("to" | "downto") Expression "do" Statement.
+
+GotoStatement = "goto" Label .
 
 WithStatement = "with" Designator {"," Designator} "do" Statement .                    
  

@@ -275,7 +275,7 @@ end;
 
 procedure SaveStackTopToEAX;
 begin
-Gen($58);                                                         // pop eax
+Gen($58);                                                                               // pop eax
 end;
 
 
@@ -283,15 +283,23 @@ end;
 
 procedure RestoreStackTopFromEAX;
 begin
-Gen($50);                                                         // push eax
+Gen($50);                                                                               // push eax
 end;
 
 
 
 
-procedure DiscardStackTop;
+procedure DiscardStackTop(NumItems: Byte);
 begin
-SaveStackTopToEAX;
+Gen($83); Gen($C4); Gen(SizeOf(LongInt) * NumItems);                                    // add esp, 4 * NumItems
+end;
+
+
+
+
+procedure DiscardStackTopAt(Pos: LongInt; NumItems: Byte);
+begin
+GenAt(Pos, $83); GenAt(Pos + 1, $C4); GenAt(Pos + 2, SizeOf(LongInt) * NumItems);       // add esp, 4 * NumItems
 end;
 
 
@@ -299,7 +307,7 @@ end;
 
 procedure DuplicateStackTop;
 begin
-Gen($FF); Gen($34); Gen($24);                                     // push dword ptr [esp]
+Gen($FF); Gen($34); Gen($24);                                                           // push dword ptr [esp]
 end;
 
 
@@ -739,6 +747,34 @@ end;
 
 
 
+procedure GenerateForwardReference;
+begin
+Gen($90);                                                     // nop   ; jump to the procedure entry point will be inserted here
+Gen($90);                                                     // nop
+Gen($90);                                                     // nop
+Gen($90);                                                     // nop
+Gen($90);                                                     // nop
+end;
+
+
+
+
+procedure GenerateForwardResolution(CodePos: Integer);
+begin
+GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, CodeSize - (CodePos + 5));      // jmp CodeSize
+end;
+
+
+
+
+procedure GenerateForwardResolutionToDestination(CodePos, DestPos: Integer);
+begin
+GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, DestPos - (CodePos + 5));       // jmp DestPos
+end;
+
+
+
+
 procedure GenerateIfCondition;
 begin
 Gen($58);                                                   // pop eax
@@ -995,6 +1031,47 @@ end;
 
 
 
+procedure GenerateGotoProlog;
+begin
+NumGotos := 0;
+end;
+
+
+
+
+procedure GenerateGoto(LabelIndex: Integer);
+begin
+Inc(NumGotos);
+Gotos[NumGotos].Pos := CodeSize;
+Gotos[NumGotos].LabelIndex := LabelIndex;
+Gotos[NumGotos].ForLoopNesting := ForLoopNesting;
+
+Gen($90);               // nop   ; the remaining numbers of iterations of all nested FOR loops will be removed from stack here 
+Gen($90);               // nop
+Gen($90);               // nop
+
+GenerateForwardReference;
+end;
+
+
+
+
+procedure GenerateGotoEpilog;
+var
+  CodePos: LongInt;
+  i: Integer;
+begin
+for i := 1 to NumGotos do
+  begin
+  CodePos := Gotos[i].Pos;
+  DiscardStackTopAt(CodePos, Gotos[i].ForLoopNesting - Ident[Gotos[i].LabelIndex].ForLoopNesting); // Remove the remaining numbers of iterations of all nested FOR loops
+  GenerateForwardResolutionToDestination(CodePos + 3, Ident[Gotos[i].LabelIndex].Value);
+  end;
+end;
+
+
+
+
 procedure GenerateNestedProcsProlog;
 begin
 GenerateIfProlog;
@@ -1013,8 +1090,7 @@ end;
 
 procedure GenerateProgramProlog;
 begin
-// Initialize FPU
-Gen($DB); Gen($E3);                                         // finit
+Gen($DB); Gen($E3);                                           // fninit
 end;
 
 
@@ -1072,26 +1148,6 @@ CodePos := CodePosStack[CodePosStackTop];
 Dec(CodePosStackTop);
 
 GenAt(CodePos, $81); GenAt(CodePos + 1, $EC); GenDWordAt(CodePos + 2, TotalTempStorageSize);      // sub esp, TotalTempStorageSize
-end;
-
-
-
-
-procedure GenerateForwardReference;
-begin
-Gen($90);                                                     // nop   ; jump to the procedure entry point will be inserted here
-Gen($90);                                                     // nop
-Gen($90);                                                     // nop
-Gen($90);                                                     // nop
-Gen($90);                                                     // nop
-end;
-
-
-
-
-procedure GenerateForwardResolution(CodePos: Integer);
-begin
-GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, CodeSize - (CodePos + 5));      // jmp Ident[IdentIndex].Value
 end;
 
 
@@ -1166,11 +1222,8 @@ end;
 
 
 procedure GenerateExitCall;
-var
-  i: Integer;
 begin
-for i := 1 to ForLoopNesting do
-  Gen($59);                                                    // pop ecx    ; remove the remaining number of iterations
+DiscardStackTop(ForLoopNesting);      // Remove the remaining numbers of iterations of all nested FOR loops
 
 Inc(ExitCall.NumCalls);
 ExitCall.Pos[ExitCall.NumCalls] := CodeSize;
@@ -1188,8 +1241,5 @@ begin
 for i := 1 to ExitCall.NumCalls do
   GenerateForwardResolution(ExitCall.Pos[i]);
 end;
-
-
-
 
 

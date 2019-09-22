@@ -10,7 +10,7 @@ const
   VERSIONMINOR          = 9;
   
   NUMDELIMITERS         = 22;
-  NUMKEYWORDS           = 36;
+  NUMKEYWORDS           = 38;
 
   // Standard token codes
 
@@ -50,29 +50,31 @@ const
   FILETOK               = NUMDELIMITERS + 11;
   FORTOK                = NUMDELIMITERS + 12;
   FUNCTIONTOK           = NUMDELIMITERS + 13;
-  IFTOK                 = NUMDELIMITERS + 14;
-  INTOK                 = NUMDELIMITERS + 15;
-  MODTOK                = NUMDELIMITERS + 16;
-  NILTOK                = NUMDELIMITERS + 17;
-  NOTTOK                = NUMDELIMITERS + 18;
-  OFTOK                 = NUMDELIMITERS + 19;
-  ORTOK                 = NUMDELIMITERS + 20;
-  PROCEDURETOK          = NUMDELIMITERS + 21;
-  PROGRAMTOK            = NUMDELIMITERS + 22;
-  RECORDTOK             = NUMDELIMITERS + 23;
-  REPEATTOK             = NUMDELIMITERS + 24;
-  SETTOK                = NUMDELIMITERS + 25;
-  SHLTOK                = NUMDELIMITERS + 26;
-  SHRTOK                = NUMDELIMITERS + 27;
-  STRINGTOK             = NUMDELIMITERS + 28;
-  THENTOK               = NUMDELIMITERS + 29;
-  TOTOK                 = NUMDELIMITERS + 30;
-  TYPETOK               = NUMDELIMITERS + 31;
-  UNTILTOK              = NUMDELIMITERS + 32;
-  VARTOK                = NUMDELIMITERS + 33;
-  WHILETOK              = NUMDELIMITERS + 34;
-  WITHTOK               = NUMDELIMITERS + 35;
-  XORTOK                = NUMDELIMITERS + 36;
+  GOTOTOK               = NUMDELIMITERS + 14;
+  IFTOK                 = NUMDELIMITERS + 15;
+  INTOK                 = NUMDELIMITERS + 16;
+  LABELTOK              = NUMDELIMITERS + 17;
+  MODTOK                = NUMDELIMITERS + 18;
+  NILTOK                = NUMDELIMITERS + 19;
+  NOTTOK                = NUMDELIMITERS + 20;
+  OFTOK                 = NUMDELIMITERS + 21;
+  ORTOK                 = NUMDELIMITERS + 22;
+  PROCEDURETOK          = NUMDELIMITERS + 23;
+  PROGRAMTOK            = NUMDELIMITERS + 24;
+  RECORDTOK             = NUMDELIMITERS + 25;
+  REPEATTOK             = NUMDELIMITERS + 26;
+  SETTOK                = NUMDELIMITERS + 27;
+  SHLTOK                = NUMDELIMITERS + 28;
+  SHRTOK                = NUMDELIMITERS + 29;
+  STRINGTOK             = NUMDELIMITERS + 30;
+  THENTOK               = NUMDELIMITERS + 31;
+  TOTOK                 = NUMDELIMITERS + 32;
+  TYPETOK               = NUMDELIMITERS + 33;
+  UNTILTOK              = NUMDELIMITERS + 34;
+  VARTOK                = NUMDELIMITERS + 35;
+  WHILETOK              = NUMDELIMITERS + 36;
+  WITHTOK               = NUMDELIMITERS + 37;
+  XORTOK                = NUMDELIMITERS + 38;
 
   // Non-standard token codes
 
@@ -84,11 +86,12 @@ const
 
   // Identifier kind codes
 
-  CONSTANT              = 1;
-  USERTYPE              = 2;
-  VARIABLE              = 3;
-  PROC                  = 4;
-  FUNC                  = 5;
+  GOTOLABEL             = 1;
+  CONSTANT              = 2;
+  USERTYPE              = 3;
+  VARIABLE              = 4;
+  PROC                  = 5;
+  FUNC                  = 6;
 
   // Type kinds
 
@@ -170,6 +173,7 @@ const
   MAXRELOCS             = 20000;
   MAXLOOPNESTING        = 20;
   MAXWITHNESTING        = 20;
+  MAXGOTOS              = 100;
   MAXBREAKCALLS         = 100;
   MAXEXITCALLS          = 100;
 
@@ -266,7 +270,7 @@ type
   TIdentifier = record
     Kind: Byte;
     Name: TString;
-    Value: LongInt;                    // Value for a constant, address for a variable, procedure or function
+    Value: LongInt;                    // Value for a constant, address for a label, variable, procedure or function
     FracValue: Single;
     Block: Integer;                    // Index of a block in which the identifier is defined
     NestingLevel: Byte;
@@ -280,6 +284,7 @@ type
     PredefIndex: Byte;
     IsUnresolvedForward: Boolean;
     IsExternal: Boolean;
+    ForLoopNesting: Integer;           // Number of nested FOR loops where the label is defined
   end;
 
   TRelocatable = record
@@ -287,6 +292,12 @@ type
     Pos: LongInt;
     Value: LongInt;
   end;
+  
+  TGoto = record
+    Pos: LongInt;
+    LabelIndex: Integer;
+    ForLoopNesting: Integer;
+  end;  
   
   TBreakContinueExitCallList = record
     NumCalls: Integer;
@@ -310,6 +321,7 @@ var
   CodePosStack: array [0..1023] of Integer;
   BlockStack: array [1..MAXBLOCKNESTING] of Integer;
   Reloc: array [1..MAXRELOCS] of TRelocatable;
+  Gotos: array [1..MAXGOTOS] of TGoto;
   BreakCall, ContinueCall: array [1..MAXLOOPNESTING] of TBreakContinueExitCallList;
   ExitCall: TBreakContinueExitCallList;
   WithStack: array [1..MAXWITHNESTING] of TWithDesignator;
@@ -320,7 +332,7 @@ var
   OperatorsForIntegers, OperatorsForReals, OperatorsForBooleans,
   IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of Byte;
 
-  NumIdent, NumTypes, NumImports, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, ForLoopNesting, WithNesting,
+  NumIdent, NumTypes, NumImports, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, NumGotos, ForLoopNesting, WithNesting,
   CodeSize, CodePosStackTop, GlobalDataSize, CurBlockLocalDataSize, CurBlockTempStorageSize,
   DataSectionOrigin, ProgramEntryPoint,
   UnitStackTop: Integer;
@@ -342,6 +354,7 @@ NumImports              := 0;
 NumBlocks               := 0; 
 BlockStackTop           := 0; 
 NumRelocs               := 0;
+NumGotos                := 0;
 ForLoopNesting          := 0;
 WithNesting             := 0;
 CodeSize                := 0; 
@@ -371,29 +384,31 @@ Keyword[10] := 'END';
 Keyword[11] := 'FILE';
 Keyword[12] := 'FOR';
 Keyword[13] := 'FUNCTION';
-Keyword[14] := 'IF';
-Keyword[15] := 'IN';
-Keyword[16] := 'MOD';
-Keyword[17] := 'NIL';
-Keyword[18] := 'NOT';
-Keyword[19] := 'OF';
-Keyword[20] := 'OR';
-Keyword[21] := 'PROCEDURE';
-Keyword[22] := 'PROGRAM';
-Keyword[23] := 'RECORD';
-Keyword[24] := 'REPEAT';
-Keyword[25] := 'SET';
-Keyword[26] := 'SHL';
-Keyword[27] := 'SHR';
-Keyword[28] := 'STRING';
-Keyword[29] := 'THEN';
-Keyword[30] := 'TO';
-Keyword[31] := 'TYPE';
-Keyword[32] := 'UNTIL';
-Keyword[33] := 'VAR';
-Keyword[34] := 'WHILE';
-Keyword[35] := 'WITH';
-Keyword[36] := 'XOR';
+Keyword[14] := 'GOTO';
+Keyword[15] := 'IF';
+Keyword[16] := 'IN';
+Keyword[17] := 'LABEL';
+Keyword[18] := 'MOD';
+Keyword[19] := 'NIL';
+Keyword[20] := 'NOT';
+Keyword[21] := 'OF';
+Keyword[22] := 'OR';
+Keyword[23] := 'PROCEDURE';
+Keyword[24] := 'PROGRAM';
+Keyword[25] := 'RECORD';
+Keyword[26] := 'REPEAT';
+Keyword[27] := 'SET';
+Keyword[28] := 'SHL';
+Keyword[29] := 'SHR';
+Keyword[30] := 'STRING';
+Keyword[31] := 'THEN';
+Keyword[32] := 'TO';
+Keyword[33] := 'TYPE';
+Keyword[34] := 'UNTIL';
+Keyword[35] := 'VAR';
+Keyword[36] := 'WHILE';
+Keyword[37] := 'WITH';
+Keyword[38] := 'XOR';
 end;  
 
 
