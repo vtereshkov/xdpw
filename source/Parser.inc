@@ -2350,6 +2350,14 @@ var
 
 
 begin // CompileType
+
+if Tok.Kind = PACKEDTOK then        // PACKED has no effect
+  begin
+  NextTok;
+  if not (Tok.Kind in [ARRAYTOK, RECORDTOK, SETTOK, FILETOK]) then
+    Error('PACKED is not allowed here', '', EMPTYTOK);
+  end;
+ 
 case Tok.Kind of
 
   OPARTOK:

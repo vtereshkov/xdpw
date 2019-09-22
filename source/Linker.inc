@@ -15,14 +15,14 @@ const
 
 
 type
-  TMZHeader = record
+  TMZHeader = packed record
     MZ: array [0..1] of Char;
     DOSStub: array [0..28] of Word;
     PEHeaderOffset: LongInt;
   end;
 
 
-  TPEHeader = record
+  TPEHeader = packed record
     PE: array [0..3] of Char;
     Machine: Word;
     NumberOfSections: Word;
@@ -34,7 +34,7 @@ type
   end;
 
 
-  TPEOptionalHeader = record
+  TPEOptionalHeader = packed record
     Magic: Word;
     MajorLinkerVersion: Byte;
     MinorLinkerVersion: Byte;
@@ -68,13 +68,13 @@ type
   end;
   
   
-  TDataDirectory = record
+  TDataDirectory = packed record
     VirtualAddress: LongInt;
     Size: LongInt;
   end;  
 
 
-  TPESectionHeader = record
+  TPESectionHeader = packed record
     Name: array [0..7] of Char;
     VirtualSize: LongInt;
     VirtualAddress: LongInt;
@@ -88,7 +88,7 @@ type
   end;
   
   
-  THeaders = record
+  THeaders = packed record
     MZHeader: TMZHeader;
     PEHeader: TPEHeader;
     PEOptionalHeader: TPEOptionalHeader;
@@ -101,7 +101,7 @@ type
   TImportFuncNames = array [0..255] of TImportFuncName;
 
 
-  TImportDirectoryTableEntry = record
+  TImportDirectoryTableEntry = packed record
     Characteristics: LongInt;
     TimeDateStamp: LongInt;
     ForwarderChain: LongInt;
@@ -110,14 +110,14 @@ type
   end; 
 
 
-  TImportNameTableEntry = record
+  TImportNameTableEntry = packed record
     Hint: Word;
     Name: TImportFuncName;
   end;
 
 
   
-  TImportSection = record
+  TImportSection = packed record
     DirectoryTable: array [0..MAXIMPORTS] of TImportDirectoryTableEntry;
     LibraryNames: array [0..MAXIMPORTS - 1, 0..15] of Char;
     LookupTable: array [0..MAXIMPORTS - 1, 0..1] of LongInt;
@@ -156,8 +156,23 @@ end;
 
   
 procedure FillHeaders(CodeSize, InitializedDataSize, UninitializedDataSize: Integer);
+const
+  IMAGE_FILE_MACHINE_I386           = $14C;
+
+  IMAGE_FILE_RELOCS_STRIPPED        = $0001;
+  IMAGE_FILE_EXECUTABLE_IMAGE       = $0002;
+  IMAGE_FILE_32BIT_MACHINE          = $0100;
+  
+  IMAGE_SCN_CNT_CODE                = $00000020;
+  IMAGE_SCN_CNT_INITIALIZED_DATA    = $00000040;
+  IMAGE_SCN_CNT_UNINITIALIZED_DATA  = $00000080;  
+  IMAGE_SCN_MEM_EXECUTE             = $20000000;
+  IMAGE_SCN_MEM_READ                = $40000000;
+  IMAGE_SCN_MEM_WRITE               = $80000000;
+
 var
   DataSize: Integer;
+  
 begin
 DataSize := InitializedDataSize + UninitializedDataSize;
 
@@ -177,10 +192,10 @@ with Headers do
     begin  
     PE[0]                         := 'P';  
     PE[1]                         := 'E';
-    Machine                       := $14C;                                                // Intel 386
+    Machine                       := IMAGE_FILE_MACHINE_I386;
     NumberOfSections              := 3;
     SizeOfOptionalHeader          := SizeOf(PEOptionalHeader) + SizeOf(DataDirectories);
-    Characteristics               := $103;                                                // No relocations, executable, 32 bit
+    Characteristics               := IMAGE_FILE_RELOCS_STRIPPED or IMAGE_FILE_EXECUTABLE_IMAGE or IMAGE_FILE_32BIT_MACHINE;
     end;
 
   with PEOptionalHeader do
@@ -220,7 +235,7 @@ with Headers do
     VirtualAddress                := Align(SizeOf(Headers), SECTALIGN);
     SizeOfRawData                 := Align(SizeOf(TImportSection), FILEALIGN);
     PointerToRawData              := Align(SizeOf(Headers), FILEALIGN);
-    Characteristics               := LongInt($C0000040);                                  // Data, readable, writable
+    Characteristics               := LongInt(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE);
     end;
 
   with DataSectionHeader do
@@ -234,7 +249,7 @@ with Headers do
     VirtualAddress                := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN);
     SizeOfRawData                 := Align(InitializedDataSize, FILEALIGN);
     PointerToRawData              := Align(SizeOf(Headers), FILEALIGN) + Align(SizeOf(TImportSection), FILEALIGN);
-    Characteristics               := LongInt($C00000C0);                                  // Data, readable, writable
+    Characteristics               := LongInt(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE);
     end;
 
   with CodeSectionHeader do
@@ -248,7 +263,7 @@ with Headers do
     VirtualAddress                := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN) + Align(DataSize, SECTALIGN);
     SizeOfRawData                 := Align(CodeSize, FILEALIGN);
     PointerToRawData              := Align(SizeOf(Headers), FILEALIGN) + Align(SizeOf(TImportSection), FILEALIGN) + Align(InitializedDataSize, FILEALIGN);
-    Characteristics               := LongInt($60000020);                                  // Code, executable, readable
+    Characteristics               := LongInt(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE);
     end;
     
   end;

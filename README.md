@@ -86,9 +86,9 @@ IdentList = Ident {"," Ident} .
 
 Type = "(" Ident {"," Ident} ")" |
        "^" TypeIdent |
-       "array" "[" Type {"," Type} "]" "of" Type |
-       "record" IdentList ":" Type {";" IdentList ":" Type} [";"] "end" |
-       "set" "of" Type |
+       ["packed"] "array" "[" Type {"," Type} "]" "of" Type |
+       ["packed"] "record" IdentList ":" Type {";" IdentList ":" Type} [";"] "end" |
+       ["packed"] "set" "of" Type |
        ConstExpression ".." ConstExpression |
        ("procedure" | "function") [FormalParams] [":" TypeIdent] |
        Ident .

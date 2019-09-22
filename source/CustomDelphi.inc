@@ -5,7 +5,6 @@
 
 
 {$APPTYPE CONSOLE}
-{$ALIGN 1}
 {$I-}
 
 

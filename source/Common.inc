@@ -9,7 +9,7 @@ const
   VERSIONMAJOR          = 0;
   VERSIONMINOR          = 9;
   
-  NUMKEYWORDS           = 38;          
+  NUMKEYWORDS           = 39;          
   MAXSTRLENGTH          = 80;
   MAXSETELEMENTS        = 256;
   MAXENUMELEMENTS       = 256;
@@ -86,6 +86,7 @@ type
     NOTTOK,
     OFTOK,
     ORTOK,
+    PACKEDTOK,
     PROCEDURETOK,
     PROGRAMTOK,
     RECORDTOK,
@@ -367,22 +368,23 @@ Keyword[19] := 'NIL';
 Keyword[20] := 'NOT';
 Keyword[21] := 'OF';
 Keyword[22] := 'OR';
-Keyword[23] := 'PROCEDURE';
-Keyword[24] := 'PROGRAM';
-Keyword[25] := 'RECORD';
-Keyword[26] := 'REPEAT';
-Keyword[27] := 'SET';
-Keyword[28] := 'SHL';
-Keyword[29] := 'SHR';
-Keyword[30] := 'STRING';
-Keyword[31] := 'THEN';
-Keyword[32] := 'TO';
-Keyword[33] := 'TYPE';
-Keyword[34] := 'UNTIL';
-Keyword[35] := 'VAR';
-Keyword[36] := 'WHILE';
-Keyword[37] := 'WITH';
-Keyword[38] := 'XOR';
+Keyword[23] := 'PACKED';
+Keyword[24] := 'PROCEDURE';
+Keyword[25] := 'PROGRAM';
+Keyword[26] := 'RECORD';
+Keyword[27] := 'REPEAT';
+Keyword[28] := 'SET';
+Keyword[29] := 'SHL';
+Keyword[30] := 'SHR';
+Keyword[31] := 'STRING';
+Keyword[32] := 'THEN';
+Keyword[33] := 'TO';
+Keyword[34] := 'TYPE';
+Keyword[35] := 'UNTIL';
+Keyword[36] := 'VAR';
+Keyword[37] := 'WHILE';
+Keyword[38] := 'WITH';
+Keyword[39] := 'XOR';
 end;  
 
 
