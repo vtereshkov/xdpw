@@ -85,7 +85,7 @@ ChangeExt(ProgramName, 'exe', ExeName);
 CustomRewrite(OutFile, ExeName);
 
 if IOResult <> 0 then
-  Error('Unable to open output file ', ExeName, -1);
+  Error('Unable to open output file ', ExeName, EMPTYTOK);
   
 BlockWrite(OutFile, Headers, SizeOf(Headers));
 Pad(OutFile, SizeOf(Headers), FILEALIGN);

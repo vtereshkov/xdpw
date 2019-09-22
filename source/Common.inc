@@ -9,160 +9,10 @@ const
   VERSIONMAJOR          = 0;
   VERSIONMINOR          = 9;
   
-  NUMDELIMITERS         = 22;
-  NUMKEYWORDS           = 38;
-
-  // Standard token codes
-
-  OPARTOK               = 1;
-  CPARTOK               = 2;
-  MULTOK                = 3;
-  PLUSTOK               = 4;
-  COMMATOK              = 5;
-  MINUSTOK              = 6;
-  PERIODTOK             = 7;
-  RANGETOK              = 8;
-  DIVTOK                = 9;
-  COLONTOK              = 10;
-  ASSIGNTOK             = 11;
-  SEMICOLONTOK          = 12;
-  LTTOK                 = 13;
-  LETOK                 = 14;
-  NETOK                 = 15;
-  EQTOK                 = 16;
-  GTTOK                 = 17;
-  GETOK                 = 18;
-  ADDRESSTOK            = 19;
-  OBRACKETTOK           = 20;
-  CBRACKETTOK           = 21;
-  DEREFERENCETOK        = 22;
-
-  ANDTOK                = NUMDELIMITERS +  1;
-  ARRAYTOK              = NUMDELIMITERS +  2;
-  BEGINTOK              = NUMDELIMITERS +  3;
-  CASETOK               = NUMDELIMITERS +  4;
-  CONSTTOK              = NUMDELIMITERS +  5;
-  IDIVTOK               = NUMDELIMITERS +  6;
-  DOTOK                 = NUMDELIMITERS +  7;
-  DOWNTOTOK             = NUMDELIMITERS +  8;
-  ELSETOK               = NUMDELIMITERS +  9;
-  ENDTOK                = NUMDELIMITERS + 10;
-  FILETOK               = NUMDELIMITERS + 11;
-  FORTOK                = NUMDELIMITERS + 12;
-  FUNCTIONTOK           = NUMDELIMITERS + 13;
-  GOTOTOK               = NUMDELIMITERS + 14;
-  IFTOK                 = NUMDELIMITERS + 15;
-  INTOK                 = NUMDELIMITERS + 16;
-  LABELTOK              = NUMDELIMITERS + 17;
-  MODTOK                = NUMDELIMITERS + 18;
-  NILTOK                = NUMDELIMITERS + 19;
-  NOTTOK                = NUMDELIMITERS + 20;
-  OFTOK                 = NUMDELIMITERS + 21;
-  ORTOK                 = NUMDELIMITERS + 22;
-  PROCEDURETOK          = NUMDELIMITERS + 23;
-  PROGRAMTOK            = NUMDELIMITERS + 24;
-  RECORDTOK             = NUMDELIMITERS + 25;
-  REPEATTOK             = NUMDELIMITERS + 26;
-  SETTOK                = NUMDELIMITERS + 27;
-  SHLTOK                = NUMDELIMITERS + 28;
-  SHRTOK                = NUMDELIMITERS + 29;
-  STRINGTOK             = NUMDELIMITERS + 30;
-  THENTOK               = NUMDELIMITERS + 31;
-  TOTOK                 = NUMDELIMITERS + 32;
-  TYPETOK               = NUMDELIMITERS + 33;
-  UNTILTOK              = NUMDELIMITERS + 34;
-  VARTOK                = NUMDELIMITERS + 35;
-  WHILETOK              = NUMDELIMITERS + 36;
-  WITHTOK               = NUMDELIMITERS + 37;
-  XORTOK                = NUMDELIMITERS + 38;
-
-  // Non-standard token codes
-
-  IDENTTOK              = 101;
-  INTNUMBERTOK          = 102;
-  FRACNUMBERTOK         = 103;
-  CHARLITERALTOK        = 104;
-  STRINGLITERALTOK      = 105;
-
-  // Identifier kind codes
-
-  GOTOLABEL             = 1;
-  CONSTANT              = 2;
-  USERTYPE              = 3;
-  VARIABLE              = 4;
-  PROC                  = 5;
-  FUNC                  = 6;
-
-  // Type kinds
-
-  ANYTYPE               = 1;
-  INTEGERTYPE           = 2;
-  SMALLINTTYPE          = 3;
-  SHORTINTTYPE          = 4;
-  WORDTYPE              = 5;
-  BYTETYPE              = 6;
-  CHARTYPE              = 7;
-  BOOLEANTYPE           = 8;
-  REALTYPE              = 9;
-  POINTERTYPE           = 10;
-  FILETYPE              = 11;
-  ARRAYTYPE             = 12;
-  RECORDTYPE            = 13;
-  SETTYPE               = 14;
-  SUBRANGETYPE          = 15;
-  PROCEDURALTYPE        = 16;
-  FORWARDTYPE           = 101;
-
-  // Predefined type indices
-
-  ANYTYPEINDEX          = 1;      // Untyped parameter, or base type for untyped pointers
-  INTEGERTYPEINDEX      = 2;
-  SMALLINTTYPEINDEX     = 3;
-  SHORTINTTYPEINDEX     = 4;
-  WORDTYPEINDEX         = 5;
-  BYTETYPEINDEX         = 6;  
-  CHARTYPEINDEX         = 7;
-  BOOLEANTYPEINDEX      = 8;
-  REALTYPEINDEX         = 9;
-  POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other
-  FILETYPEINDEX         = 11;     // Universal file type
-  STRINGTYPEINDEX       = 12;
-
-  // Predefined routine codes
-
-  INCPROC               = 1;
-  DECPROC               = 2;
-  READPROC              = 3;
-  WRITEPROC             = 4;
-  READLNPROC            = 5;
-  WRITELNPROC           = 6;
-  NEWPROC               = 7;
-  DISPOSEPROC           = 8;
-  BREAKPROC             = 9;
-  CONTINUEPROC          = 10;
-  EXITPROC              = 11;
-  HALTPROC              = 12;
-
-  SIZEOFFUNC            = 15;
-  ORDFUNC               = 16;
-  CHRFUNC               = 17;
-  PREDFUNC              = 18;
-  SUCCFUNC              = 19;
-  ROUNDFUNC             = 20;
-  TRUNCFUNC             = 21;
-  ABSFUNC               = 22;
-  SQRFUNC               = 23;
-  SINFUNC               = 24;
-  COSFUNC               = 25;
-  ARCTANFUNC            = 26;
-  EXPFUNC               = 27;
-  LNFUNC                = 28;
-  SQRTFUNC              = 29;
-
-  // Compiler parameters
-             
+  NUMKEYWORDS           = 38;          
   MAXSTRLENGTH          = 80;
   MAXSETELEMENTS        = 256;
+  MAXENUMELEMENTS       = 256;
   MAXIDENTS             = 1000;
   MAXTYPES              = 1000;
   MAXBLOCKS             = 1000;
@@ -181,51 +31,179 @@ const
   MAXDATASIZE           = 32768 * 1024; 
   MAXSTATICSTRDATASIZE  = 128 * 1024;
 
-  // Scope levels
-
-  GLOBAL                = 1;
-  LOCAL                 = 2;
-
-  // Parameter passing
-
-  VALPASSING            = 1;
-  CONSTPASSING          = 2;
-  VARPASSING            = 3;
-  
-  // Relocation types
-  
-  RELOCNONE             = 0;
-  RELOCCODE             = 1;
-  RELOCDATA             = 2;
 
 
 
 type
-  TUnit = record
-    FileName: TString;
-    Buffer: PChar;
-    Size, Pos, Line: Integer;
-  end;  
+  TTokenKind =
+    (
+    EMPTYTOK,
+    
+    // Delimiters        
+    OPARTOK,
+    CPARTOK,
+    MULTOK,
+    PLUSTOK,
+    COMMATOK,
+    MINUSTOK,
+    PERIODTOK,
+    RANGETOK,
+    DIVTOK,
+    COLONTOK,
+    ASSIGNTOK,
+    SEMICOLONTOK,
+    LTTOK,
+    LETOK,
+    NETOK,
+    EQTOK,
+    GTTOK,
+    GETOK,
+    ADDRESSTOK,
+    OBRACKETTOK,
+    CBRACKETTOK,
+    DEREFERENCETOK,
+
+    // Keywords
+    ANDTOK,
+    ARRAYTOK,
+    BEGINTOK,
+    CASETOK,
+    CONSTTOK,
+    IDIVTOK,
+    DOTOK,
+    DOWNTOTOK,
+    ELSETOK,
+    ENDTOK,
+    FILETOK,
+    FORTOK,
+    FUNCTIONTOK,
+    GOTOTOK,
+    IFTOK,
+    INTOK,
+    LABELTOK,
+    MODTOK,
+    NILTOK,
+    NOTTOK,
+    OFTOK,
+    ORTOK,
+    PROCEDURETOK,
+    PROGRAMTOK,
+    RECORDTOK,
+    REPEATTOK,
+    SETTOK,
+    SHLTOK,
+    SHRTOK,
+    STRINGTOK,
+    THENTOK,
+    TOTOK,
+    TYPETOK,
+    UNTILTOK,
+    VARTOK,
+    WHILETOK,
+    WITHTOK,
+    XORTOK,
+
+    // User tokens
+    IDENTTOK,
+    INTNUMBERTOK,
+    FRACNUMBERTOK,
+    CHARLITERALTOK,
+    STRINGLITERALTOK    
+    );
+    
+  TToken = record
+    Kind: TTokenKind;
+    Name: TString;
+    Value: LongInt;
+    FracValue: Single;
+    StrAddress: Integer;
+    StrLength: Integer;
+  end;   
   
+  TPassMethod = (EMPTYPASSING, VALPASSING, CONSTPASSING, VARPASSING); 
+
   TParam = record
     Name: TString;
     DataType: Integer;
-    PassMethod: Byte;
+    PassMethod: TPassMethod;
   end;
 
   PParam = ^TParam;
   
-  PParams = array [1..MAXPARAMS] of PParam;
+  PParams = array [1..MAXPARAMS] of PParam;   
+    
+  TIdentKind = (EMPTYIDENT, GOTOLABEL, CONSTANT, USERTYPE, VARIABLE, PROC, FUNC);
+  
+  TScope = (EMPTYSCOPE, GLOBAL, LOCAL);
+  
+  TPredefProc = 
+    (
+    EMPTYPROC,
+    
+    // Procedures     
+    INCPROC, 
+    DECPROC, 
+    READPROC, 
+    WRITEPROC, 
+    READLNPROC, 
+    WRITELNPROC, 
+    NEWPROC, 
+    DISPOSEPROC, 
+    BREAKPROC, 
+    CONTINUEPROC,
+    EXITPROC,
+    HALTPROC,
+
+    // Functions
+    SIZEOFFUNC,
+    ORDFUNC,
+    CHRFUNC,
+    PREDFUNC,
+    SUCCFUNC,
+    ROUNDFUNC,
+    TRUNCFUNC,
+    ABSFUNC,
+    SQRFUNC,
+    SINFUNC,
+    COSFUNC,
+    ARCTANFUNC,
+    EXPFUNC,
+    LNFUNC,
+    SQRTFUNC
+    );
+
+  TIdentifier = record
+    Kind: TIdentKind;
+    Name: TString;
+    Value: LongInt;                    // Value for a constant, address for a label, variable, procedure or function
+    FracValue: Single;
+    Block: Integer;                    // Index of a block in which the identifier is defined
+    NestingLevel: Byte;
+    DataType: Integer;
+    RecType: Integer;                  // Parent record type code for a field
+    Scope: TScope;
+    PassMethod: TPassMethod;           // Value, CONST or VAR parameter status
+    NumParams: Integer;
+    Param: PParams;
+    ProcAsBlock: Integer;
+    PredefProc: TPredefProc;
+    IsUnresolvedForward: Boolean;
+    IsExternal: Boolean;
+    ForLoopNesting: Integer;           // Number of nested FOR loops where the label is defined
+  end;
 
   TField = record
     Name: TString;
     DataType: Integer;
     Offset: Integer;
-  end;
+  end;    
+
+  TTypeKind = (EMPTYTYPE, ANYTYPE, INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE, CHARTYPE, BOOLEANTYPE, REALTYPE,
+               POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, PROCEDURALTYPE, FORWARDTYPE);
 
   TType = record
+    Kind: TTypeKind;
     Block: Integer;
-    TypeKind: Byte;
     
     // For subranges
     HostType: Integer;
@@ -247,52 +225,26 @@ type
     // For forward types
     TypeIdentName: TString;   
   end;
-
-  TConst = record
-    Kind: Byte;
-      
-    // For integer numbers
-    Value: LongInt;
-    
-    // For floating-point numbers 
-    FracValue: Single;
-  end;
-
-  TToken = record
-    Kind: Byte;
-    Name: TString;
-    Value: LongInt;
-    FracValue: Single;
-    StrAddress: Integer;
-    StrLength: Integer;
-  end;
-
-  TIdentifier = record
-    Kind: Byte;
-    Name: TString;
-    Value: LongInt;                    // Value for a constant, address for a label, variable, procedure or function
-    FracValue: Single;
-    Block: Integer;                    // Index of a block in which the identifier is defined
-    NestingLevel: Byte;
-    DataType: Integer;
-    RecType: Integer;                  // Parent record type code for a field
-    Scope: Byte;
-    PassMethod: Byte;                  // Value, CONST or VAR parameter status
-    NumParams: Integer;
-    Param: PParams;
-    ProcAsBlock: Integer;
-    PredefIndex: Byte;
-    IsUnresolvedForward: Boolean;
-    IsExternal: Boolean;
-    ForLoopNesting: Integer;           // Number of nested FOR loops where the label is defined
-  end;
+  
+  TRelocType = (RELOCNONE, RELOCCODE, RELOCDATA);
 
   TRelocatable = record
-    RelocType: Byte;
+    RelocType: TRelocType;
     Pos: LongInt;
     Value: LongInt;
-  end;
+  end;       
+    
+  TUnit = record
+    FileName: TString;
+    Buffer: PChar;
+    Size, Pos, Line: Integer;
+  end;  
   
+  TConst = record
+    Value: LongInt;       // For integer numbers 
+    FracValue: Single;    // For floating-point numbers
+  end;
+
   TGoto = record
     Pos: LongInt;
     LabelIndex: Integer;
@@ -308,6 +260,26 @@ type
     TempPointer: Integer;
     DataType: Integer;
   end;
+  
+  
+
+  
+const
+  // Predefined type indices
+
+  ANYTYPEINDEX          = 1;      // Untyped parameter, or base type for untyped pointers
+  INTEGERTYPEINDEX      = 2;
+  SMALLINTTYPEINDEX     = 3;
+  SHORTINTTYPEINDEX     = 4;
+  WORDTYPEINDEX         = 5;
+  BYTETYPEINDEX         = 6;  
+  CHARTYPEINDEX         = 7;
+  BOOLEANTYPEINDEX      = 8;
+  REALTYPEINDEX         = 9;
+  POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other
+  FILETYPEINDEX         = 11;     // Universal file type
+  STRINGTYPEINDEX       = 12;
+  
 
  
 
@@ -329,15 +301,16 @@ var
   Tok: TToken;
   
   MultiplicativeOperators, AdditiveOperators, UnaryOperators, RelationOperators,
-  OperatorsForIntegers, OperatorsForReals, OperatorsForBooleans,
-  IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of Byte;
+  OperatorsForIntegers, OperatorsForReals, OperatorsForBooleans: set of TTokenKind;
+  
+  IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of TTypeKind;
 
   NumIdent, NumTypes, NumImports, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, NumGotos, ForLoopNesting, WithNesting,
-  CodeSize, CodePosStackTop, GlobalDataSize, CurBlockLocalDataSize, CurBlockTempStorageSize,
+  CodeSize, CodePosStackTop, GlobalDataSize, LocalDataSize, ParamDataSize, TempDataSize,
   DataSectionOrigin, ProgramEntryPoint,
   UnitStackTop: Integer;
   
-  IsConsoleProgram: Integer;                                              // More convenient than Boolean
+  IsConsoleProgram: Integer;      // More convenient than Boolean
   
 
 
@@ -361,8 +334,9 @@ CodeSize                := 0;
 CodePosStackTop         := 0;
 NumStaticStrChars       := 0;
 GlobalDataSize          := 0;
-CurBlockLocalDataSize   := 0;
-CurBlockTempStorageSize := 0;
+LocalDataSize           := 0;
+ParamDataSize           := 0;
+TempDataSize            := 0;
 ProgramEntryPoint       := 0;
 end;
 
@@ -432,7 +406,7 @@ end;
 procedure FillTypeSets;
 begin
 IntegerTypes     := [INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE];
-OrdinalTypes     := IntegerTypes + [CHARTYPE, BOOLEANTYPE, SUBRANGETYPE];
+OrdinalTypes     := IntegerTypes + [CHARTYPE, BOOLEANTYPE, SUBRANGETYPE, ENUMERATEDTYPE];
 UnsignedTypes    := [WORDTYPE, BYTETYPE, CHARTYPE];
 NumericTypes     := IntegerTypes + [REALTYPE];
 StructuredTypes  := [ARRAYTYPE, RECORDTYPE, SETTYPE];
@@ -457,11 +431,11 @@ for i := 1 to NumIdent do
 // Dispose of dynamically allocated parameter and field data
 for i := 1 to NumTypes do
   begin
-  if Types[i].TypeKind = PROCEDURALTYPE then
+  if Types[i].Kind = PROCEDURALTYPE then
     for j := 1 to Types[i].NumParams do
       Dispose(Types[i].Param[j]);
   
-  if Types[i].TypeKind = RECORDTYPE then
+  if Types[i].Kind = RECORDTYPE then
     for j := 1 to Types[i].NumFields do
       Dispose(Types[i].Field[j]);
   end;
@@ -477,36 +451,36 @@ end;
 
 
 
-procedure WriteToken(TokKind: Integer);
+procedure WriteToken(TokKind: TTokenKind);
 begin
 case TokKind of
-  0:                                                Write('no token');
-  OPARTOK:                                          Write('(');
-  CPARTOK:                                          Write(')');
-  MULTOK:                                           Write('*');
-  PLUSTOK:                                          Write('+');
-  COMMATOK:                                         Write(',');
-  MINUSTOK:                                         Write('-');
-  PERIODTOK:                                        Write('.');
-  RANGETOK:                                         Write('..');
-  DIVTOK:                                           Write('/');
-  COLONTOK:                                         Write(':');
-  ASSIGNTOK:                                        Write(':=');
-  SEMICOLONTOK:                                     Write(';');
-  LTTOK:                                            Write('<');
-  LETOK:                                            Write('<=');
-  NETOK:                                            Write('<>');
-  EQTOK:                                            Write('=');
-  GTTOK:                                            Write('>');
-  GETOK:                                            Write('>=');
-  ADDRESSTOK:                                       Write('@');
-  OBRACKETTOK:                                      Write('[');
-  CBRACKETTOK:                                      Write(']');
-  DEREFERENCETOK:                                   Write('^');
-  NUMDELIMITERS + 1 .. NUMDELIMITERS + NUMKEYWORDS: Write(Keyword[TokKind - NUMDELIMITERS]);
-  IDENTTOK:                                         Write('identifier');
-  INTNUMBERTOK, FRACNUMBERTOK:                      Write('number');
-  CHARLITERALTOK, STRINGLITERALTOK:                 Write('literal')
+  EMPTYTOK:                          Write('no token');
+  OPARTOK:                           Write('(');
+  CPARTOK:                           Write(')');
+  MULTOK:                            Write('*');
+  PLUSTOK:                           Write('+');
+  COMMATOK:                          Write(',');
+  MINUSTOK:                          Write('-');
+  PERIODTOK:                         Write('.');
+  RANGETOK:                          Write('..');
+  DIVTOK:                            Write('/');
+  COLONTOK:                          Write(':');
+  ASSIGNTOK:                         Write(':=');
+  SEMICOLONTOK:                      Write(';');
+  LTTOK:                             Write('<');
+  LETOK:                             Write('<=');
+  NETOK:                             Write('<>');
+  EQTOK:                             Write('=');
+  GTTOK:                             Write('>');
+  GETOK:                             Write('>=');
+  ADDRESSTOK:                        Write('@');
+  OBRACKETTOK:                       Write('[');
+  CBRACKETTOK:                       Write(']');
+  DEREFERENCETOK:                    Write('^');
+  ANDTOK..XORTOK:                    Write(Keyword[Ord(TokKind) - Ord(ANDTOK) + 1]);
+  IDENTTOK:                          Write('identifier');
+  INTNUMBERTOK, FRACNUMBERTOK:       Write('number');
+  CHARLITERALTOK, STRINGLITERALTOK:  Write('literal')
 else
   Write('unknown token');
 end; //case
@@ -516,134 +490,17 @@ end;
 
 
   
-procedure Error(const Msg, Name: TString; TokKind: Integer);
+procedure Error(const Msg, Name: TString; TokKind: TTokenKind);
 begin
 if UnitStackTop >= 1 then
   Write('Error ', UnitStack[UnitStackTop].FileName, ' ', UnitStack[UnitStackTop].Line, ': ', Msg, Name)
 else
   Write('Error: ', Msg, Name);  
-if TokKind > -1 then WriteToken(TokKind);
+if TokKind > EMPTYTOK then WriteToken(TokKind);
 WriteLn;
 
 DisposeAll;
 Halt(1);
-end;
-
-
-
-
-
-function GetKeyword(const S: TKeyName): Integer;
-var
-  Max, Mid, Min: Integer;
-  Found: Boolean;
-begin
-Result := 0;
-
-// Binary search
-Min := 1;
-Max := NUMKEYWORDS;
-
-repeat
-  Mid := (Min + Max) div 2;
-  if S > Keyword[Mid] then
-    Min := Mid + 1
-  else
-    Max := Mid - 1;
-  Found := S = Keyword[Mid];
-until Found or (Min > Max);
-
-if Found then Result := NUMDELIMITERS + Mid;
-end;
-
-
-
-
-
-function GetIdentUnsafe(const S: TString): Integer;
-var
-  IdentIndex, BlockStackIndex: Integer;
-begin
-for BlockStackIndex := BlockStackTop downto 1 do
-  for IdentIndex := NumIdent downto 1 do
-    if (Ident[IdentIndex].Name = S) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex]) then 
-      begin
-      Result := IdentIndex;
-      Exit;
-      end;
-      
-Result := 0;
-end;
-
-
-
-
-function GetIdent(const S: TString): Integer;
-begin
-Result := GetIdentUnsafe(S);
-if Result = 0 then
-  Error('Unknown identifier: ', S, -1);
-end;
-
-
-
-
-function GetFieldUnsafe(RecType: Integer; const S: TString): Integer;
-var
-  FieldIndex: Integer;
-begin
-for FieldIndex := 1 to Types[RecType].NumFields do
-  if Types[RecType].Field[FieldIndex]^.Name = S then
-    begin
-    Result := FieldIndex;
-    Exit;
-    end;
-
-Result := 0;
-end;
-
-
-
-
-function GetField(RecType: Integer; const S: TString): Integer;
-begin
-Result := GetFieldUnsafe(RecType, S);
-if Result = 0 then
-  Error('Unknown field: ', S, -1);
-end;
-
-
-
-
-function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const S: TString): Integer;
-var
-  FieldIndex, WithIndex: Integer;
-begin 
-for WithIndex := WithNesting downto 1 do
-  begin
-  RecType := WithStack[WithIndex].DataType;
-  FieldIndex := GetFieldUnsafe(RecType, S);
-  
-  if FieldIndex <> 0 then
-    begin
-    RecPointer := WithStack[WithIndex].TempPointer;
-    Result := FieldIndex;
-    Exit;
-    end;
-  end;
-
-Result := 0;  
-end;
-
-
-
-
-function FieldInsideWithFound(const S: TString): Boolean;
-var
-  RecPointer: Integer; 
-  RecType: Integer;        
-begin
-Result := GetFieldInsideWith(RecPointer, RecType, S) <> 0;
 end;
 
 
@@ -661,7 +518,7 @@ for i := 0 to Length(StrValue) - 1 do
   StaticStringData[NumStaticStrChars] := StrValue[i + STRINGFIRSTINDEX];
   Inc(NumStaticStrChars);
   if NumStaticStrChars > MAXSTATICSTRDATASIZE - 1 then
-    Error('Maximum string data size exceeded', '', -1);
+    Error('Maximum string data size exceeded', '', EMPTYTOK);
   end;
 
 // Add string termination character
@@ -675,17 +532,18 @@ end;
 function LowBound(DataType: Integer): Integer;
 begin
 Result := 0;
-case Types[DataType].TypeKind of
-  INTEGERTYPE:  Result := -2147483648;
-  SMALLINTTYPE: Result := -32768;
-  SHORTINTTYPE: Result := -128;
-  WORDTYPE:     Result :=  0;
-  BYTETYPE:     Result :=  0;
-  CHARTYPE:     Result :=  0;
-  BOOLEANTYPE:  Result := -1;
-  SUBRANGETYPE: Result :=  Types[DataType].Low
+case Types[DataType].Kind of
+  INTEGERTYPE:    Result := -2147483648;
+  SMALLINTTYPE:   Result := -32768;
+  SHORTINTTYPE:   Result := -128;
+  WORDTYPE:       Result :=  0;
+  BYTETYPE:       Result :=  0;
+  CHARTYPE:       Result :=  0;
+  BOOLEANTYPE:    Result := -1;
+  SUBRANGETYPE:   Result :=  Types[DataType].Low;
+  ENUMERATEDTYPE: Result :=  Types[DataType].Low
 else
-  Error('Ordinal type expected', '', -1)
+  Error('Ordinal type expected', '', EMPTYTOK)
 end;// case
 end;
                         
@@ -695,17 +553,18 @@ end;
 function HighBound(DataType: Integer): Integer;
 begin
 Result := 0;
-case Types[DataType].TypeKind of
-  INTEGERTYPE:  Result := 2147483647;
-  SMALLINTTYPE: Result := 32767;
-  SHORTINTTYPE: Result := 127;
-  WORDTYPE:     Result := 65535;
-  BYTETYPE:     Result := 255;  
-  CHARTYPE:     Result := 255;
-  BOOLEANTYPE:  Result := 0;
-  SUBRANGETYPE: Result := Types[DataType].High
+case Types[DataType].Kind of
+  INTEGERTYPE:    Result := 2147483647;
+  SMALLINTTYPE:   Result := 32767;
+  SHORTINTTYPE:   Result := 127;
+  WORDTYPE:       Result := 65535;
+  BYTETYPE:       Result := 255;  
+  CHARTYPE:       Result := 255;
+  BOOLEANTYPE:    Result := 0;
+  SUBRANGETYPE:   Result := Types[DataType].High;
+  ENUMERATEDTYPE: Result := Types[DataType].High
 else
-  Error('Ordinal type expected', '', -1)
+  Error('Ordinal type expected', '', EMPTYTOK)
 end;// case
 end;
 
@@ -717,7 +576,7 @@ var
   i: Integer;
 begin
 Result := 0;
-case Types[DataType].TypeKind of
+case Types[DataType].Kind of
   INTEGERTYPE:    Result := SizeOf(Integer);
   SMALLINTTYPE:   Result := SizeOf(SmallInt);
   SHORTINTTYPE:   Result := SizeOf(ShortInt);
@@ -730,7 +589,7 @@ case Types[DataType].TypeKind of
   FILETYPE:       Result := SizeOf(Integer);
   SUBRANGETYPE:   Result := SizeOf(Integer);
   ARRAYTYPE:      if Types[DataType].IsOpenArray then
-                    Error('Illegal type', '', -1)
+                    Error('Illegal type', '', EMPTYTOK)
                   else  
                     Result := (HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1) * TypeSize(Types[DataType].BaseType);
   RECORDTYPE:     begin
@@ -738,10 +597,11 @@ case Types[DataType].TypeKind of
                   for i := 1 to Types[DataType].NumFields do
                     Result := Result + TypeSize(Types[DataType].Field[i]^.DataType);
                   end;
-  SETTYPE:        Result := MAXSETELEMENTS;                
+  SETTYPE:        Result := MAXSETELEMENTS;
+  ENUMERATEDTYPE: Result := SizeOf(Byte);                
   PROCEDURALTYPE: Result := SizeOf(Pointer)               
 else
-  Error('Illegal type', '', -1)
+  Error('Illegal type', '', EMPTYTOK)
 end;// case
 end;    
 
@@ -757,7 +617,7 @@ if LeftType = RightType then                 // General rule
 else                                         // Special cases
   begin
   // Sets are compatible with other sets having a compatible base type, or with an empty set constructor
-  if (Types[LeftType].TypeKind = SETTYPE) and (Types[RightType].TypeKind = SETTYPE) then
+  if (Types[LeftType].Kind = SETTYPE) and (Types[RightType].Kind = SETTYPE) then
     begin
     if Types[RightType].BaseType = ANYTYPEINDEX then
       Result := LeftType
@@ -771,38 +631,38 @@ else                                         // Special cases
     end;
     
   // Untyped pointers are compatible with any other pointers
-  if (Types[LeftType].TypeKind = POINTERTYPE) and (Types[RightType].TypeKind = POINTERTYPE) and
+  if (Types[LeftType].Kind = POINTERTYPE) and (Types[RightType].Kind = POINTERTYPE) and
      ((Types[LeftType].BaseType = ANYTYPEINDEX) or (Types[RightType].BaseType = ANYTYPEINDEX)) then
     Result := LeftType;
     
   // Procedural types are compatible with any untyped pointers
-  if ((Types[LeftType].TypeKind = PROCEDURALTYPE) and (Types[RightType].TypeKind = POINTERTYPE) and (Types[RightType].BaseType = ANYTYPEINDEX)) or
-     ((Types[LeftType].TypeKind = POINTERTYPE) and (Types[LeftType].BaseType = ANYTYPEINDEX) and (Types[RightType].TypeKind = PROCEDURALTYPE)) then
+  if ((Types[LeftType].Kind = PROCEDURALTYPE) and (Types[RightType].Kind = POINTERTYPE) and (Types[RightType].BaseType = ANYTYPEINDEX)) or
+     ((Types[LeftType].Kind = POINTERTYPE) and (Types[LeftType].BaseType = ANYTYPEINDEX) and (Types[RightType].Kind = PROCEDURALTYPE)) then
     Result := RightType;    
 
   // Subranges are compatible with their host types
-  if Types[LeftType].TypeKind = SUBRANGETYPE then
+  if Types[LeftType].Kind = SUBRANGETYPE then
     Result := GetCompatibleType(Types[LeftType].HostType, RightType);
-  if Types[RightType].TypeKind = SUBRANGETYPE then
+  if Types[RightType].Kind = SUBRANGETYPE then
     Result := GetCompatibleType(LeftType, Types[RightType].HostType);
 
   // Integers
-  if (Types[LeftType].TypeKind in IntegerTypes) and (Types[RightType].TypeKind in IntegerTypes) then
+  if (Types[LeftType].Kind in IntegerTypes) and (Types[RightType].Kind in IntegerTypes) then
     Result := LeftType;
 
   // Booleans
-  if (Types[LeftType].TypeKind = BOOLEANTYPE) and
-     (Types[RightType].TypeKind = BOOLEANTYPE) then
+  if (Types[LeftType].Kind = BOOLEANTYPE) and
+     (Types[RightType].Kind = BOOLEANTYPE) then
     Result := LeftType;
 
   // Characters
-  if (Types[LeftType].TypeKind = CHARTYPE) and
-     (Types[RightType].TypeKind = CHARTYPE) then
+  if (Types[LeftType].Kind = CHARTYPE) and
+     (Types[RightType].Kind = CHARTYPE) then
     Result := LeftType;
   end; // if
 
 if Result = 0 then
-  Error('Incompatible types', '', -1);  
+  Error('Incompatible types', '', EMPTYTOK);  
 end;
 
 
@@ -818,24 +678,24 @@ if LeftType = RightType then                 // General rule
 else                                         // Special cases
   begin
   // Open arrays are compatible with any other arrays of the same base type
-  if (Types[LeftType].TypeKind = ARRAYTYPE) and (Types[RightType].TypeKind = ARRAYTYPE) and 
+  if (Types[LeftType].Kind = ARRAYTYPE) and (Types[RightType].Kind = ARRAYTYPE) and 
       Types[LeftType].IsOpenArray and (Types[LeftType].BaseType = Types[RightType].BaseType) 
   then       
     Result := RightType;
 
   // Untyped pointers are compatible with any other pointers 
-  if (Types[LeftType].TypeKind = POINTERTYPE) and (Types[RightType].TypeKind = POINTERTYPE) and
+  if (Types[LeftType].Kind = POINTERTYPE) and (Types[RightType].Kind = POINTERTYPE) and
      (Types[LeftType].BaseType = ANYTYPEINDEX) 
   then  
     Result := RightType;
     
   // Untyped parameters are compatible with any type
-  if Types[LeftType].TypeKind = ANYTYPE then
+  if Types[LeftType].Kind = ANYTYPE then
     Result := RightType;
   end; // if  
 
 if Result = 0 then
-  Error('Incompatible types', '', -1);  
+  Error('Incompatible types', '', EMPTYTOK);  
 end;
 
 
@@ -844,18 +704,9 @@ end;
 function ConversionIsPossible(SrcType, DestType: Integer): Boolean;
 begin
 // Implicit type conversion is possible if DestType is real and SrcType is integer or a subrange of integer
-Result := (Types[DestType].TypeKind = REALTYPE) and
-          ((Types[SrcType].TypeKind in IntegerTypes) or
-           ((Types[SrcType].TypeKind = SUBRANGETYPE) and (Types[Types[SrcType].HostType].TypeKind in IntegerTypes)));
-end;
-
-
-
-
-procedure AssertIdent;
-begin
-if Tok.Kind <> IDENTTOK then
-  Error('Expected identifier but found ', '', Tok.Kind);
+Result := (Types[DestType].Kind = REALTYPE) and
+          ((Types[SrcType].Kind in IntegerTypes) or
+           ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].HostType].Kind in IntegerTypes)));
 end;
 
 
@@ -863,27 +714,238 @@ end;
 
 procedure CheckOperator(const Tok: TToken; DataType: Integer); 
 begin
-if Types[DataType].TypeKind = SUBRANGETYPE then
+if Types[DataType].Kind = SUBRANGETYPE then
   CheckOperator(Tok, Types[DataType].HostType)
 else 
   begin
-  if not (Types[DataType].TypeKind in OrdinalTypes) and 
-    (Types[DataType].TypeKind <> REALTYPE) and 
-    (Types[DataType].TypeKind <> POINTERTYPE) and
-    (Types[DataType].TypeKind <> PROCEDURALTYPE) 
+  if not (Types[DataType].Kind in OrdinalTypes) and 
+    (Types[DataType].Kind <> REALTYPE) and 
+    (Types[DataType].Kind <> POINTERTYPE) and
+    (Types[DataType].Kind <> PROCEDURALTYPE) 
   then
-    Error('Operator is not applicable', '', -1);
+    Error('Operator is not applicable', '', EMPTYTOK);
    
-  if ((Types[DataType].TypeKind in IntegerTypes)  and not (Tok.Kind in OperatorsForIntegers)) or
-     ((Types[DataType].TypeKind = REALTYPE)       and not (Tok.Kind in OperatorsForReals)) or   
-     ((Types[DataType].TypeKind = CHARTYPE)       and not (Tok.Kind in RelationOperators)) or
-     ((Types[DataType].TypeKind = BOOLEANTYPE)    and not (Tok.Kind in OperatorsForBooleans)) or
-     ((Types[DataType].TypeKind = POINTERTYPE)    and not (Tok.Kind in RelationOperators)) or
-     ((Types[DataType].TypeKind = PROCEDURALTYPE) and not (Tok.Kind in RelationOperators)) 
+  if ((Types[DataType].Kind in IntegerTypes)  and not (Tok.Kind in OperatorsForIntegers)) or
+     ((Types[DataType].Kind = REALTYPE)       and not (Tok.Kind in OperatorsForReals)) or   
+     ((Types[DataType].Kind = CHARTYPE)       and not (Tok.Kind in RelationOperators)) or
+     ((Types[DataType].Kind = BOOLEANTYPE)    and not (Tok.Kind in OperatorsForBooleans)) or
+     ((Types[DataType].Kind = POINTERTYPE)    and not (Tok.Kind in RelationOperators)) or
+     ((Types[DataType].Kind = ENUMERATEDTYPE) and not (Tok.Kind in RelationOperators)) or
+     ((Types[DataType].Kind = PROCEDURALTYPE) and not (Tok.Kind in RelationOperators)) 
   then
-    Error('Operator is not applicable', '', -1);
+    Error('Operator is not applicable', '', EMPTYTOK);
   end;  
 end;  
 
 
+
+
+function GetKeyword(const Name: TKeyName): TTokenKind;
+var
+  Max, Mid, Min: Integer;
+  Found: Boolean;
+begin
+Result := EMPTYTOK;
+
+// Binary search
+Min := 1;
+Max := NUMKEYWORDS;
+
+repeat
+  Mid := (Min + Max) div 2;
+  if Name > Keyword[Mid] then
+    Min := Mid + 1
+  else
+    Max := Mid - 1;
+  Found := Name = Keyword[Mid];
+until Found or (Min > Max);
+
+if Found then Result := TTokenKind(Ord(ANDTOK) - 1 + Mid);
+end;
+
+
+
+
+
+function GetIdentUnsafe(const Name: TString): Integer;
+var
+  IdentIndex, BlockStackIndex: Integer;
+begin
+for BlockStackIndex := BlockStackTop downto 1 do
+  for IdentIndex := NumIdent downto 1 do
+    if (Ident[IdentIndex].Name = Name) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex]) then 
+      begin
+      Result := IdentIndex;
+      Exit;
+      end;
+      
+Result := 0;
+end;
+
+
+
+
+function GetIdent(const Name: TString): Integer;
+begin
+Result := GetIdentUnsafe(Name);
+if Result = 0 then
+  Error('Unknown identifier: ', Name, EMPTYTOK);
+end;
+
+
+
+
+procedure DeclareIdent(const Name: TString; Kind: TIdentKind; TotalNumParams: Integer; DataType: Integer; PassMethod: TPassMethod; ConstValue: LongInt; FracConstValue: Single; PredefProc: TPredefProc);
+var
+  i, AdditionalStackItems: Integer;
+  Scope: TScope;
+begin
+if BlockStack[BlockStackTop] = 1 then Scope := GLOBAL else Scope := LOCAL;
+
+i := GetIdentUnsafe(Name);
+
+if (i > 0) and (Ident[i].Block = BlockStack[BlockStackTop]) then
+  Error('Duplicate identifier ', Name, EMPTYTOK);
+
+Inc(NumIdent);
+if NumIdent > MAXIDENTS then
+  Error('Maximum number of identifiers exceeded', '', EMPTYTOK);
+  
+Ident[NumIdent].Name := Name;
+Ident[NumIdent].Kind := Kind;
+Ident[NumIdent].Scope := Scope;
+Ident[NumIdent].DataType := DataType;
+Ident[NumIdent].Block := BlockStack[BlockStackTop];
+Ident[NumIdent].NestingLevel := BlockStackTop;
+Ident[NumIdent].NumParams := 0;
+Ident[NumIdent].PassMethod := PassMethod;
+Ident[NumIdent].IsUnresolvedForward := FALSE;
+Ident[NumIdent].IsExternal := FALSE;
+Ident[NumIdent].ForLoopNesting := 0;
+
+case Kind of
+  PROC, FUNC:
+    if PredefProc = EMPTYPROC then
+      begin
+      Ident[NumIdent].Value := CodeSize;                              // Routine entry point address
+      Ident[NumIdent].PredefProc := EMPTYPROC;
+      end
+    else
+      begin
+      Ident[NumIdent].Value := 0;
+      Ident[NumIdent].PredefProc := PredefProc;                       // Predefined routine index
+      end;
+
+  VARIABLE:
+    case Scope of
+     GLOBAL:
+       begin
+       Ident[NumIdent].Value := GlobalDataSize;                                              // Variable address (relocatable)
+       GlobalDataSize := GlobalDataSize + TypeSize(DataType);
+       end;// else
+
+     LOCAL:
+       if TotalNumParams > 0 then
+         begin          
+         if Ident[NumIdent].NestingLevel = 2 then                                            // Inside a non-nested routine
+           AdditionalStackItems := 1                                                         // Return address
+         else                                                                                // Inside a nested routine
+           AdditionalStackItems := 2;                                                        // Return address, static link (hidden parameter)  
+
+         Ident[NumIdent].Value := (AdditionalStackItems + TotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from EBP (>0)
+         ParamDataSize := ParamDataSize + SizeOf(LongInt);                                   // Parameters always occupy 4 bytes each
+         end
+       else
+         begin
+         Ident[NumIdent].Value := -LocalDataSize - TypeSize(DataType);                       // Local variable offset from EBP (<0)
+         LocalDataSize := LocalDataSize + TypeSize(DataType);
+         end;
+    end; // case
+
+
+  CONSTANT:
+    if Types[DataType].Kind = REALTYPE then
+      Ident[NumIdent].FracValue := FracConstValue                     // Real constant value
+    else
+      Ident[NumIdent].Value := ConstValue;                            // Ordinal constant value
+      
+      
+  GOTOLABEL:
+    Ident[NumIdent].IsUnresolvedForward := TRUE;
+
+end;// case
+
+
+if GlobalDataSize + MAXSTATICSTRDATASIZE >= MAXDATASIZE then
+  Error('Maximum global data size exceeded', '', EMPTYTOK);
+
+if LocalDataSize >= MAXDATASIZE then
+  Error('Maximum local data size exceeded', '', EMPTYTOK);
+
+if ParamDataSize >= MAXDATASIZE then
+  Error('Maximum parameter data size exceeded', '', EMPTYTOK);
+
+end;
+
+
+
+
+
+function GetFieldUnsafe(RecType: Integer; const Name: TString): Integer;
+var
+  FieldIndex: Integer;
+begin
+for FieldIndex := 1 to Types[RecType].NumFields do
+  if Types[RecType].Field[FieldIndex]^.Name = Name then
+    begin
+    Result := FieldIndex;
+    Exit;
+    end;
+
+Result := 0;
+end;
+
+
+
+
+function GetField(RecType: Integer; const Name: TString): Integer;
+begin
+Result := GetFieldUnsafe(RecType, Name);
+if Result = 0 then
+  Error('Unknown field: ', Name, EMPTYTOK);
+end;
+
+
+
+
+function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const Name: TString): Integer;
+var
+  FieldIndex, WithIndex: Integer;
+begin 
+for WithIndex := WithNesting downto 1 do
+  begin
+  RecType := WithStack[WithIndex].DataType;
+  FieldIndex := GetFieldUnsafe(RecType, Name);
+  
+  if FieldIndex <> 0 then
+    begin
+    RecPointer := WithStack[WithIndex].TempPointer;
+    Result := FieldIndex;
+    Exit;
+    end;
+  end;
+
+Result := 0;  
+end;
+
+
+
+
+function FieldInsideWithFound(const Name: TString): Boolean;
+var
+  RecPointer: Integer; 
+  RecType: Integer;        
+begin
+Result := GetFieldInsideWith(RecPointer, RecType, Name) <> 0;
+end;
 

@@ -43,7 +43,7 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 #### Limitations
 * No object-oriented programming
 * No `uses` clause. The `$I` directive should be used instead (Turbo Pascal 3 style)
-* No double-precision floating-point numbers, enumerations, variant records, typed files 
+* No double-precision floating-point numbers, variant records, typed files 
 * No typed constants
 * Arrays, records and sets cannot be passed to subroutines without `const` or `var`, or used as function results
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
@@ -84,7 +84,8 @@ FormalParamList = ["const" | "var"] IdentList [":" ["array" "of"] TypeIdent] .
 
 IdentList = Ident {"," Ident} .
 
-Type = "^" TypeIdent |
+Type = "(" Ident {"," Ident} ")" |
+       "^" TypeIdent |
        "array" "[" Type {"," Type} "]" "of" Type |
        "record" IdentList ":" Type {";" IdentList ":" Type} [";"] "end" |
        "set" "of" Type |

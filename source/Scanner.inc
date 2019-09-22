@@ -38,7 +38,7 @@ var
 begin
 CustomReset(F, Name);
 if IOResult <> 0 then
-  Error('Unable to open source file ', Name, -1);
+  Error('Unable to open source file ', Name, EMPTYTOK);
 
 Inc(UnitStackTop);
 UnitStack[UnitStackTop].FileName := Name;
@@ -53,7 +53,7 @@ BlockRead(F, UnitStack[UnitStackTop].Buffer^, UnitStack[UnitStackTop].Size, Actu
 Close(F);
 
 if ActualSize <> UnitStack[UnitStackTop].Size then
-  Error('Unable to read source file ', Name, -1);
+  Error('Unable to read source file ', Name, EMPTYTOK);
 end;
 
 
@@ -103,7 +103,7 @@ end;
 procedure AppendStrSafe(var s: TString; ch: Char);
 begin
 if Length(s) >= MAXSTRLENGTH - 1 then
-  Error('String is too long', '', -1);
+  Error('String is too long', '', EMPTYTOK);
 s := s + ch;  
 end;
 
@@ -139,7 +139,7 @@ procedure ReadLiteralChar(var ch: Char);
 begin
 ReadChar(ch);
 if (ch = #0) or (ch = #10) then
-  Error('Unterminated string', '', -1);
+  Error('Unterminated string', '', EMPTYTOK);
 end;
 
 
@@ -199,11 +199,11 @@ case UpCase(ch) of
     else if Text = 'GUI' then
       IsConsoleProgram := 0
     else
-      Error('Unknown application type', '', -1);
+      Error('Unknown application type', '', EMPTYTOK);
     end      
       
   else
-    Error('Unknown compiler directive', '', -1);
+    Error('Unknown compiler directive', '', EMPTYTOK);
   end; // case  
 end;
 
@@ -229,7 +229,7 @@ while ch in HexDigits do
   end;
 
 if not NumFound then
-  Error('Hexadecimal constant is not found', '', -1);
+  Error('Hexadecimal constant is not found', '', EMPTYTOK);
 
 Tok.Kind := INTNUMBERTOK;
 Tok.Value := Num;
@@ -317,7 +317,7 @@ else
         end;
 
       if not ExponFound then
-        Error('Exponent is not found', '', -1);
+        Error('Exponent is not found', '', EMPTYTOK);
 
       if NegExpon then Expon := -Expon;
       end; // if ch = 'E'
@@ -350,12 +350,12 @@ begin
 ReadValidChar(ch);
 
 if not (ch in Digits + ['$']) then
-  Error('Character code is not found', '', -1);
+  Error('Character code is not found', '', EMPTYTOK);
 
 ReadNumber;
 
 if Tok.Kind = FRACNUMBERTOK then
-  Error('Integer character code expected', '', -1);
+  Error('Integer character code expected', '', EMPTYTOK);
 
 Tok.Kind := CHARLITERALTOK;
 end;
@@ -366,7 +366,7 @@ end;
 procedure ReadKeywordOrIdentifier;
 var
   Text: TString;
-  CurToken: Integer;
+  CurToken: TTokenKind;
 begin
 Text := '';
 repeat
@@ -375,7 +375,7 @@ repeat
 until not (ch in AlphaNums);
 
 CurToken := GetKeyword(Text);
-if CurToken <> 0 then               // Keyword found
+if CurToken <> EMPTYTOK then        // Keyword found
   Tok.Kind := CurToken
 else
   begin                             // Identifier found
@@ -435,7 +435,7 @@ procedure NextTok;
 var
   DivFound: Boolean;
 begin
-Tok.Kind := 0;
+Tok.Kind := EMPTYTOK;
 
 // Skip spaces, comments, directives
 DivFound := FALSE;
@@ -535,7 +535,7 @@ else                                // Single-character tokens
     '[': Tok.Kind := OBRACKETTOK;
     ']': Tok.Kind := CBRACKETTOK
   else
-    Error('Unexpected end of program', '', -1);
+    Error('Unexpected end of program', '', EMPTYTOK);
   end; // case
 
   ReadValidChar(ch);
@@ -546,7 +546,7 @@ end; // NextTok
 
 
 
-procedure CheckTok(ExpectedTokKind: Byte);
+procedure CheckTok(ExpectedTokKind: TTokenKind);
 begin
 if Tok.Kind <> ExpectedTokKind then
   Error('Expected ', '', ExpectedTokKind);
@@ -555,10 +555,19 @@ end;
 
 
 
-procedure EatTok(ExpectedTokKind: Byte);
+procedure EatTok(ExpectedTokKind: TTokenKind);
 begin
 CheckTok(ExpectedTokKind);
 NextTok;
+end;
+
+
+
+
+procedure AssertIdent;
+begin
+if Tok.Kind <> IDENTTOK then
+  Error('Expected identifier but found ', '', Tok.Kind);
 end;
 
 

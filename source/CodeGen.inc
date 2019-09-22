@@ -8,7 +8,7 @@
 procedure Gen(b: Byte);
 begin
 if CodeSize >= MAXCODESIZE then
-  Error('Maximum code size exceeded', '', -1);
+  Error('Maximum code size exceeded', '', EMPTYTOK);
 Code[CodeSize] := b;
 Inc(CodeSize);
 end;
@@ -80,11 +80,11 @@ end;
 
 
 
-procedure GenRelocDWord(dw: LongInt; RelocType: Byte);
+procedure GenRelocDWord(dw: LongInt; RelocType: TRelocType);
 begin
 Inc(NumRelocs);
 if NumRelocs > MAXRELOCS then
-  Error('Maximum number of relocations exceeded', '', -1);  
+  Error('Maximum number of relocations exceeded', '', EMPTYTOK);  
 Reloc[NumRelocs].RelocType := RelocType;
 Reloc[NumRelocs].Pos := CodeSize;
 Reloc[NumRelocs].Value := dw;
@@ -103,7 +103,7 @@ end;
 
 
 
-procedure PushRelocConst(Value: LongInt; RelocType: Byte);
+procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 begin
 Gen($68); GenRelocDWord(Value, RelocType);                        // push Value  ; relocatable
 end;
@@ -131,7 +131,7 @@ end;
 
 
 
-procedure PushVarPtr(Addr: Integer; Scope: Byte; DeltaNesting: Byte; RelocType: Byte);
+procedure PushVarPtr(Addr: Integer; Scope: TScope; DeltaNesting: Byte; RelocType: TRelocType);
 const
   StaticLinkAddr = 2 * 4;
 var
@@ -169,7 +169,7 @@ Gen($5E);                                                         // pop esi
 
 case TypeSize(DataType) of
 
-  1: if DataType in UnsignedTypes then
+  1: if Types[DataType].Kind in UnsignedTypes then
        begin
        Gen($31); Gen($C0);                                        // xor eax, eax
        Gen($8A); Gen($06);                                        // mov al, [esi]
@@ -181,7 +181,7 @@ case TypeSize(DataType) of
        Gen($98);                                                  // cwde
        end;
        
-  2: if DataType in UnsignedTypes then
+  2: if Types[DataType].Kind in UnsignedTypes then
        begin
        Gen($31); Gen($C0);                                        // xor eax, eax
        Gen($66); Gen($8B); Gen($06);                              // mov ax, [esi]
@@ -197,7 +197,7 @@ case TypeSize(DataType) of
      end
      
 else
-  Error('Internal fault: Illegal designator size', '', -1);
+  Error('Internal fault: Illegal designator size', '', EMPTYTOK);
 end;
 
 Gen($50);                                                         // push eax
@@ -313,7 +313,7 @@ end;
 
 
 
-procedure GenerateIncDec(proc, Size: Byte);
+procedure GenerateIncDec(proc: TPredefProc; Size: Byte);
 begin
 Gen($5E);                                                             // pop esi
 
@@ -374,9 +374,9 @@ end;// GenerateFloat
 
 
 
-procedure GenerateMathFunction(func, ResultType: Integer);
+procedure GenerateMathFunction(func: TPredefProc; ResultType: Integer);
 begin
-if Types[ResultType].TypeKind = REALTYPE then       // Real type
+if Types[ResultType].Kind = REALTYPE then       // Real type
   begin
   Gen($89); Gen($E3);                                                   // mov ebx, esp
   Gen($D9); Gen($03);                                                   // fld dword ptr [ebx]  ; st = x
@@ -453,9 +453,9 @@ end;// GenerateMathFunction
 
 
 
-procedure GenerateUnaryOperator(op: Byte; ResultType: Integer);
+procedure GenerateUnaryOperator(op: TTokenKind; ResultType: Integer);
 begin
-if Types[ResultType].TypeKind = REALTYPE then     // Real type
+if Types[ResultType].Kind = REALTYPE then     // Real type
   begin
   if op = MINUSTOK then
     begin
@@ -486,9 +486,9 @@ end;
 
 
 
-procedure GenerateBinaryOperator(op: Byte; ResultType: Integer);
+procedure GenerateBinaryOperator(op: TTokenKind; ResultType: Integer);
 begin
-if Types[ResultType].TypeKind = REALTYPE then     // Real type
+if Types[ResultType].Kind = REALTYPE then     // Real type
   begin
   Gen($89); Gen($E3);                                                   // mov ebx, esp
   Gen($D9); Gen($03);                                                   // fld dword ptr [ebx]  ; st = operand2
@@ -519,7 +519,7 @@ if Types[ResultType].TypeKind = REALTYPE then     // Real type
   Gen($D9); Gen($1B);                                                   // fstp dword ptr [ebx]  ;  [ebx] := result;  pop
 
   end // if
-else                              // Ordinal types
+else                                          // Ordinal types
   begin
   Gen($59);                                                             // pop ecx
   Gen($58);                                                             // pop eax
@@ -576,9 +576,9 @@ end;
 
 
 
-procedure GenerateRelation(rel: Byte; ValType: Integer);
+procedure GenerateRelation(rel: TTokenKind; ValType: Integer);
 begin
-if Types[ValType].TypeKind = REALTYPE then        // Real type
+if Types[ValType].Kind = REALTYPE then        // Real type
   begin
   Gen($89); Gen($E3);                                                   // mov ebx, esp
   Gen($D9); Gen($03);                                                   // fld dword ptr [ebx]  ; st = operand2
@@ -600,7 +600,7 @@ if Types[ValType].TypeKind = REALTYPE then        // Real type
     LETOK: Gen($76);                                                    // jbe ...
   end;// case
   end
-else                              // Ordinal types
+else                                          // Ordinal types
   begin
   Gen($59);                                                             // pop ecx
   Gen($58);                                                             // pop eax
@@ -643,7 +643,7 @@ case TypeSize(DesignatorType) of
      Gen($89); Gen($06);                                                // mov [esi], eax
      end
 else
-  Error('Internal fault: Illegal designator size', '', -1);
+  Error('Internal fault: Illegal designator size', '', EMPTYTOK);
 end;
 
 end;
@@ -675,7 +675,7 @@ var
   i: Integer;
 begin
 if (CallerNesting < 0) or (CalleeNesting < 1) or (CallerNesting - CalleeNesting < -1) then
-  Error('Internal fault: Illegal nesting level', '', -1);
+  Error('Internal fault: Illegal nesting level', '', EMPTYTOK);
   
 if CalleeNesting > 1 then                        // If a nested routine is called, push static link as the last hidden parameter
   if CallerNesting - CalleeNesting = -1 then     // The caller and the callee's enclosing routine are at the same nesting level
