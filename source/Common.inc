@@ -515,9 +515,9 @@ begin
 Tok.StrAddress := DataSectionOrigin + NumStaticStrChars;
 Tok.StrLength := Length(StrValue);
 
-for i := 0 to Length(StrValue) - 1 do
+for i := 1 to Length(StrValue) do
   begin
-  StaticStringData[NumStaticStrChars] := StrValue[i + STRINGFIRSTINDEX];
+  StaticStringData[NumStaticStrChars] := StrValue[i];
   Inc(NumStaticStrChars);
   if NumStaticStrChars > MAXSTATICSTRDATASIZE - 1 then
     Error('Maximum string data size exceeded', '', EMPTYTOK);

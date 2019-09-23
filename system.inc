@@ -470,7 +470,7 @@ procedure WriteString(F: Text; P: PStream; const s: string);
 var
   i: Integer;
 begin
-i := 0;
+i := 1;
 while s[i] <> #0 do
   begin
   WriteCh(F, P, s[i]);
@@ -692,7 +692,7 @@ var
   i: Integer;
   Ch: Char;
 begin
-i := 0;
+i := 1;
 ReadCh(F, P, Ch);
 
 while Ch <> #13 do
@@ -726,7 +726,7 @@ end;
 function Length(const s: string): Integer;
 begin
 Result := 0;
-while s[Result] <> #0 do Inc(Result);
+while s[Result + 1] <> #0 do Inc(Result);
 end;
 
 
@@ -734,7 +734,7 @@ end;
 
 procedure SetLength(var s: string; NewLength: Integer);
 begin
-if NewLength >= 0 then s[NewLength] := #0;
+if NewLength >= 0 then s[NewLength + 1] := #0;
 end;
 
 
@@ -742,15 +742,14 @@ end;
 
 procedure AppendStr(var Dest: string; const Source: string);
 var
-  i, j: Integer;
+  DestLen, i: Integer;
 begin
+DestLen := Length(Dest);
 i := 0;
-while Dest[i] <> #0 do Inc(i);
-j := -1;
 repeat 
-  Inc(j);
-  Dest[i + j] := Source[j];
-until Source[j] = #0;
+  Inc(i);
+  Dest[DestLen + i] := Source[i];
+until Source[i] = #0;
 end;
 
 
@@ -769,8 +768,8 @@ procedure ConcatStrChar(const s1: string; ch: Char; var s: string);
 var
   s2: string;
 begin
-s2[0] := ch;  
-s2[1] := #0;
+s2[1] := ch;  
+s2[2] := #0;
 ConcatStr(s1, s2, s);
 end;
 
@@ -781,8 +780,8 @@ procedure ConcatCharStr(ch: Char; const s2: string; var s: string);
 var
   s1: string;
 begin
-s1[0] := ch;  
-s1[1] := #0;
+s1[1] := ch;  
+s1[2] := #0;
 ConcatStr(s1, s2, s);
 end;
 
@@ -793,10 +792,10 @@ procedure ConcatChar(ch1, ch2: Char; var s: string);
 var
   s1, s2: string;
 begin
-s1[0] := ch1;  
-s1[1] := #0;
-s2[0] := ch2;  
-s2[1] := #0;
+s1[1] := ch1;  
+s1[2] := #0;
+s2[1] := ch2;  
+s2[2] := #0;
 ConcatStr(s1, s2, s);
 end;
 
@@ -808,7 +807,7 @@ var
   i: Integer;
 begin
 Result := 0;
-i := -1;
+i := 0;
 repeat 
   Inc(i);
   Result := Integer(s1[i]) - Integer(s2[i]);
@@ -822,8 +821,8 @@ function CompareStrChar(const s: string; ch: Char): Integer;
 var
   s2: string;
 begin
-s2[0] := ch;  
-s2[1] := #0;
+s2[1] := ch;  
+s2[2] := #0;
 Result := CompareStr(s, s2);
 end;
 
@@ -834,8 +833,8 @@ function CompareCharStr(ch: Char; const s: string): Integer;
 var
   s1: string;
 begin
-s1[0] := ch;  
-s1[1] := #0;
+s1[1] := ch;  
+s1[2] := #0;
 Result := CompareStr(s1, s);
 end;
 
@@ -852,7 +851,7 @@ D := @Dest;
 
 if S = D then Exit;
 
-for i := 0 to Count - 1 do
+for i := 1 to Count do
   D^[i] := S^[i];
 end;
 
@@ -865,7 +864,7 @@ var
   i: Integer;
 begin
 D := @Data;
-for i := 0 to Count - 1 do
+for i := 1 to Count do
   D^[i] := Value;
 end;
 
@@ -888,12 +887,12 @@ CmdLineLen := Length(CmdLine);
 NumParam := 1;
 ParamPtr[NumParam - 1] := @CmdLine;
 
-for i := 0 to CmdLineLen - 1 do
+for i := 1 to CmdLineLen do
   begin
   if CmdLine[i] <= ' ' then
     CmdLine[i] := #0;
     
-  if (i > 0) and (CmdLine[i] > ' ') and (CmdLine[i - 1] = #0) then
+  if (i > 1) and (CmdLine[i] > ' ') and (CmdLine[i - 1] = #0) then
     begin
     Inc(NumParam);
     ParamPtr[NumParam - 1] := @CmdLine[i];
@@ -933,7 +932,7 @@ Stream.Index := 0;
 
 ReadReal(Text(0), @Stream, Number);
 
-if Stream.Index - 1 <> Length(s) then Code := Stream.Index - 1 else Code := 0;
+if Stream.Index - 1 <> Length(s) then Code := Stream.Index else Code := 0;
 end;
 
 
@@ -947,7 +946,7 @@ Stream.Data := @s;
 Stream.Index := 0;
 
 WriteReal(Text(0), @Stream, Number);
-s[Stream.Index] := #0;
+s[Stream.Index + 1] := #0;
 end;
 
 
@@ -962,7 +961,7 @@ Stream.Index := 0;
 
 ReadInt(Text(0), @Stream, Number);
 
-if Stream.Index - 1 <> Length(s) then Code := Stream.Index - 1 else Code := 0;
+if Stream.Index - 1 <> Length(s) then Code := Stream.Index else Code := 0;
 end;
 
 
@@ -976,7 +975,7 @@ Stream.Data := @s;
 Stream.Index := 0;
 
 WriteInt(Text(0), @Stream, Number);
-s[Stream.Index] := #0;
+s[Stream.Index + 1] := #0;
 end;
 
 

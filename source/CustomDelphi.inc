@@ -8,12 +8,6 @@
 {$I-}
 
 
-
-const
-  STRINGFIRSTINDEX = 1;
-
-
-
 type
   TString  = string [80];
   TKeyName = string [80];
@@ -46,4 +40,3 @@ begin
 Assign(F, Name);
 Rewrite(F, 1);
 end;
-

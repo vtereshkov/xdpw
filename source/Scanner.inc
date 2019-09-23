@@ -415,7 +415,7 @@ until EndOfLiteral;
 if Length(Text) = 1 then
   begin
   Tok.Kind := CHARLITERALTOK;
-  Tok.Value := Ord(Text[STRINGFIRSTINDEX]);
+  Tok.Value := Ord(Text[1]);
   end
 else
   begin

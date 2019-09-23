@@ -287,14 +287,14 @@ ImportSection.DirectoryTable[NumImports].FirstThunk  := VirtualAddress + SizeOf(
                                                                        + SizeOf(ImportSection.LibraryNames)
                                                                        + SizeOf(ImportSection.LookupTable[0]) * NumImports;
 
-Move(ImportLibName[STRINGFIRSTINDEX], ImportSection.LibraryNames[NumImports], Length(ImportLibName));
+Move(ImportLibName[1], ImportSection.LibraryNames[NumImports], Length(ImportLibName));
 
 ImportSection.LookupTable[NumImports, 0] := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
                                                            + SizeOf(ImportSection.LibraryNames)
                                                            + SizeOf(ImportSection.LookupTable)
                                                            + SizeOf(ImportSection.NameTable[0]) * NumImports;                                              
 
-Move(ImportFuncName[STRINGFIRSTINDEX], ImportSection.NameTable[NumImports].Name, Length(ImportFuncName));
+Move(ImportFuncName[1], ImportSection.NameTable[NumImports].Name, Length(ImportFuncName));
 
 Result := IMGBASE + VirtualAddress + LongInt(@ImportSection.LookupTable[NumImports, 0]) - LongInt(@ImportSection);
 Inc(NumImports);

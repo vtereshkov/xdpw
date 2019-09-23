@@ -805,15 +805,26 @@ if Tok.Kind = OPARTOK then
       // Special case: open array parameters
       if IsOpenArrayList then
         begin
-        // Add new anonymous type
+        // Add new anonymous type 0..0 for array index
         Inc(NumTypes);
         if NumTypes > MAXTYPES then
           Error('Maximum number of types exceeded', '', EMPTYTOK);
         
-        Types[NumTypes].Kind    := ARRAYTYPE;
+        Types[NumTypes].Kind        := SUBRANGETYPE;
+        Types[NumTypes].Block       := BlockStack[BlockStackTop];
+        Types[NumTypes].HostType    := INTEGERTYPEINDEX;
+        Types[NumTypes].Low         := 0;
+        Types[NumTypes].High        := 0;
+        
+        // Add new anonymous type for array itself
+        Inc(NumTypes);
+        if NumTypes > MAXTYPES then
+          Error('Maximum number of types exceeded', '', EMPTYTOK);
+        
+        Types[NumTypes].Kind        := ARRAYTYPE;
         Types[NumTypes].Block       := BlockStack[BlockStackTop];
         Types[NumTypes].BaseType    := ParamType;
-        Types[NumTypes].IndexType   := Types[STRINGTYPEINDEX].IndexType;   // Any subrange with zero lower bound
+        Types[NumTypes].IndexType   := NumTypes - 1;
         Types[NumTypes].IsOpenArray := TRUE;
         
         ParamType := NumTypes;
@@ -1652,21 +1663,10 @@ procedure CompileStatement{(LoopNesting: Integer)};
   
   procedure CompileAssignment(DesignatorType: Integer);
   var
-    ExpressionType: Integer;
-    TreatCharAsString: Boolean;
-    
+    ExpressionType: Integer;   
   begin
-  NextTok;
-
-  TreatCharAsString := (Tok.Kind = CHARLITERALTOK) and (DesignatorType = STRINGTYPEINDEX);
-  if TreatCharAsString then
-    begin                                                       // Special case
-    PushVarPtr(Tok.StrAddress, GLOBAL, 0, RELOCNONE);
-    ExpressionType := STRINGTYPEINDEX;
-    NextTok;
-    end
-  else                                                          
-    CompileExpression(ExpressionType);                          // General rule: right-hand side expression
+  NextTok;                       
+  CompileExpression(ExpressionType);
 
   // Try to convert integer to real
   if ConversionIsPossible(ExpressionType, DesignatorType) then
@@ -2489,15 +2489,15 @@ procedure CompileBlock(BlockIdentIndex: Integer);
 
   Types[POINTERTYPEINDEX].BaseType  := ANYTYPEINDEX;
   
-  // Add new anonymous type: 0..MAXSTRLENGTH
+  // Add new anonymous type: 1 .. MAXSTRLENGTH + 1
   Inc(NumTypes);
   if NumTypes > MAXTYPES then
     Error('Maximum number of types exceeded', '', EMPTYTOK);
   
-  Types[NumTypes].Kind := SUBRANGETYPE;
+  Types[NumTypes].Kind     := SUBRANGETYPE;
   Types[NumTypes].HostType := INTEGERTYPEINDEX;
-  Types[NumTypes].Low      := 0;
-  Types[NumTypes].High     := MAXSTRLENGTH;
+  Types[NumTypes].Low      := 1;
+  Types[NumTypes].High     := MAXSTRLENGTH + 1;
   Types[NumTypes].Block    := BlockStack[BlockStackTop];
 
   Types[STRINGTYPEINDEX].BaseType    := CHARTYPEINDEX;

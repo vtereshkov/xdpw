@@ -24,7 +24,7 @@ The source file should be specified with its extension (.pas).
  
 ### Language
 
-XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal with the following changes:
+XD Pascal is similar to Turbo Pascal with the following changes:
 
 #### Enhancements
 * The target operating system is Windows
@@ -34,7 +34,7 @@ XD Pascal is a dialect of Pascal programming language similar to Turbo Pascal wi
 * Single-line comments (`//`) are supported (Delphi style)
 
 #### Differences
-* Strings are null-terminated arrays of characters (C style)
+* Strings are null-terminated arrays of characters (C style), but indexed from 1 for compatibility
 * No `Assign` procedure. File names should be passed directly to `Reset` or `Rewrite` (Apple Pascal style)
 * The `Text` type is equivalent to `file`. It can be used for both text and untyped files
 * Calls via procedural variables require parentheses even for empty parameter lists
@@ -239,7 +239,7 @@ function UpCase(ch: Char): Char;
 
 ### Samples
 * `factor.pas`   - Integer factorization demo
-* `lineq.pas`    - Linear algebraic equation systems solver. Uses `gauss.inc` unit. Requires `eq.txt`, `eqerr.txt`, or similar data file
+* `lineq.pas`    - Linear equation solver. Uses `gauss.inc` unit. Requires `eq.txt`, `eqerr.txt`, or similar data file
 * `life.pas`     - The Game of Life
 * `sort.pas`     - Array sorting demo
 * `fft.pas`      - Fast Fourier Transform demo
@@ -249,4 +249,4 @@ function UpCase(ch: Char): Char;
 
 ### Known issues
 
-The AVG antivirus gives false positive results on some programs compiled with XD Pascal.
+The AVG antivirus and the Windows Defender are known to give false positive results on some programs compiled with XD Pascal.

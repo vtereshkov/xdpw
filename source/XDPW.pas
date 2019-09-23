@@ -21,9 +21,9 @@ procedure ChangeExt(const InStr, Ext: TString; var OutStr: TString);
 var
   i, DotPos: Integer;
 begin
-DotPos := -1;
+DotPos := 0;
 
-for i := STRINGFIRSTINDEX + Length(InStr) - 1 downto STRINGFIRSTINDEX do
+for i := Length(InStr) downto 1 do
   if InStr[i] = '.' then
     begin
     DotPos := i;
@@ -31,7 +31,7 @@ for i := STRINGFIRSTINDEX + Length(InStr) - 1 downto STRINGFIRSTINDEX do
     end;
 
 OutStr := InStr;
-if DotPos >= 0 then SetLength(OutStr, DotPos - STRINGFIRSTINDEX + 1);  
+if DotPos > 0 then SetLength(OutStr, DotPos);  
 OutStr := OutStr + Ext;
 end;
 

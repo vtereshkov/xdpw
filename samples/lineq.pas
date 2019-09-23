@@ -12,7 +12,7 @@ program LinEq;
 procedure Error;
 begin
 WriteLn;
-WriteLn('Error: ', E, '.');
+WriteLn('Error: ' + E + '.');
 ReadLn;
 Halt(1);
 end;
