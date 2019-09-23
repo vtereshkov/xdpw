@@ -366,7 +366,7 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
 
 var
   DesignatorType, ExpressionType: Integer;
-  LibProcIdentIndex: Integer;
+  LibProcIdentIndex, ConsoleIndex: Integer;
   IsFirstParam, FileSpecified: Boolean;
   
   
@@ -386,7 +386,8 @@ case proc of
 
   READPROC, READLNPROC:
     begin
-    FileSpecified := FALSE;              // By default, use standard output device, i.e. console
+    ConsoleIndex := GetIdent('STDINPUTFILE');
+    FileSpecified := FALSE;                       // By default, use standard input device, i.e. console
     IsFirstParam := TRUE;
 
     if Tok.Kind = OPARTOK then
@@ -397,7 +398,7 @@ case proc of
         if FileSpecified then
           DuplicateStackTop
         else
-          PushConst(0);                  // Console handle
+          PushVarPtr(Ident[ConsoleIndex].Value, Ident[ConsoleIndex].Scope, BlockStackTop - Ident[ConsoleIndex].NestingLevel, RELOCDATA);
 
         // 2nd argument - stream handle
         PushConst(0);
@@ -410,7 +411,6 @@ case proc of
           if not IsFirstParam then
             Error('Incompatible types', '', EMPTYTOK);
           FileSpecified := TRUE;
-          DerefPtr(DesignatorType);
           end
         else                                                        // Any output expression
           begin
@@ -436,7 +436,7 @@ case proc of
       if FileSpecified then
         DuplicateStackTop
       else
-        PushConst(0);   // Console handle
+        PushVarPtr(Ident[ConsoleIndex].Value, Ident[ConsoleIndex].Scope, BlockStackTop - Ident[ConsoleIndex].NestingLevel, RELOCDATA);
         
       // 2nd argument - stream handle
       PushConst(0);        
@@ -453,7 +453,8 @@ case proc of
 
   WRITEPROC, WRITELNPROC:
     begin
-    FileSpecified := FALSE;              // By default, use standard output device, i.e. console
+    ConsoleIndex := GetIdent('STDOUTPUTFILE');
+    FileSpecified := FALSE;                       // By default, use standard output device, i.e. console
     IsFirstParam := TRUE;
 
     if Tok.Kind = OPARTOK then
@@ -464,7 +465,7 @@ case proc of
         if FileSpecified then
           DuplicateStackTop
         else
-          PushConst(0);                  // Console handle
+          PushVarPtr(Ident[ConsoleIndex].Value, Ident[ConsoleIndex].Scope, BlockStackTop - Ident[ConsoleIndex].NestingLevel, RELOCDATA);
 
         // 2nd argument - stream handle
         PushConst(0);
@@ -502,7 +503,7 @@ case proc of
       if FileSpecified then
         DuplicateStackTop
       else
-        PushConst(0);   // Console handle
+        PushVarPtr(Ident[ConsoleIndex].Value, Ident[ConsoleIndex].Scope, BlockStackTop - Ident[ConsoleIndex].NestingLevel, RELOCDATA);
         
       // 2nd argument - stream handle
       PushConst(0);         

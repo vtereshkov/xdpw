@@ -82,7 +82,8 @@ Relocate(IMGBASE + Headers.CodeSectionHeader.VirtualAddress,
 
 // Write output file
 ChangeExt(ProgramName, 'exe', ExeName);
-CustomRewrite(OutFile, ExeName);
+Assign(OutFile, ExeName);
+Rewrite(OutFile, 1);
 
 if IOResult <> 0 then
   Error('Unable to open output file ', ExeName, EMPTYTOK);

@@ -411,8 +411,8 @@ IntegerTypes     := [INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE
 OrdinalTypes     := IntegerTypes + [CHARTYPE, BOOLEANTYPE, SUBRANGETYPE, ENUMERATEDTYPE];
 UnsignedTypes    := [WORDTYPE, BYTETYPE, CHARTYPE];
 NumericTypes     := IntegerTypes + [REALTYPE];
-StructuredTypes  := [ARRAYTYPE, RECORDTYPE, SETTYPE];
-CastableTypes    := OrdinalTypes + [FILETYPE, POINTERTYPE, PROCEDURALTYPE];
+StructuredTypes  := [ARRAYTYPE, RECORDTYPE, SETTYPE, FILETYPE];
+CastableTypes    := OrdinalTypes + [POINTERTYPE, PROCEDURALTYPE];
 end; 
 
 
@@ -588,7 +588,7 @@ case Types[DataType].Kind of
   BOOLEANTYPE:    Result := SizeOf(Boolean);
   REALTYPE:       Result := SizeOf(Single);
   POINTERTYPE:    Result := SizeOf(Pointer);
-  FILETYPE:       Result := SizeOf(Integer);
+  FILETYPE:       Result := SizeOf(TString) + SizeOf(Integer);  // Name + Handle
   SUBRANGETYPE:   Result := SizeOf(Integer);
   ARRAYTYPE:      if Types[DataType].IsOpenArray then
                     Error('Illegal type', '', EMPTYTOK)

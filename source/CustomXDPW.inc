@@ -18,20 +18,3 @@ procedure CustomParamStr(Index: Integer; var Str: TString);
 begin  
 ParseCmdLine(Index, Str);
 end;
-
-
-
-
-procedure CustomReset(var F: TInFile; const Name: TString);
-begin
-Reset(F, Name);
-end;
-
-
-
-
-procedure CustomRewrite(var F: TOutFile; const Name: TString);
-begin
-Rewrite(F, Name);
-end;
-

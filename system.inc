@@ -36,6 +36,13 @@ type
   Text = file;  
   PChar = ^Char;
   
+  TFileRec = record
+    Name: string;
+    Handle: LongInt;
+  end;
+
+  PFileRec = ^TFileRec;  
+  
   TStream = record
     Data: PChar;
     Index: Integer;
@@ -55,7 +62,9 @@ var
   Buffer: string;
   IOError: Integer;
   LastReadChar: Char;
-  StdInputHandle, StdOutputHandle: file;
+  
+  StdInputFile, StdOutputFile: file;
+  StdInputHandle, StdOutputHandle: LongInt;
   
   
   
@@ -73,9 +82,9 @@ procedure HeapFree(hHeap,
                    dwFlags: LongInt; 
                    lpMem: Pointer); external 'KERNEL32.DLL' name 'HeapFree';
 
-function GetStdHandle(nStdHandle: Integer): file; external 'KERNEL32.DLL' name 'GetStdHandle';
+function GetStdHandle(nStdHandle: Integer): LongInt; external 'KERNEL32.DLL' name 'GetStdHandle';
 
-procedure SetConsoleMode(hConsoleHandle: file; 
+procedure SetConsoleMode(hConsoleHandle: LongInt; 
                          dwMode: LongInt); external 'KERNEL32.DLL' name 'SetConsoleMode';
 
 function CreateFileA(const lpFileName: string; 
@@ -84,29 +93,29 @@ function CreateFileA(const lpFileName: string;
                      lpSecurityAttributes: Pointer; 
                      dwCreationDisposition, 
                      dwFlagsAndAttributes, 
-                     hTemplateFile: LongInt): file; external 'KERNEL32.DLL' name 'CreateFileA';
+                     hTemplateFile: LongInt): LongInt; external 'KERNEL32.DLL' name 'CreateFileA';
                      
-function SetFilePointer(hFile: file; 
+function SetFilePointer(hFile: LongInt; 
                         lDistanceToMove: LongInt; 
                         pDistanceToMoveHigh: Pointer; 
                         dwMoveMethod: LongInt): LongInt; external 'KERNEL32.DLL' name 'SetFilePointer';
 
-function GetFileSize(hFile: file; 
+function GetFileSize(hFile: LongInt; 
                      lpFileSizeHigh: Pointer): LongInt; external 'KERNEL32.DLL' name 'GetFileSize';        
                      
-procedure WriteFile(hFile: file;
+procedure WriteFile(hFile: LongInt;
                     lpBuffer: Pointer;
                     nNumberOfBytesToWrite: LongInt;
                     var lpNumberOfBytesWritten: LongInt;
                     lpOverlapped: LongInt); external 'KERNEL32.DLL' name 'WriteFile';
                     
-procedure ReadFile(hFile: file;
+procedure ReadFile(hFile: LongInt;
                    lpBuffer: Pointer;
                    nNumberOfBytesToRead: LongInt;
                    var lpNumberOfBytesRead: LongInt;
                    lpOverlapped: LongInt); external 'KERNEL32.DLL' name 'ReadFile';
 
-procedure CloseHandle(hObject: Text); external 'KERNEL32.DLL' name 'CloseHandle';
+procedure CloseHandle(hObject: LongInt); external 'KERNEL32.DLL' name 'CloseHandle';
 
 function GetLastError: LongInt; external 'KERNEL32.DLL' name 'GetLastError';
 
@@ -120,12 +129,21 @@ procedure ExitProcess(uExitCode: Integer); external 'KERNEL32.DLL' name 'ExitPro
 
 
 procedure InitSystem;
+var
+  FileRecPtr: PFileRec;
 begin
 Heap := GetProcessHeap;
 
-StdInputHandle := Text(GetStdHandle(STD_INPUT_HANDLE));
-StdOutputHandle := Text(GetStdHandle(STD_OUTPUT_HANDLE));
+StdInputHandle := GetStdHandle(STD_INPUT_HANDLE);
+FileRecPtr := @StdInputFile;
+FileRecPtr^.Handle := StdInputHandle;
+
+StdOutputHandle := GetStdHandle(STD_OUTPUT_HANDLE);
+FileRecPtr := @StdOutputFile;
+FileRecPtr^.Handle := StdOutputHandle;
+
 SetConsoleMode(StdInputHandle, $02F5);                      // set all flags except ENABLE_LINE_INPUT and ENABLE_WINDOW_INPUT 
+
 IOError := 0;
 end;
 
@@ -197,7 +215,6 @@ end;
 
 
 
-
 function Max(x, y: Real): Real;
 begin
 if x > y then Result := x else Result := y;
@@ -238,27 +255,47 @@ end;
 
 
 
-procedure Rewrite(var F: file; const Name: string);
+procedure Assign(var F: file; const Name: string);
+var
+  FileRecPtr: PFileRec;
 begin
-F := CreateFileA(Name, GENERIC_WRITE, 0, nil, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-if Integer(F) = INVALID_HANDLE_VALUE then IOError := -2;
+FileRecPtr := @F;
+FileRecPtr^.Name := Name;
 end;
 
 
 
 
-procedure Reset(var F: file; const Name: string);
+procedure Rewrite(var F: file; BlockSize: Integer);
+var
+  FileRecPtr: PFileRec;
 begin
-F := CreateFileA(Name, GENERIC_READ or GENERIC_WRITE, 0, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-if Integer(F) = INVALID_HANDLE_VALUE then IOError := -2;
+FileRecPtr := @F;
+FileRecPtr^.Handle := CreateFileA(FileRecPtr^.Name, GENERIC_WRITE, 0, nil, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+if FileRecPtr^.Handle = INVALID_HANDLE_VALUE then IOError := -2;
 end;
 
 
 
 
-procedure Close(var F: Text);
+procedure Reset(var F: file; BlockSize: Integer);
+var
+  FileRecPtr: PFileRec;
 begin
-CloseHandle(F);
+FileRecPtr := @F;
+FileRecPtr^.Handle := CreateFileA(FileRecPtr^.Name, GENERIC_READ or GENERIC_WRITE, 0, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+if FileRecPtr^.Handle = INVALID_HANDLE_VALUE then IOError := -2;
+end;
+
+
+
+
+procedure Close(var F: file);
+var
+  FileRecPtr: PFileRec;
+begin
+FileRecPtr := @F;
+CloseHandle(FileRecPtr^.Handle);
 end;
 
 
@@ -266,17 +303,22 @@ end;
   
 procedure BlockWrite(var F: file; var Buf; Len: Integer);
 var
+  FileRecPtr: PFileRec;
   LenWritten: Integer;
 begin
-WriteFile(F, @Buf, Len, LenWritten, 0);
+FileRecPtr := @F;
+WriteFile(FileRecPtr^.Handle, @Buf, Len, LenWritten, 0);
 end;
 
 
 
 
 procedure BlockRead(var F: file; var Buf; Len: Integer; var LenRead: Integer);
+var
+  FileRecPtr: PFileRec;
 begin
-ReadFile(F, @Buf, Len, LenRead, 0);
+FileRecPtr := @F;
+ReadFile(FileRecPtr^.Handle, @Buf, Len, LenRead, 0);
 if LenRead < Len then IOError := -1;
 end;
 
@@ -284,32 +326,44 @@ end;
 
 
 procedure Seek(var F: file; Pos: Integer);
+var
+  FileRecPtr: PFileRec;
 begin
-Pos := SetFilePointer(F, Pos, nil, FILE_BEGIN);
+FileRecPtr := @F;
+Pos := SetFilePointer(FileRecPtr^.Handle, Pos, nil, FILE_BEGIN);
 end;
 
 
 
 
 function FileSize(var F: file): Integer;
+var
+  FileRecPtr: PFileRec;
 begin
-Result := GetFileSize(F, nil);
+FileRecPtr := @F;
+Result := GetFileSize(FileRecPtr^.Handle, nil);
 end;
 
 
 
 
 function FilePos(var F: file): Integer;
+var
+  FileRecPtr: PFileRec;
 begin
-Result := SetFilePointer(F, 0, nil, FILE_CURRENT);
+FileRecPtr := @F;
+Result := SetFilePointer(FileRecPtr^.Handle, 0, nil, FILE_CURRENT);
 end;
 
 
 
 
 function EOF(var F: file): Boolean;
+var
+  FileRecPtr: PFileRec;
 begin
-if Integer(F) = 0 then
+FileRecPtr := @F;
+if (FileRecPtr^.Handle = StdInputHandle) or (FileRecPtr^.Handle = StdOutputHandle) then
   Result := FALSE
 else
   Result := FilePos(F) >= FileSize(F);
@@ -327,27 +381,29 @@ end;
 
 
 
-procedure WriteCh(F: Text; P: PStream; ch: Char);
+procedure WriteCh(var F: file; P: PStream; ch: Char);
 var
   Dest: PChar;
+  FileRecPtr: PFileRec;
 begin
-if P <> nil then             // String stream output
+FileRecPtr := @F;  
+if P <> nil then                                    // String stream output
   begin                      
   Dest := PChar(Integer(P^.Data) + P^.Index);
   Dest^ := ch;
   Inc(P^.Index);
   end
 else  
-  if Integer(F) = 0 then     // Console output
+  if FileRecPtr^.Handle = StdOutputHandle then      // Console output
     WriteConsole(ch)                
-  else                       // File output
+  else                                              // File output
     BlockWrite(F, ch, 1);   
 end;
 
 
 
 
-procedure WriteInt(F: Text; P: PStream; Number: Integer);
+procedure WriteInt(var F: file; P: PStream; Number: Integer);
 var
   Digit, Weight: Integer;
   Skip: Boolean;
@@ -386,7 +442,7 @@ end;
 
 
 
-procedure WriteHex(F: Text; P: PStream; Number: Integer; Digits: ShortInt);
+procedure WriteHex(var F: file; P: PStream; Number: Integer; Digits: ShortInt);
 var
   i, Digit: ShortInt;
 begin
@@ -402,7 +458,7 @@ end;
 
 
 
-procedure WritePointer(F: Text; P: PStream; Number: Integer);
+procedure WritePointer(var F: file; P: PStream; Number: Integer);
 begin
 WriteHex(F, P, Number, 8);
 end;
@@ -411,7 +467,7 @@ end;
 
 
 
-procedure WriteReal(F: Text; P: PStream; Number: Real);
+procedure WriteReal(var F: file; P: PStream; Number: Real);
 const
   FracBits = 16;
 var
@@ -466,7 +522,7 @@ end;
 
 
 
-procedure WriteString(F: Text; P: PStream; const s: string);
+procedure WriteString(var F: file; P: PStream; const s: string);
 var
   i: Integer;
 begin
@@ -481,7 +537,7 @@ end;
 
 
 
-procedure WriteBoolean(F: Text; P: PStream; Flag: Boolean);
+procedure WriteBoolean(var F: file; P: PStream; Flag: Boolean);
 begin
 if Flag then WriteString(F, P, 'TRUE') else WriteString(F, P, 'FALSE');
 end;
@@ -489,7 +545,7 @@ end;
 
 
 
-procedure WriteNewLine(F: Text; P: PStream);
+procedure WriteNewLine(var F: file; P: PStream);
 begin
 WriteCh(F, P, #13);  WriteCh(F, P, #10);
 end;
@@ -497,24 +553,26 @@ end;
 
 
 
-procedure ReadCh(F: Text; P: PStream; var ch: Char);
+procedure ReadCh(var F: file; P: PStream; var ch: Char);
 var
   Len: Integer;
   Dest: PChar;
+  FileRecPtr: PFileRec;
 begin
-if P <> nil then                // String stream input
+FileRecPtr := @F;   
+if P <> nil then                                      // String stream input
   begin                      
   Dest := PChar(Integer(P^.Data) + P^.Index);
   ch := Dest^;
   Inc(P^.Index);
   end
 else  
-  if Integer(F) = 0 then        // Console input
+  if FileRecPtr^.Handle = StdInputHandle then         // Console input
     begin
     ReadConsole(ch);
     if ch = #13 then WriteConsole(#10);
     end 
-  else                          // File input
+  else                                                // File input
     begin
     BlockRead(F, ch, 1, Len);
     if ch = #10 then BlockRead(F, ch, 1, Len);
@@ -527,7 +585,7 @@ end;
 
 
 
-procedure ReadInt(F: Text; P: PStream; var Number: Integer);
+procedure ReadInt(var F: file; P: PStream; var Number: Integer);
 var
   Ch: Char;
   Negative: Boolean;
@@ -559,7 +617,7 @@ end;
 
 
 
-procedure ReadSmallInt(F: Text; P: PStream; var Number: SmallInt);
+procedure ReadSmallInt(var F: file; P: PStream; var Number: SmallInt);
 var
   IntNumber: Integer;
 begin
@@ -570,7 +628,7 @@ end;
 
 
 
-procedure ReadShortInt(F: Text; P: PStream; var Number: ShortInt);
+procedure ReadShortInt(var F: file; P: PStream; var Number: ShortInt);
 var
   IntNumber: Integer;
 begin
@@ -581,7 +639,7 @@ end;
 
 
 
-procedure ReadWord(F: Text; P: PStream; var Number: Word);
+procedure ReadWord(var F: file; P: PStream; var Number: Word);
 var
   IntNumber: Integer;
 begin
@@ -592,7 +650,7 @@ end;
 
 
 
-procedure ReadByte(F: Text; P: PStream; var Number: Byte);
+procedure ReadByte(var F: file; P: PStream; var Number: Byte);
 var
   IntNumber: Integer;
 begin
@@ -603,7 +661,7 @@ end;
 
 
 
-procedure ReadBoolean(F: Text; P: PStream; var Value: Boolean);
+procedure ReadBoolean(var F: file; P: PStream; var Value: Boolean);
 var
   IntNumber: Integer;
 begin
@@ -614,7 +672,7 @@ end;
 
 
 
-procedure ReadReal(F: Text; P: PStream; var Number: Real);
+procedure ReadReal(var F: file; P: PStream; var Number: Real);
 var
   Ch: Char;
   Negative, ExponNegative: Boolean;
@@ -687,7 +745,7 @@ end;
 
 
 
-procedure ReadString(F: Text; P: PStream; const s: string);
+procedure ReadString(var F: file; P: PStream; const s: string);
 var
   i: Integer;
   Ch: Char;
@@ -708,7 +766,7 @@ end;
 
 
 
-procedure ReadNewLine(F: Text; P: PStream);
+procedure ReadNewLine(var F: file; P: PStream);
 var
   Ch: Char;
 begin
@@ -930,7 +988,7 @@ begin
 Stream.Data := @s;
 Stream.Index := 0;
 
-ReadReal(Text(0), @Stream, Number);
+ReadReal(StdInputFile, @Stream, Number);
 
 if Stream.Index - 1 <> Length(s) then Code := Stream.Index else Code := 0;
 end;
@@ -945,7 +1003,7 @@ begin
 Stream.Data := @s;
 Stream.Index := 0;
 
-WriteReal(Text(0), @Stream, Number);
+WriteReal(StdOutputFile, @Stream, Number);
 s[Stream.Index + 1] := #0;
 end;
 
@@ -959,7 +1017,7 @@ begin
 Stream.Data := @s;
 Stream.Index := 0;
 
-ReadInt(Text(0), @Stream, Number);
+ReadInt(StdInputFile, @Stream, Number);
 
 if Stream.Index - 1 <> Length(s) then Code := Stream.Index else Code := 0;
 end;
@@ -974,7 +1032,7 @@ begin
 Stream.Data := @s;
 Stream.Index := 0;
 
-WriteInt(Text(0), @Stream, Number);
+WriteInt(StdOutputFile, @Stream, Number);
 s[Stream.Index + 1] := #0;
 end;
 

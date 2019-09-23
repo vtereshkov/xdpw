@@ -36,7 +36,8 @@ var
   ActualSize: Integer;
   
 begin
-CustomReset(F, Name);
+Assign(F, Name);
+Reset(F, 1);
 if IOResult <> 0 then
   Error('Unable to open source file ', Name, EMPTYTOK);
 

@@ -35,7 +35,6 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 
 #### Differences
 * Strings are null-terminated arrays of characters (C style), but indexed from 1 for compatibility
-* No `Assign` procedure. File names should be passed directly to `Reset` or `Rewrite` (Apple Pascal style)
 * The `Text` type is equivalent to `file`. It can be used for both text and untyped files
 * Calls via procedural variables require parentheses even for empty parameter lists
 * The `external` directive implies the `stdcall` calling convention
@@ -48,6 +47,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Arrays, records and sets cannot be passed to subroutines without `const` or `var`, or used as function results
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical
+* `Reset` and `Rewrite` always require the block size 1 as the second parameter
 
 #### Formal grammar
 ```
@@ -179,10 +179,10 @@ The following identifiers are implemented as part of the compiler. Their names a
 ```pascal
 procedure Inc(var x: Integer);
 procedure Dec(var x: Integer);
-procedure Read([F: Text;] var x1 {; var xi});
-procedure Write([F: Text;] x1 {; xi});
-procedure ReadLn([F: Text;] var x1 {; var xi});
-procedure WriteLn([F: Text;] x1 {; xi});
+procedure Read([var F: file;] var x1 {; var xi});
+procedure Write([var F: file;] x1 {; xi});
+procedure ReadLn([var F: file;] var x1 {; var xi});
+procedure WriteLn([var F: file;] x1 {; xi});
 procedure New(var P: Pointer);
 procedure Dispose(var P: Pointer);
 procedure Break;
@@ -214,8 +214,9 @@ function Min(x, y: Real): Real;
 function IMin(x, y: Integer): Integer;
 function Max(x, y: Real): Real;
 function IMax(x, y: Integer): Integer;
-procedure Rewrite(var F: file; const Name: string);
-procedure Reset(var F: file; const Name: string);
+procedure Assign(var F: file; const Name: string);
+procedure Rewrite(var F: file; BlockSize: Integer);
+procedure Reset(var F: file; BlockSize: Integer);
 procedure Close(var F: file);
 procedure BlockRead(var F: file; var Buf; Len: Integer; var LenRead: Integer);
 procedure BlockWrite(var F: file; var Buf; Len: Integer);

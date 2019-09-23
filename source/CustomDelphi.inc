@@ -22,21 +22,3 @@ procedure CustomParamStr(Index: Integer; var Str: TString);
 begin  
 Str := ParamStr(Index);
 end;
-
-
-
-
-procedure CustomReset(var F: TInFile; const Name: TString);
-begin
-Assign(F, Name);
-Reset(F, 1);
-end;
-
-
-
-
-procedure CustomRewrite(var F: TOutFile; const Name: TString);
-begin
-Assign(F, Name);
-Rewrite(F, 1);
-end;
