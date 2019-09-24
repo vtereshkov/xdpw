@@ -8,12 +8,17 @@
 program XDPW;
 
 
-{$I Custom.inc}
+{$APPTYPE CONSOLE}
+{$I-}
+{$H-}
+
+
 {$I Common.inc}
 {$I Scanner.inc}
 {$I CodeGen.inc}
 {$I Linker.inc}
 {$I Parser.inc}
+
 
 
 

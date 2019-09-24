@@ -1,6 +1,6 @@
 // GUI demo
 
-{$A GUI}
+{$APPTYPE GUI}
 
 program GUI;
 

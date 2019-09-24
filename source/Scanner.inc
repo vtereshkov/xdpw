@@ -168,9 +168,18 @@ procedure ReadDirective;
 var
   Text: TString;
 begin
-ReadChar(ch);
-case UpCase(ch) of
-  'I':                               // Include directive found
+Text := '';
+repeat
+  AppendStrSafe(Text, ch);
+  ReadValidChar(ch);
+until not (ch in AlphaNums);
+
+if Text = '$I' then
+  begin
+  if (ch = '+') or (ch = '-') then   // I/O checking directive - ignored
+    ReadMultiLineComment
+    
+  else if ch in Spaces then          // Include directive
     begin
     Text := '';
     ReadChar(ch);
@@ -182,30 +191,32 @@ case UpCase(ch) of
       end;
       
     EnterIncludedFile(Text);
-    end;
-    
-  'A':                              // Console/GUI application type directive found
-    begin
-    Text := '';
-    ReadChar(ch);
-    while (ch <> '}') and not EndOfProgram do
-      begin
-      if (ch = #0) or (ch > ' ') then 
-        AppendStrSafe(Text, UpCase(ch));
-      ReadChar(ch);
-      end;
-      
-    if Text = 'CONSOLE' then
-      IsConsoleProgram := 1
-    else if Text = 'GUI' then
-      IsConsoleProgram := 0
-    else
-      Error('Unknown application type', '', EMPTYTOK);
-    end      
-      
+    end
   else
     Error('Unknown compiler directive', '', EMPTYTOK);
-  end; // case  
+  end
+  
+else if Text = '$APPTYPE' then       // Console/GUI application type directive
+  begin
+  Text := '';
+  ReadChar(ch);
+  while (ch <> '}') and not EndOfProgram do
+    begin
+    if (ch = #0) or (ch > ' ') then 
+      AppendStrSafe(Text, UpCase(ch));
+    ReadChar(ch);
+    end;
+    
+  if Text = 'CONSOLE' then
+    IsConsoleProgram := 1
+  else if Text = 'GUI' then
+    IsConsoleProgram := 0
+  else
+    Error('Unknown application type', '', EMPTYTOK);
+  end
+      
+else
+  ReadMultiLineComment;
 end;
 
 

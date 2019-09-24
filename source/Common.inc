@@ -10,7 +10,7 @@ const
   VERSIONMINOR          = 9;
   
   NUMKEYWORDS           = 39;          
-  MAXSTRLENGTH          = 80;
+  MAXSTRLENGTH          = 255;
   MAXSETELEMENTS        = 256;
   MAXENUMELEMENTS       = 256;
   MAXIDENTS             = 1000;
@@ -35,6 +35,12 @@ const
 
 
 type
+  TString  = string;  
+  TKeyName = string;
+  
+  TInFile = file;  
+  TOutFile = file;  
+  
   TTokenKind =
     (
     EMPTYTOK,

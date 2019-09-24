@@ -983,6 +983,8 @@ end; // CompileCall
 
 
 procedure CompileIndirectCall(ProcVarType: Integer; FunctionOnly: Boolean);
+var
+  TotalNumParams: Integer;
 begin
 if (Types[ProcVarType].Kind <> PROCEDURALTYPE) or (FunctionOnly and (Types[ProcVarType].ResultType = 0)) then 
   Error('Appropriate procedural variable expected', '', EMPTYTOK); 
@@ -991,7 +993,11 @@ DerefPtr(ProcVarType);
 
 CompileActualParameters(Types[ProcVarType].NumParams, Types[ProcVarType].Param, Types[ProcVarType].ResultType);
 
-GenerateIndirectCall(Types[ProcVarType].NumParams);
+TotalNumParams := Types[ProcVarType].NumParams;
+if Types[Types[ProcVarType].ResultType].Kind in StructuredTypes then
+  Inc(TotalNumParams);  //   Allocate space for structured Result as a hidden VAR parameter
+
+GenerateIndirectCall(TotalNumParams);
 end; // CompileIndirectCall
 
 
