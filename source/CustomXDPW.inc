@@ -10,11 +10,3 @@ type
   
   TInFile = file;
   TOutFile = file;
-  
-
-
-
-procedure CustomParamStr(Index: Integer; var Str: TString);
-begin  
-ParseCmdLine(Index, Str);
-end;

@@ -44,7 +44,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * No `uses` clause. The `$I` directive should be used instead (Turbo Pascal 3 style)
 * No double-precision floating-point numbers, variant records, typed files 
 * No typed constants
-* Arrays, records and sets cannot be passed to subroutines without `const` or `var`, or used as function results
+* Arrays, records and sets cannot be passed to subroutines without `const` or `var`
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical
 * `Reset` and `Rewrite` always require the block size 1 as the second parameter
@@ -230,7 +230,8 @@ procedure AppendStr(var Dest: string; const Source: string);
 function CompareStr(const s1, s2: string): Integer;
 procedure Move(const Source; var Dest; Count: Integer);
 procedure FillChar(var Data; Count: Integer; Value: Char);
-function ParseCmdLine(Index: Integer; var Str: string): Integer;
+function ParamCount: Integer;
+function ParamStr(Index: Integer): string;
 procedure Val(const s: string; var Number: Real; var Code: Integer);
 procedure Str(Number: Real; var s: string);
 procedure IVal(const s: string; var Number: Integer; var Code: Integer);

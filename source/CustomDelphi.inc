@@ -14,11 +14,3 @@ type
   
   TInFile = file;
   TOutFile = file;
-
-
-
-
-procedure CustomParamStr(Index: Integer; var Str: TString);
-begin  
-Str := ParamStr(Index);
-end;

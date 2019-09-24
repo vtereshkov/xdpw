@@ -973,6 +973,16 @@ var
   Str: string;
 begin  
 Result := ParseCmdLine(0, Str) - 1;
+end; 
+
+
+
+
+function ParamStr(Index: Integer): string;
+var
+  NumParam: Integer;
+begin  
+NumParam := ParseCmdLine(Index, Result);
 end;   
 
 

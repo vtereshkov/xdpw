@@ -868,22 +868,19 @@ ResultType := 0;
 
 if IsFunction then
   begin
-  EatTok(COLONTOK);
-  
+  EatTok(COLONTOK);  
   CompileTypeIdent(ResultType, FALSE);
-
-  if Types[ResultType].Kind in StructuredTypes then
-    Error('Structured result is not allowed', '', EMPTYTOK);
   end;
 end; // CompileFormalParametersAndResult
 
 
 
 
-procedure CompileActualParameters(NumFormalParams: Integer; var FormalParam: PParams);
+procedure CompileActualParameters(NumFormalParams: Integer; var FormalParam: PParams; ResultType: Integer);
 var
   NumActualParams: Integer;
   ActualParamType: Integer;
+  TempStorageAddr: Integer;
   IsRefParam, TreatCharAsString: Boolean;
   CurParam: PParam;
 begin
@@ -953,14 +950,28 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
 if NumActualParams < NumFormalParams then
   Error('Too few actual parameters', '', EMPTYTOK);
   
+// Allocate space for structured Result as a hidden VAR parameter
+if ResultType <> 0 then
+  if Types[ResultType].Kind in StructuredTypes then
+    begin
+    TempStorageAddr := AllocateTempStorage(TypeSize(ResultType));
+    PushVarPtr(TempStorageAddr, LOCAL, 0, RELOCNONE);
+    end;
 end;// CompileActualParameters
 
 
 
 
 procedure CompileCall(IdentIndex: Integer);
+var
+  ResultType: Integer;
 begin
-CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].Param);
+if Ident[IdentIndex].Kind = FUNC then
+  ResultType := Ident[IdentIndex].DataType
+else  
+  ResultType := 0;
+  
+CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].Param, ResultType);
   
 if Ident[IdentIndex].IsExternal then
   GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams)
@@ -978,7 +989,7 @@ if (Types[ProcVarType].Kind <> PROCEDURALTYPE) or (FunctionOnly and (Types[ProcV
 
 DerefPtr(ProcVarType);
 
-CompileActualParameters(Types[ProcVarType].NumParams, Types[ProcVarType].Param);
+CompileActualParameters(Types[ProcVarType].NumParams, Types[ProcVarType].Param, Types[ProcVarType].ResultType);
 
 GenerateIndirectCall(Types[ProcVarType].NumParams);
 end; // CompileIndirectCall
@@ -2752,6 +2763,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   var
     DeclTok: TToken;
     ParamIndex: Integer;
+    TotalNumParams: Integer;
     NestedProcsFound: Boolean;
    
   begin  
@@ -2768,10 +2780,14 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   else
     begin
     // Declare parameters like local variables
+    TotalNumParams := Ident[BlockIdentIndex].NumParams;
+    if (Ident[BlockIdentIndex].Kind = FUNC) and (Types[Ident[BlockIdentIndex].DataType].Kind in StructuredTypes) then
+      Inc(TotalNumParams);                          // Allocate space for structured Result as a hidden VAR parameter
+    
     for ParamIndex := 1 to Ident[BlockIdentIndex].NumParams do
       DeclareIdent(Ident[BlockIdentIndex].Param[ParamIndex]^.Name,
                    VARIABLE,
-                   Ident[BlockIdentIndex].NumParams,
+                   TotalNumParams,
                    Ident[BlockIdentIndex].Param[ParamIndex]^.DataType,
                    Ident[BlockIdentIndex].Param[ParamIndex]^.PassMethod,
                    0,
@@ -2779,8 +2795,11 @@ procedure CompileBlock(BlockIdentIndex: Integer);
                    EMPTYPROC);
 
     // Allocate Result variable if the current block is a function
-    if Ident[BlockIdentIndex].Kind = FUNC then 
-      DeclareIdent('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].DataType, VALPASSING, 0, 0.0, EMPTYPROC);
+    if Ident[BlockIdentIndex].Kind = FUNC then
+      if Types[Ident[BlockIdentIndex].DataType].Kind in StructuredTypes then    // For functions returning structured variables, Result is a hidden VAR parameter 
+        DeclareIdent('RESULT', VARIABLE, TotalNumParams, Ident[BlockIdentIndex].DataType, VARPASSING, 0, 0.0, EMPTYPROC)
+      else                                                                      // Otherwise, Result is a hidden local variable
+        DeclareIdent('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].DataType, VALPASSING, 0, 0.0, EMPTYPROC);
     end;// else
     
 
@@ -2885,6 +2904,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
 
 var
   LibProcIdentIndex: Integer;
+  TotalNumParams: Integer;
 
 
 begin // CompileBlock
@@ -2934,7 +2954,10 @@ if ForLoopNesting <> 0 then
 if (BlockStack[BlockStackTop] <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) then
   begin
   PushVarPtr(Ident[GetIdent('RESULT')].Value, LOCAL, 0, RELOCDATA);
-  DerefPtr(Ident[BlockIdentIndex].DataType);
+  if Types[Ident[BlockIdentIndex].DataType].Kind in StructuredTypes then
+    DerefPtr(POINTERTYPEINDEX)
+  else  
+    DerefPtr(Ident[BlockIdentIndex].DataType);
   SaveStackTopToEAX;
   end;
   
@@ -2949,8 +2972,12 @@ if BlockStack[BlockStackTop] = 1 then          // Main program
   end
 else
   begin
+  TotalNumParams := Ident[BlockIdentIndex].NumParams;
+    if (Ident[BlockIdentIndex].Kind = FUNC) and (Types[Ident[BlockIdentIndex].DataType].Kind in StructuredTypes) then
+      Inc(TotalNumParams);                     // Deallocate space allocated for structured Result as a hidden VAR parameter
+      
   GenerateStackFrameEpilog;
-  GenerateReturn(Ident[BlockIdentIndex].NumParams * SizeOf(LongInt), Ident[BlockIdentIndex].NestingLevel);
+  GenerateReturn(TotalNumParams * SizeOf(LongInt), Ident[BlockIdentIndex].NestingLevel);
   end;
   
 DeleteDeclarations;  

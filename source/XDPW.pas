@@ -55,7 +55,7 @@ if ParamCount < 1 then
   Halt(1);
   end;  
   
-CustomParamStr(1, ProgramName);
+ProgramName := ParamStr(1);
 
 
 // Compile
