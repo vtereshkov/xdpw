@@ -34,7 +34,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Single-line comments (`//`) are supported (Delphi style)
 
 #### Differences
-* Strings are null-terminated arrays of characters (C style), but indexed from 1 for compatibility
+* Strings are null-terminated arrays of characters (C style), but indexed from 1 for Pascal compatibility
 * The `Text` type is equivalent to `file`. It can be used for both text and untyped files
 * Calls via procedural variables require parentheses even for empty parameter lists
 * The `external` directive implies the `stdcall` calling convention
