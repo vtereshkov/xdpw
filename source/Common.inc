@@ -541,7 +541,7 @@ function LowBound(DataType: Integer): Integer;
 begin
 Result := 0;
 case Types[DataType].Kind of
-  INTEGERTYPE:    Result := -2147483648;
+  INTEGERTYPE:    Result := -2147483647 - 1;
   SMALLINTTYPE:   Result := -32768;
   SHORTINTTYPE:   Result := -128;
   WORDTYPE:       Result :=  0;
