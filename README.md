@@ -172,7 +172,7 @@ The compiler directly builds a Windows PE executable without using any external 
 
 #### Directives
 * `$I` - Include source file. Examples: `{$I windows.inc}`, `{$I samples\gauss.inc}`
-* `$A` - Set application type. Examples: `{$A GUI}`, `{$A CONSOLE}`
+* `$APPTYPE` - Set application type. Examples: `{$APPTYPE GUI}`, `{$APPTYPE CONSOLE}`
 
 #### Inlined procedures and functions
 The following identifiers are implemented as part of the compiler. Their names are not reserved words and can be locally redefined by the user.
