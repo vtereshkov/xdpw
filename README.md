@@ -29,8 +29,9 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 #### Enhancements
 * The target operating system is Windows
 * The compiler is self-hosting
-* The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
+* Functions can return arrays, records or sets (Delphi style)
 * Functions can be called as procedures (Delphi style)
+* The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
 * Single-line comments (`//`) are supported (Delphi style)
 
 #### Differences
