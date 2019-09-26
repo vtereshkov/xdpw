@@ -71,7 +71,6 @@ FillOperatorSets;
 FillTypeSets;
  
 IsConsoleProgram := 1;  // Console program by default  
-DataSectionOrigin := IMGBASE + Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN);
 
 ZeroAll;
 FillChar(ImportSection, SizeOf(ImportSection), #0);
@@ -80,9 +79,11 @@ InitializeScanner(ProgramName);
 CompileProgram;
 FinalizeScanner;
 
-FillHeaders(CodeSize, NumStaticStrChars, GlobalDataSize);
-Relocate(IMGBASE + Headers.CodeSectionHeader.VirtualAddress, 
-         IMGBASE + Headers.DataSectionHeader.VirtualAddress + NumStaticStrChars);
+FillHeaders(CodeSize, InitializedGlobalDataSize, UninitializedGlobalDataSize);
+
+Relocate(IMGBASE + Headers.CodeSectionHeader.VirtualAddress,
+         IMGBASE + Headers.DataSectionHeader.VirtualAddress,
+         IMGBASE + Headers.DataSectionHeader.VirtualAddress + InitializedGlobalDataSize);
 
 
 // Write output file
@@ -99,8 +100,8 @@ Pad(OutFile, SizeOf(Headers), FILEALIGN);
 BlockWrite(OutFile, ImportSection, SizeOf(ImportSection));
 Pad(OutFile, SizeOf(ImportSection), FILEALIGN);
 
-BlockWrite(OutFile, StaticStringData, NumStaticStrChars);
-Pad(OutFile, NumStaticStrChars, FILEALIGN);
+BlockWrite(OutFile, InitializedGlobalData, InitializedGlobalDataSize);
+Pad(OutFile, InitializedGlobalDataSize, FILEALIGN);
 
 BlockWrite(OutFile, Code, CodeSize);
 Pad(OutFile, CodeSize, FILEALIGN);
@@ -108,6 +109,6 @@ Pad(OutFile, CodeSize, FILEALIGN);
 Close(OutFile);
 
 
-WriteLn('Compilation complete. Code size: ', CodeSize, ' bytes. Data size: ', NumStaticStrChars + GlobalDataSize, ' bytes.');
+WriteLn('Compilation complete. Code size: ', CodeSize, ' bytes. Data size: ', InitializedGlobalDataSize + UninitializedGlobalDataSize, ' bytes.');
 end.
 

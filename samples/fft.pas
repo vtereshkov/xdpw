@@ -131,7 +131,7 @@ var
 begin
 Randomize;
 
-// For random sinusoids and a constant bias
+// Four random sinusoids and a constant bias
 for j := 0 to 4 do
   begin
   Mag[j]    := (Random - 0.5) * 100;

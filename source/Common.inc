@@ -6,31 +6,32 @@
 
 
 const
-  VERSIONMAJOR          = 0;
-  VERSIONMINOR          = 9;
+  VERSIONMAJOR              = 0;
+  VERSIONMINOR              = 9;
   
-  NUMKEYWORDS           = 39;          
-  MAXSTRLENGTH          = 255;
-  MAXSETELEMENTS        = 256;
-  MAXENUMELEMENTS       = 256;
-  MAXIDENTS             = 1000;
-  MAXTYPES              = 1000;
-  MAXBLOCKS             = 1000;
-  MAXBLOCKNESTING       = 10;
-  MAXPARAMS             = 20;
-  MAXUNITNESTING        = 5;
-  MAXFIELDS             = 100;
-  MAXRELOCS             = 20000;
-  MAXLOOPNESTING        = 20;
-  MAXWITHNESTING        = 20;
-  MAXGOTOS              = 100;
-  MAXBREAKCALLS         = 100;
-  MAXEXITCALLS          = 100;
+  NUMKEYWORDS               = 39;          
+  MAXSTRLENGTH              = 255;
+  MAXSETELEMENTS            = 256;
+  MAXENUMELEMENTS           = 256;
+  MAXIDENTS                 = 1000;
+  MAXTYPES                  = 1000;
+  MAXBLOCKS                 = 1000;
+  MAXBLOCKNESTING           = 10;
+  MAXPARAMS                 = 20;
+  MAXUNITNESTING            = 5;
+  MAXFIELDS                 = 100;
+  MAXRELOCS                 = 20000;
+  MAXLOOPNESTING            = 20;
+  MAXWITHNESTING            = 20;
+  MAXGOTOS                  = 100;
+  MAXBREAKCALLS             = 100;
+  MAXEXITCALLS              = 100;
 
-  MAXCODESIZE           = 1024 * 1024;
-  MAXDATASIZE           = 32768 * 1024; 
-  MAXSTATICSTRDATASIZE  = 128 * 1024;
-
+  MAXCODESIZE               =  1 * 1024 * 1024;
+  MAXINITIALIZEDDATASIZE    =  1 * 1024 * 1024;
+  MAXUNINITIALIZEDDATASIZE  = 32 * 1024 * 1024;
+  MAXSTACKSIZE              = 16 * 1024 * 1024;
+  
 
 
 
@@ -143,6 +144,8 @@ type
   
   TScope = (EMPTYSCOPE, GLOBAL, LOCAL);
   
+  TRelocType = (EMPTYRELOC, CODERELOC, INITDATARELOC, UNINITDATARELOC);
+  
   TPredefProc = 
     (
     EMPTYPROC,
@@ -189,6 +192,7 @@ type
     DataType: Integer;
     RecType: Integer;                  // Parent record type code for a field
     Scope: TScope;
+    RelocType: TRelocType;
     PassMethod: TPassMethod;           // Value, CONST or VAR parameter status
     NumParams: Integer;
     Param: PParams;
@@ -233,8 +237,6 @@ type
     TypeIdentName: TString;   
   end;
   
-  TRelocType = (RELOCNONE, RELOCCODE, RELOCDATA);
-
   TRelocatable = record
     RelocType: TRelocType;
     Pos: LongInt;
@@ -296,7 +298,7 @@ var
   Types: array [1..MAXTYPES] of TType;
   UnitStack: array [1..MAXUNITNESTING] of TUnit;
   Code: array [0..MAXCODESIZE - 1] of Byte;
-  StaticStringData: array [0..MAXSTATICSTRDATASIZE - 1] of Char;
+  InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of Char;
   CodePosStack: array [0..1023] of Integer;
   BlockStack: array [1..MAXBLOCKNESTING] of Integer;
   Reloc: array [1..MAXRELOCS] of TRelocatable;
@@ -312,9 +314,10 @@ var
   
   IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of TTypeKind;
 
-  NumIdent, NumTypes, NumImports, NumStaticStrChars, NumBlocks, BlockStackTop, NumRelocs, NumGotos, ForLoopNesting, WithNesting,
-  CodeSize, CodePosStackTop, GlobalDataSize, LocalDataSize, ParamDataSize, TempDataSize,
-  DataSectionOrigin, ProgramEntryPoint,
+  NumIdent, NumTypes, NumImports, NumBlocks, BlockStackTop, NumRelocs, NumGotos, ForLoopNesting, WithNesting,
+  CodeSize, CodePosStackTop, 
+  InitializedGlobalDataSize, UninitializedGlobalDataSize, LocalDataSize, ParamDataSize, TempDataSize,
+  ProgramEntryPoint,
   UnitStackTop: Integer;
   
   IsConsoleProgram: Integer;      // More convenient than Boolean
@@ -328,23 +331,23 @@ FillChar(Ident, SizeOf(Ident), #0);
 FillChar(Types, SizeOf(Types), #0);
 FillChar(UnitStack, SizeOf(UnitStack), #0);
 
-NumIdent                := 0; 
-NumTypes                := 0; 
-NumImports              := 0; 
-NumBlocks               := 0; 
-BlockStackTop           := 0; 
-NumRelocs               := 0;
-NumGotos                := 0;
-ForLoopNesting          := 0;
-WithNesting             := 0;
-CodeSize                := 0; 
-CodePosStackTop         := 0;
-NumStaticStrChars       := 0;
-GlobalDataSize          := 0;
-LocalDataSize           := 0;
-ParamDataSize           := 0;
-TempDataSize            := 0;
-ProgramEntryPoint       := 0;
+NumIdent                    := 0; 
+NumTypes                    := 0; 
+NumImports                  := 0; 
+NumBlocks                   := 0; 
+BlockStackTop               := 0; 
+NumRelocs                   := 0;
+NumGotos                    := 0;
+ForLoopNesting              := 0;
+WithNesting                 := 0;
+CodeSize                    := 0; 
+CodePosStackTop             := 0;
+InitializedGlobalDataSize   := 0;
+UninitializedGlobalDataSize := 0;
+LocalDataSize               := 0;
+ParamDataSize               := 0;
+TempDataSize                := 0;
+ProgramEntryPoint           := 0;
 end;
 
 
@@ -518,20 +521,20 @@ procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
 var
   i: Integer;
 begin
-Tok.StrAddress := DataSectionOrigin + NumStaticStrChars;
+Tok.StrAddress := InitializedGlobalDataSize;  // Relocatable
 Tok.StrLength := Length(StrValue);
 
 for i := 1 to Length(StrValue) do
   begin
-  StaticStringData[NumStaticStrChars] := StrValue[i];
-  Inc(NumStaticStrChars);
-  if NumStaticStrChars > MAXSTATICSTRDATASIZE - 1 then
+  InitializedGlobalData[InitializedGlobalDataSize] := StrValue[i];
+  Inc(InitializedGlobalDataSize);
+  if InitializedGlobalDataSize > MAXINITIALIZEDDATASIZE - 1 then
     Error('Maximum string data size exceeded', '', EMPTYTOK);
   end;
 
 // Add string termination character
-StaticStringData[NumStaticStrChars] := #0;
-Inc(NumStaticStrChars);
+InitializedGlobalData[InitializedGlobalDataSize] := #0;
+Inc(InitializedGlobalDataSize);
 end;
 
 
@@ -822,6 +825,7 @@ if NumIdent > MAXIDENTS then
 Ident[NumIdent].Name := Name;
 Ident[NumIdent].Kind := Kind;
 Ident[NumIdent].Scope := Scope;
+Ident[NumIdent].RelocType := UNINITDATARELOC;
 Ident[NumIdent].DataType := DataType;
 Ident[NumIdent].Block := BlockStack[BlockStackTop];
 Ident[NumIdent].NestingLevel := BlockStackTop;
@@ -848,8 +852,8 @@ case Kind of
     case Scope of
      GLOBAL:
        begin
-       Ident[NumIdent].Value := GlobalDataSize;                                              // Variable address (relocatable)
-       GlobalDataSize := GlobalDataSize + TypeSize(DataType);
+       Ident[NumIdent].Value := UninitializedGlobalDataSize;                                 // Variable address (relocatable)
+       UninitializedGlobalDataSize := UninitializedGlobalDataSize + TypeSize(DataType);
        end;// else
 
      LOCAL:
@@ -872,11 +876,21 @@ case Kind of
 
 
   CONSTANT:
-    if Types[DataType].Kind = REALTYPE then
-      Ident[NumIdent].FracValue := FracConstValue                     // Real constant value
-    else
-      Ident[NumIdent].Value := ConstValue;                            // Ordinal constant value
+    if PassMethod = VALPASSING then                                     // Untyped constant
+      if Types[DataType].Kind = REALTYPE then
+        Ident[NumIdent].FracValue := FracConstValue                     // Real constant value
+      else
+        Ident[NumIdent].Value := ConstValue                             // Ordinal constant value
+    else                                                                // Typed constant (actually an initialized global variable)    
+      begin
+      Ident[NumIdent].Kind := VARIABLE;
+      Ident[NumIdent].Scope := GLOBAL;
+      Ident[NumIdent].RelocType := INITDATARELOC;
+      Ident[NumIdent].PassMethod := VALPASSING;
       
+      Ident[NumIdent].Value := InitializedGlobalDataSize;               // Typed constant address (relocatable)
+      InitializedGlobalDataSize := InitializedGlobalDataSize + TypeSize(DataType);      
+      end;
       
   GOTOLABEL:
     Ident[NumIdent].IsUnresolvedForward := TRUE;
@@ -884,13 +898,16 @@ case Kind of
 end;// case
 
 
-if GlobalDataSize + MAXSTATICSTRDATASIZE >= MAXDATASIZE then
-  Error('Maximum global data size exceeded', '', EMPTYTOK);
+if InitializedGlobalDataSize >= MAXINITIALIZEDDATASIZE then
+  Error('Maximum initialized data size exceeded', '', EMPTYTOK);
 
-if LocalDataSize >= MAXDATASIZE then
+if UninitializedGlobalDataSize >= MAXUNINITIALIZEDDATASIZE then
+  Error('Maximum uninitialized data size exceeded', '', EMPTYTOK);
+
+if LocalDataSize >= MAXSTACKSIZE then
   Error('Maximum local data size exceeded', '', EMPTYTOK);
 
-if ParamDataSize >= MAXDATASIZE then
+if ParamDataSize >= MAXSTACKSIZE then
   Error('Maximum parameter data size exceeded', '', EMPTYTOK);
 
 end;

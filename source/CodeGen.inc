@@ -111,17 +111,20 @@ end;
 
 
 
-procedure Relocate(CodeDeltaAddr, DataDeltaAddr: Integer);
+procedure Relocate(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr: Integer);
 var
   i, DeltaAddr: Integer;
 begin
+DeltaAddr := 0;
+
 for i := 1 to NumRelocs do
   begin
   case Reloc[i].RelocType of
-    RELOCCODE: DeltaAddr := CodeDeltaAddr;
-    RELOCDATA: DeltaAddr := DataDeltaAddr
+    CODERELOC:        DeltaAddr := CodeDeltaAddr;
+    INITDATARELOC:    DeltaAddr := InitDataDeltaAddr;
+    UNINITDATARELOC:  DeltaAddr := UninitDataDeltaAddr
   else 
-    DeltaAddr := 0;
+    Error('Internal fault: Illegal relocation type', '', EMPTYTOK);
   end;  
   
   GenDWordAt(Reloc[i].Pos, Reloc[i].Value + DeltaAddr);

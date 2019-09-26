@@ -44,7 +44,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * No object-oriented programming
 * No `uses` clause. The `$I` directive should be used instead (Turbo Pascal 3 style)
 * No double-precision floating-point numbers, variant records, typed files 
-* No typed constants
+* No structured typed constants
 * Arrays, records and sets cannot be passed to subroutines without `const` or `var`
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical
@@ -64,8 +64,12 @@ Declarations = LabelDeclarations |
                
 LabelDeclarations = "label" Ident {"," Ident} ";"               
              
-ConstDeclarations = "const" Ident "=" ConstExpression ";"
-                   {Ident "=" ConstExpression ";"} .
+ConstDeclarations = "const" Ident (UntypedConstDeclaration | TypedConstDeclaration)
+                             {";" (UntypedConstDeclaration | TypedConstDeclaration)} .
+
+UntypedConstDeclaration =  "=" ConstExpression .
+                                 
+TypedConstDeclaration = ":" Type "=" ConstExpression .                                 
 
 TypeDeclarations = "type" Ident "=" Type ";" {Ident "=" Type ";"} .
 
