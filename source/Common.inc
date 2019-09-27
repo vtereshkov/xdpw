@@ -273,9 +273,8 @@ type
   
 
   
-const
+const    
   // Predefined type indices
-
   ANYTYPEINDEX          = 1;      // Untyped parameter, or base type for untyped pointers
   INTEGERTYPEINDEX      = 2;
   SMALLINTTYPEINDEX     = 3;
@@ -288,12 +287,55 @@ const
   POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other
   FILETYPEINDEX         = 11;     // Universal file type
   STRINGTYPEINDEX       = 12;
-  
 
+  // Keywords
+  Keyword: array [1..NUMKEYWORDS] of TKeyName = 
+    (
+    'AND',
+    'ARRAY',
+    'BEGIN',
+    'CASE',
+    'CONST',
+    'DIV',
+    'DO',
+    'DOWNTO',
+    'ELSE',
+    'END',
+    'FILE',
+    'FOR',
+    'FUNCTION',
+    'GOTO',
+    'IF',
+    'IN',
+    'LABEL',
+    'MOD',
+    'NIL',
+    'NOT',
+    'OF',
+    'OR',
+    'PACKED',
+    'PROCEDURE',
+    'PROGRAM',
+    'RECORD',
+    'REPEAT',
+    'SET',
+    'SHL',
+    'SHR',
+    'STRING',
+    'THEN',
+    'TO',
+    'TYPE',
+    'UNTIL',
+    'VAR',
+    'WHILE',
+    'WITH',
+    'XOR'
+    );
+    
+    
  
 
 var
-  Keyword: array [1..NUMKEYWORDS] of TKeyName;
   Ident: array [1..MAXIDENTS] of TIdentifier;
   Types: array [1..MAXTYPES] of TType;
   UnitStack: array [1..MAXUNITNESTING] of TUnit;
@@ -353,52 +395,6 @@ end;
 
 
   
-procedure FillKeywords;
-begin
-Keyword[1]  := 'AND';
-Keyword[2]  := 'ARRAY';
-Keyword[3]  := 'BEGIN';
-Keyword[4]  := 'CASE';
-Keyword[5]  := 'CONST';
-Keyword[6]  := 'DIV';
-Keyword[7]  := 'DO';
-Keyword[8]  := 'DOWNTO';
-Keyword[9]  := 'ELSE';
-Keyword[10] := 'END';
-Keyword[11] := 'FILE';
-Keyword[12] := 'FOR';
-Keyword[13] := 'FUNCTION';
-Keyword[14] := 'GOTO';
-Keyword[15] := 'IF';
-Keyword[16] := 'IN';
-Keyword[17] := 'LABEL';
-Keyword[18] := 'MOD';
-Keyword[19] := 'NIL';
-Keyword[20] := 'NOT';
-Keyword[21] := 'OF';
-Keyword[22] := 'OR';
-Keyword[23] := 'PACKED';
-Keyword[24] := 'PROCEDURE';
-Keyword[25] := 'PROGRAM';
-Keyword[26] := 'RECORD';
-Keyword[27] := 'REPEAT';
-Keyword[28] := 'SET';
-Keyword[29] := 'SHL';
-Keyword[30] := 'SHR';
-Keyword[31] := 'STRING';
-Keyword[32] := 'THEN';
-Keyword[33] := 'TO';
-Keyword[34] := 'TYPE';
-Keyword[35] := 'UNTIL';
-Keyword[36] := 'VAR';
-Keyword[37] := 'WHILE';
-Keyword[38] := 'WITH';
-Keyword[39] := 'XOR';
-end;  
-
-
-
-
 procedure FillOperatorSets;
 begin
 MultiplicativeOperators := [MULTOK, DIVTOK, IDIVTOK, MODTOK, SHLTOK, SHRTOK, ANDTOK];

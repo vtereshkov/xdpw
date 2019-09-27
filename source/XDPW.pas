@@ -66,7 +66,6 @@ ProgramName := ParamStr(1);
 // Compile
 WriteLn('Compiling ', ProgramName);
 
-FillKeywords;
 FillOperatorSets;
 FillTypeSets;
  

@@ -18,7 +18,7 @@ function AllocateTempStorage(Size: Integer): Integer;
 begin
 TempDataSize := TempDataSize + Size;    
 Result := -LocalDataSize - TempDataSize;
-end;
+end; // AllocateTempStorage
 
 
 
@@ -2583,6 +2583,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   procedure CompileConstDeclarations;
   
   
+  
     procedure CompileUntypedConstDeclaration(var NameTok: TToken);
     var
       ConstVal: TConst;
@@ -2596,26 +2597,89 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     
     
     
+    
     procedure CompileTypedConstDeclaration(var NameTok: TToken);
+    
+    
+      procedure CompileTypedConstConstructor(InitializedDataOffset: LongInt; ConstType: Integer);
+      var
+        ConstVal: TConst;
+        ConstValType: Integer;
+        NumElements, i: Integer;
+        
+      begin
+      // Numbers
+      if Types[ConstType].Kind in NumericTypes then
+        begin
+        CompileConstExpression(ConstVal, ConstValType);          
+        GetCompatibleType(ConstType, ConstValType); 
+          
+        if Types[ConstType].Kind = REALTYPE then
+          Move(ConstVal.FracValue, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType))
+        else
+          Move(ConstVal.Value, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
+        end
+        
+      // Characters
+      else if Types[ConstType].Kind = CHARTYPE then
+        begin
+        CheckTok(CHARLITERALTOK);
+        NextTok;
+        ConstVal.Value := Tok.Value;
+        Move(ConstVal.Value, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
+        end 
+
+      // Arrays
+      else if Types[ConstType].Kind = ARRAYTYPE then
+        begin
+        
+        if ConstType = STRINGTYPEINDEX then         // Special case: strings
+          begin
+          if (Tok.Kind <> CHARLITERALTOK) and (Tok.Kind <> STRINGLITERALTOK) then
+            Error('String literal expected', '', EMPTYTOK);
+            
+          Move(InitializedGlobalData[Tok.StrAddress], InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
+          NextTok;
+          end
+        else                                        // General rule
+          begin
+          EatTok(OPARTOK);
+          
+          NumElements := HighBound(Types[ConstType].IndexType) - LowBound(Types[ConstType].IndexType) + 1;
+          for i := 1 to NumElements do
+            begin
+            CompileTypedConstConstructor(InitializedDataOffset, Types[ConstType].BaseType);
+            InitializedDataOffset := InitializedDataOffset + TypeSize(Types[ConstType].BaseType);
+            
+            if i < NumElements then 
+              EatTok(COMMATOK)
+            else
+              EatTok(CPARTOK);  
+            end; // for
+          end; // else
+ 
+        end
+     
+      else
+        Error('Type not implemented', '', EMPTYTOK);         
+ 
+      end; // CompileTypedConstConstructor  
+    
+    
     var
-      ConstVal: TConst;
-      ConstType, ConstValType: Integer;
-    begin
+      ConstType: Integer;
+      
+      
+    begin // CompileTypedConstDeclaration
     EatTok(COLONTOK);    
     CompileType(ConstType);
     
-    EatTok(EQTOK);    
-    CompileConstExpression(ConstVal, ConstValType);
-    
-    GetCompatibleType(ConstType, ConstValType);
     DeclareIdent(NameTok.Name, CONSTANT, 0, ConstType, VARPASSING, 0, 0.0, EMPTYPROC);
     
-    if Types[ConstType].Kind = REALTYPE then
-      Move(ConstVal.FracValue, InitializedGlobalData[Ident[NumIdent].Value], TypeSize(ConstType))
-    else
-      Move(ConstVal.Value, InitializedGlobalData[Ident[NumIdent].Value], TypeSize(ConstType));
-      
-    end; // CompileTypedConstDeclaration;    
+    EatTok(EQTOK);    
+    CompileTypedConstConstructor(Ident[NumIdent].Value, ConstType);   
+    end; // CompileTypedConstDeclaration    
+
 
 
   
