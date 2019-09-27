@@ -372,6 +372,7 @@ begin
 FillChar(Ident, SizeOf(Ident), #0);
 FillChar(Types, SizeOf(Types), #0);
 FillChar(UnitStack, SizeOf(UnitStack), #0);
+FillChar(InitializedGlobalData, SizeOf(InitializedGlobalData), #0);
 
 NumIdent                    := 0; 
 NumTypes                    := 0; 

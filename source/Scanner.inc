@@ -5,8 +5,17 @@
 
 
 
+const
+  Letters:   set of Char = ['A'..'Z'];
+  Digits:    set of Char = ['0'..'9'];
+  HexDigits: set of Char = ['0'..'9', 'A'..'F'];
+  Spaces:    set of Char = [#1..#31, ' '];
+  AlphaNums: set of Char = ['A'..'Z', '0'..'9', '_'];
+  
+  
+  
+  
 var
-  Letters, Digits, HexDigits, Spaces, AlphaNums: set of Char;
   EndOfProgram: Boolean;
   ch, ch2: Char;
   
@@ -75,12 +84,6 @@ end;
 
 procedure InitializeScanner(const Name: TString);
 begin
-Letters   := ['A'..'Z'];
-Digits    := ['0'..'9'];
-HexDigits := Digits + ['A'..'F'];
-Spaces    := [#1..#31, ' '];
-AlphaNums := Letters + Digits + ['_'];
-
 ch  := ' ';
 ch2 := ' ';
 

@@ -2602,14 +2602,17 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     
     
       procedure CompileTypedConstConstructor(InitializedDataOffset: LongInt; ConstType: Integer);
+      const
+        TrueVal: Integer = -1;
+      
       var
-        ConstVal: TConst;
-        ConstValType: Integer;
-        NumElements, i: Integer;
+        ConstVal, ElementVal, ElementVal2: TConst;
+        ConstValType, ElementValType: Integer;
+        NumElements, ElementIndex, FieldIndex: Integer;
         
       begin
       // Numbers
-      if Types[ConstType].Kind in NumericTypes then
+      if Types[ConstType].Kind in OrdinalTypes + [REALTYPE] then
         begin
         CompileConstExpression(ConstVal, ConstValType);          
         GetCompatibleType(ConstType, ConstValType); 
@@ -2620,15 +2623,6 @@ procedure CompileBlock(BlockIdentIndex: Integer);
           Move(ConstVal.Value, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
         end
         
-      // Characters
-      else if Types[ConstType].Kind = CHARTYPE then
-        begin
-        CheckTok(CHARLITERALTOK);
-        NextTok;
-        ConstVal.Value := Tok.Value;
-        Move(ConstVal.Value, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
-        end 
-
       // Arrays
       else if Types[ConstType].Kind = ARRAYTYPE then
         begin
@@ -2636,7 +2630,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
         if ConstType = STRINGTYPEINDEX then         // Special case: strings
           begin
           if (Tok.Kind <> CHARLITERALTOK) and (Tok.Kind <> STRINGLITERALTOK) then
-            Error('String literal expected', '', EMPTYTOK);
+            CheckTok(STRINGLITERALTOK);
             
           Move(InitializedGlobalData[Tok.StrAddress], InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
           NextTok;
@@ -2646,12 +2640,12 @@ procedure CompileBlock(BlockIdentIndex: Integer);
           EatTok(OPARTOK);
           
           NumElements := HighBound(Types[ConstType].IndexType) - LowBound(Types[ConstType].IndexType) + 1;
-          for i := 1 to NumElements do
+          for ElementIndex := 1 to NumElements do
             begin
             CompileTypedConstConstructor(InitializedDataOffset, Types[ConstType].BaseType);
             InitializedDataOffset := InitializedDataOffset + TypeSize(Types[ConstType].BaseType);
             
-            if i < NumElements then 
+            if ElementIndex < NumElements then 
               EatTok(COMMATOK)
             else
               EatTok(CPARTOK);  
@@ -2659,9 +2653,59 @@ procedure CompileBlock(BlockIdentIndex: Integer);
           end; // else
  
         end
+        
+      // Records
+      else if Types[ConstType].Kind = RECORDTYPE then
+        begin
+        EatTok(OPARTOK);
+        
+        repeat
+          AssertIdent;
+          FieldIndex := GetField(ConstType, Tok.Name);
+          
+          NextTok;
+          EatTok(COLONTOK);
+          
+          CompileTypedConstConstructor(InitializedDataOffset + Types[ConstType].Field[FieldIndex]^.Offset, Types[ConstType].Field[FieldIndex]^.DataType);          
+          
+          if Tok.Kind <> SEMICOLONTOK then Break;
+          NextTok; 
+        until FALSE;
+        
+        EatTok(CPARTOK);
+        end
+        
+      // Sets
+      else if Types[ConstType].Kind = SETTYPE then
+        begin
+        EatTok(OBRACKETTOK);
+        
+        if Tok.Kind <> CBRACKETTOK then
+          repeat      
+            CompileConstExpression(ElementVal, ElementValType);            
+            GetCompatibleType(ElementValType, Types[ConstType].BaseType);
+
+            if Tok.Kind = RANGETOK then
+              begin
+              NextTok;
+              CompileConstExpression(ElementVal2, ElementValType);    
+              GetCompatibleType(ElementValType, Types[ConstType].BaseType);
+              end
+            else
+              ElementVal2 := ElementVal;
+              
+            for ElementIndex := ElementVal.Value to ElementVal2.Value do
+              Move(TrueVal, InitializedGlobalData[InitializedDataOffset + ElementIndex], TypeSize(BOOLEANTYPEINDEX));
+  
+            if Tok.Kind <> COMMATOK then Break;
+            NextTok;
+          until FALSE;
+        
+        EatTok(CBRACKETTOK);
+        end        
      
       else
-        Error('Type not implemented', '', EMPTYTOK);         
+        Error('Illegal type', '', EMPTYTOK);         
  
       end; // CompileTypedConstConstructor  
     
