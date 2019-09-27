@@ -13,14 +13,10 @@ const
   MAXIMPORTS = 64;
   
 
-
+    
 type
-  TMZHeader = packed record
-    MZ: array [0..1] of Char;
-    DOSStub: array [0..28] of Word;
-    PEHeaderOffset: LongInt;
-  end;
-
+  TDOSStub = array [0..127] of Byte;
+ 
 
   TPEHeader = packed record
     PE: array [0..3] of Char;
@@ -89,7 +85,7 @@ type
   
   
   THeaders = packed record
-    MZHeader: TMZHeader;
+    Stub: TDOSStub;
     PEHeader: TPEHeader;
     PEOptionalHeader: TPEOptionalHeader;
     DataDirectories: array [0..15] of TDataDirectory;
@@ -115,7 +111,6 @@ type
     Name: TImportFuncName;
   end;
 
-
   
   TImportSection = packed record
     DirectoryTable: array [0..MAXIMPORTS] of TImportDirectoryTableEntry;
@@ -124,7 +119,22 @@ type
     NameTable: array [0..MAXIMPORTS - 1] of TImportNameTableEntry;
   end;
   
-  
+
+
+const
+  DOSStub: TDOSStub = 
+    (
+    $4D, $5A, $90, $00, $03, $00, $00, $00, $04, $00, $00, $00, $FF, $FF, $00, $00,
+    $B8, $00, $00, $00, $00, $00, $00, $00, $40, $00, $00, $00, $00, $00, $00, $00,
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
+    $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $80, $00, $00, $00,
+    $0E, $1F, $BA, $0E, $00, $B4, $09, $CD, $21, $B8, $01, $4C, $CD, $21, $54, $68,
+    $69, $73, $20, $70, $72, $6F, $67, $72, $61, $6D, $20, $63, $61, $6E, $6E, $6F,
+    $74, $20, $62, $65, $20, $72, $75, $6E, $20, $69, $6E, $20, $44, $4F, $53, $20,
+    $6D, $6F, $64, $65, $2E, $0D, $0D, $0A, $24, $00, $00, $00, $00, $00, $00, $00
+    );
+
+ 
   
 
 var
@@ -179,14 +189,8 @@ DataSize := InitializedDataSize + UninitializedDataSize;
 FillChar(Headers, SizeOf(Headers), #0);
 
 with Headers do
-  begin
-  
-  with MZHeader do
-    begin
-    MZ[0]                         := 'M';  
-    MZ[1]                         := 'Z';
-    PEHeaderOffset                := SizeOf(MZHeader);
-    end;  
+  begin  
+  Stub := DOSStub;  
       
   with PEHeader do
     begin  

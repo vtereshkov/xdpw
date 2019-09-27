@@ -6,7 +6,6 @@
 
 
 const
-  Letters:   set of Char = ['A'..'Z'];
   Digits:    set of Char = ['0'..'9'];
   HexDigits: set of Char = ['0'..'9', 'A'..'F'];
   Spaces:    set of Char = [#1..#31, ' '];
