@@ -8,7 +8,7 @@
 procedure Gen(b: Byte);
 begin
 if CodeSize >= MAXCODESIZE then
-  Error('Maximum code size exceeded', '', EMPTYTOK);
+  Error('Maximum code size exceeded');
 Code[CodeSize] := b;
 Inc(CodeSize);
 end;
@@ -84,7 +84,7 @@ procedure GenRelocDWord(dw: LongInt; RelocType: TRelocType);
 begin
 Inc(NumRelocs);
 if NumRelocs > MAXRELOCS then
-  Error('Maximum number of relocations exceeded', '', EMPTYTOK);  
+  Error('Maximum number of relocations exceeded');  
 Reloc[NumRelocs].RelocType := RelocType;
 Reloc[NumRelocs].Pos := CodeSize;
 Reloc[NumRelocs].Value := dw;
@@ -124,7 +124,7 @@ for i := 1 to NumRelocs do
     INITDATARELOC:    DeltaAddr := InitDataDeltaAddr;
     UNINITDATARELOC:  DeltaAddr := UninitDataDeltaAddr
   else 
-    Error('Internal fault: Illegal relocation type', '', EMPTYTOK);
+    Error('Internal fault: Illegal relocation type');
   end;  
   
   GenDWordAt(Reloc[i].Pos, Reloc[i].Value + DeltaAddr);
@@ -200,7 +200,7 @@ case TypeSize(DataType) of
      end
      
 else
-  Error('Internal fault: Illegal designator size', '', EMPTYTOK);
+  Error('Internal fault: Illegal designator size');
 end;
 
 Gen($50);                                                         // push eax
@@ -646,7 +646,7 @@ case TypeSize(DesignatorType) of
      Gen($89); Gen($06);                                                // mov [esi], eax
      end
 else
-  Error('Internal fault: Illegal designator size', '', EMPTYTOK);
+  Error('Internal fault: Illegal designator size');
 end;
 
 end;
@@ -678,7 +678,7 @@ var
   i: Integer;
 begin
 if (CallerNesting < 0) or (CalleeNesting < 1) or (CallerNesting - CalleeNesting < -1) then
-  Error('Internal fault: Illegal nesting level', '', EMPTYTOK);
+  Error('Internal fault: Illegal nesting level');
   
 if CalleeNesting > 1 then                        // If a nested routine is called, push static link as the last hidden parameter
   if CallerNesting - CalleeNesting = -1 then     // The caller and the callee's enclosing routine are at the same nesting level

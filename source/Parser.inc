@@ -32,7 +32,7 @@ case Tok.Kind of
     begin
     IdentIndex := GetIdent(Tok.Name);
     if Ident[IdentIndex].Kind <> CONSTANT then
-      Error('Expected constant but found ', Ident[IdentIndex].Name, EMPTYTOK)
+      Error('Constant expected but ' + Ident[IdentIndex].Name + ' found')
     else
       begin
       ConstValType := Ident[IdentIndex].DataType;
@@ -84,7 +84,7 @@ case Tok.Kind of
     end 
 
 else
-  Error('Expected expression but found ', '', Tok.Kind);
+  Error('Expression expected but ' + GetTokSpelling(Tok.Kind) + ' found');
 end;// case
 
 end;// CompileConstFactor
@@ -108,19 +108,19 @@ while Tok.Kind in MultiplicativeOperators do
   CompileConstFactor(RightConstVal, RightConstValType);
 
   // Try to convert integer to real
-  if ConversionIsPossible(ConstValType, RightConstValType) then
+  if ConversionToRealIsPossible(ConstValType, RightConstValType) then
     begin
     ConstVal.FracValue := ConstVal.Value;
     ConstValType := REALTYPEINDEX;
     end;
-  if ConversionIsPossible(RightConstValType, ConstValType) then
+  if ConversionToRealIsPossible(RightConstValType, ConstValType) then
     begin
     RightConstVal.FracValue := RightConstVal.Value;
     RightConstValType := REALTYPEINDEX;
     end;
 
   // Special case: real division of two integers
-  if (OpTok.Kind = DIVTOK) and ConversionIsPossible(ConstValType, REALTYPEINDEX) and ConversionIsPossible(RightConstValType, REALTYPEINDEX) then
+  if (OpTok.Kind = DIVTOK) and ConversionToRealIsPossible(ConstValType, REALTYPEINDEX) and ConversionToRealIsPossible(RightConstValType, REALTYPEINDEX) then
     begin
     ConstVal.FracValue := ConstVal.Value;
     RightConstVal.FracValue := RightConstVal.Value;
@@ -137,7 +137,7 @@ while Tok.Kind in MultiplicativeOperators do
       DIVTOK:  if RightConstVal.FracValue <> 0 then
                  ConstVal.FracValue := ConstVal.FracValue / RightConstVal.FracValue
                else
-                 Error('Constant division by zero', '', EMPTYTOK)
+                 Error('Constant division by zero')
     end
   else                                                    // Integer constants
     case OpTok.Kind of             
@@ -145,11 +145,11 @@ while Tok.Kind in MultiplicativeOperators do
       IDIVTOK: if RightConstVal.Value <> 0 then
                  ConstVal.Value := ConstVal.Value div RightConstVal.Value
                else
-                 Error('Constant division by zero', '', EMPTYTOK);  
+                 Error('Constant division by zero');  
       MODTOK:  if RightConstVal.Value <> 0 then
                  ConstVal.Value := ConstVal.Value mod RightConstVal.Value
                else
-                 Error('Constant division by zero', '', EMPTYTOK);
+                 Error('Constant division by zero');
       SHLTOK:  ConstVal.Value := ConstVal.Value shl RightConstVal.Value;
       SHRTOK:  ConstVal.Value := ConstVal.Value shr RightConstVal.Value;
       ANDTOK:  ConstVal.Value := ConstVal.Value and RightConstVal.Value;
@@ -190,12 +190,12 @@ while Tok.Kind in AdditiveOperators do
   CompileConstTerm(RightConstVal, RightConstValType);
 
   // Try to convert integer to real
-  if ConversionIsPossible(ConstValType, RightConstValType) then
+  if ConversionToRealIsPossible(ConstValType, RightConstValType) then
     begin
     ConstVal.FracValue := ConstVal.Value;
     ConstValType := REALTYPEINDEX;
     end;
-  if ConversionIsPossible(RightConstValType, ConstValType) then
+  if ConversionToRealIsPossible(RightConstValType, ConstValType) then
     begin
     RightConstVal.FracValue := RightConstVal.Value;
     RightConstValType := REALTYPEINDEX;
@@ -241,12 +241,12 @@ if Tok.Kind in RelationOperators then
   CompileSimpleConstExpression(RightConstVal, RightConstValType);
 
   // Try to convert integer to real
-  if ConversionIsPossible(ConstValType, RightConstValType) then
+  if ConversionToRealIsPossible(ConstValType, RightConstValType) then
     begin
     ConstVal.FracValue := ConstVal.Value;
     ConstValType := REALTYPEINDEX;
     end;
-  if ConversionIsPossible(RightConstValType, ConstValType) then
+  if ConversionToRealIsPossible(RightConstValType, ConstValType) then
     begin
     RightConstVal.FracValue := RightConstVal.Value;
     RightConstValType := REALTYPEINDEX;
@@ -326,7 +326,7 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
         Result := GetIdent('READSTRING')              // String argument
         
   else
-    Error('Incompatible types', '', EMPTYTOK);
+    Error('Incompatible types');
  
   end; // GetReadProcIdent
   
@@ -358,7 +358,7 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
         Result := GetIdent('WRITESTRING')              // String argument
         
   else
-    Error('Incompatible types', '', EMPTYTOK);
+    Error('Incompatible types');
   
   end; // GetWriteProcIdentIndex
   
@@ -412,7 +412,7 @@ case proc of
         if Types[DesignatorType].Kind = FILETYPE then           // Text file handle
           begin
           if not IsFirstParam then
-            Error('Incompatible types', '', EMPTYTOK);
+            Error('Incompatible types');
           FileSpecified := TRUE;
           end
         else                                                        // Any output expression
@@ -485,7 +485,7 @@ case proc of
         if Types[ExpressionType].Kind = FILETYPE then           // Text file handle
           begin
           if not IsFirstParam then
-            Error('Incompatible types', '', EMPTYTOK);
+            Error('Incompatible types');
           FileSpecified := TRUE;
           end
         else                                                        // Any output expression
@@ -553,7 +553,7 @@ case proc of
   BREAKPROC:
     begin
     if LoopNesting < 1 then
-      Error('BREAK outside of loop is not allowed', '', EMPTYTOK);
+      Error('BREAK outside of loop is not allowed');
     GenerateBreakCall(LoopNesting);
     end;
   
@@ -561,7 +561,7 @@ case proc of
   CONTINUEPROC:
     begin
     if LoopNesting < 1 then
-      Error('CONTINUE outside of loop is not allowed', '', EMPTYTOK);
+      Error('CONTINUE outside of loop is not allowed');
     GenerateContinueCall(LoopNesting);
     end;
     
@@ -636,7 +636,7 @@ case func of
     CompileExpression(ValType);
 
     // Try to convert integer to real
-    if ConversionIsPossible(ValType, REALTYPEINDEX) then
+    if ConversionToRealIsPossible(ValType, REALTYPEINDEX) then
       begin
       GenerateFloat(0);
       ValType := REALTYPEINDEX;
@@ -652,7 +652,7 @@ case func of
     begin
     CompileExpression(ValType);
     if not (Types[ValType].Kind in OrdinalTypes) then
-      Error('Ordinal type expected', '', EMPTYTOK);
+      Error('Ordinal type expected');
     ValType := INTEGERTYPEINDEX;
     end;
     
@@ -669,7 +669,7 @@ case func of
     begin
     CompileExpression(ValType);
     if not (Types[ValType].Kind in OrdinalTypes) then
-      Error('Ordinal type expected', '', EMPTYTOK);
+      Error('Ordinal type expected');
     if func = SUCCFUNC then
       PushConst(1)
     else
@@ -685,13 +685,13 @@ case func of
       begin
       if not ((Types[ValType].Kind in NumericTypes) or
              ((Types[ValType].Kind = SUBRANGETYPE) and (Types[Types[ValType].HostType].Kind in NumericTypes))) then
-        Error('Numeric type expected', '', EMPTYTOK)
+        Error('Numeric type expected')
       end
     else
       begin
       
       // Try to convert integer to real
-      if ConversionIsPossible(ValType, REALTYPEINDEX) then
+      if ConversionToRealIsPossible(ValType, REALTYPEINDEX) then
         begin
         GenerateFloat(0);
         ValType := REALTYPEINDEX;
@@ -734,7 +734,7 @@ else
     // Add new forward-referenced type
     Inc(NumTypes);
     if NumTypes > MAXTYPES then
-      Error('Maximum number of types exceeded', '', EMPTYTOK);    
+      Error('Maximum number of types exceeded');    
     
     Types[NumTypes].Kind := FORWARDTYPE;
     Types[NumTypes].TypeIdentName := Tok.Name;
@@ -744,7 +744,7 @@ else
   else
     begin
     if Ident[IdentIndex].Kind <> USERTYPE then
-      Error('Type name expected', '', EMPTYTOK);
+      Error('Type name expected');
     DataType := Ident[IdentIndex].DataType;                 // Usual type
     end;
 end; // case
@@ -821,7 +821,7 @@ if Tok.Kind = OPARTOK then
         // Add new anonymous type 0..0 for array index
         Inc(NumTypes);
         if NumTypes > MAXTYPES then
-          Error('Maximum number of types exceeded', '', EMPTYTOK);
+          Error('Maximum number of types exceeded');
         
         Types[NumTypes].Kind        := SUBRANGETYPE;
         Types[NumTypes].Block       := BlockStack[BlockStackTop];
@@ -832,7 +832,7 @@ if Tok.Kind = OPARTOK then
         // Add new anonymous type for array itself
         Inc(NumTypes);
         if NumTypes > MAXTYPES then
-          Error('Maximum number of types exceeded', '', EMPTYTOK);
+          Error('Maximum number of types exceeded');
         
         Types[NumTypes].Kind        := ARRAYTYPE;
         Types[NumTypes].Block       := BlockStack[BlockStackTop];
@@ -848,17 +848,17 @@ if Tok.Kind = OPARTOK then
 
     
     if (ListPassMethod = VALPASSING) and (Types[ParamType].Kind in StructuredTypes) then
-      Error('Structured parameters cannot be passed by value', '', EMPTYTOK);
+      Error('Structured parameters cannot be passed by value');
       
     if (ListPassMethod = VALPASSING) and (ParamType = ANYTYPEINDEX) then
-      Error('Untyped parameters cannot be passed by value', '', EMPTYTOK);          
+      Error('Untyped parameters cannot be passed by value');          
 
     for IdentInListIndex := 1 to NumIdentInList do
       begin
       Inc(NumFormalParams);
 
       if NumFormalParams > MAXPARAMS then
-        Error('Too many formal parameters', '', EMPTYTOK);
+        Error('Too many formal parameters');
 
       New(FormalParam[NumFormalParams]);
 
@@ -905,7 +905,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
   if Tok.Kind <> CPARTOK then
     repeat
       if NumActualParams + 1 > NumFormalParams then
-        Error('Too many actual parameters', '', EMPTYTOK);
+        Error('Too many actual parameters');
 
       CurParam := FormalParam[NumActualParams + 1];
 
@@ -916,7 +916,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       if (Tok.Kind = STRINGLITERALTOK) or TreatCharAsString then
         begin
         if CurParam^.PassMethod <> CONSTPASSING then
-          Error('String literals can be passed as CONST only', '', EMPTYTOK);
+          Error('String literals can be passed as CONST only');
         IsRefParam := FALSE;
         end
       else
@@ -941,7 +941,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       Inc(NumActualParams);
 
       // Try to convert integer to real
-      if ConversionIsPossible(ActualParamType, CurParam^.DataType) and not IsRefParam then
+      if ConversionToRealIsPossible(ActualParamType, CurParam^.DataType) and not IsRefParam then
         begin
         GenerateFloat(0);
         ActualParamType := REALTYPEINDEX;
@@ -960,7 +960,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
   end;// if Tok.Kind = OPARTOK
 
 if NumActualParams < NumFormalParams then
-  Error('Too few actual parameters', '', EMPTYTOK);
+  Error('Too few actual parameters');
   
 // Allocate space for structured Result as a hidden VAR parameter
 if ResultType <> 0 then
@@ -999,7 +999,7 @@ var
   TotalNumParams: Integer;
 begin
 if (Types[ProcVarType].Kind <> PROCEDURALTYPE) or (FunctionOnly and (Types[ProcVarType].ResultType = 0)) then 
-  Error('Appropriate procedural variable expected', '', EMPTYTOK); 
+  Error('Appropriate procedural variable expected'); 
 
 DerefPtr(ProcVarType);
 
@@ -1056,7 +1056,7 @@ if ValType = 0 then
   IdentIndex := GetIdent(Tok.Name);
 
   if Ident[IdentIndex].Kind <> VARIABLE then
-    Error('Expected variable but found ', '', Tok.Kind);
+    Error('Variable expected but ' + GetTokSpelling(Tok.Kind) + ' found');
 
   PushVarPtr(Ident[IdentIndex].Value, 
              Ident[IdentIndex].Scope, 
@@ -1083,7 +1083,7 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK] do
     DEREFERENCETOK:                           // Pointer dereferencing
       begin
       if (Types[ValType].Kind <> POINTERTYPE) or (Types[ValType].BaseType = ANYTYPEINDEX) then
-        Error('Typed pointer expected', '', EMPTYTOK);
+        Error('Typed pointer expected');
       DerefPtr(ValType);
       ValType := Types[ValType].BaseType;
       NextTok;
@@ -1093,7 +1093,7 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK] do
       begin
       repeat
         if Types[ValType].Kind <> ARRAYTYPE then
-          Error('Array expected', '', EMPTYTOK);
+          Error('Array expected');
         NextTok;
         CompileExpression(ArrayIndexType);    // Array index
         GetCompatibleType(ArrayIndexType, Types[ValType].IndexType);
@@ -1106,7 +1106,7 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK] do
     PERIODTOK:                                // Record field access
       begin
       if Types[ValType].Kind <> RECORDTYPE then
-        Error('Record expected', '', EMPTYTOK);
+        Error('Record expected');
       NextTok;
       AssertIdent;
       FieldIndex := GetField(ValType, Tok.Name);
@@ -1132,7 +1132,7 @@ begin
 // Add new anonymous type
 Inc(NumTypes);
 if NumTypes > MAXTYPES then
-  Error('Maximum number of types exceeded', '', EMPTYTOK);
+  Error('Maximum number of types exceeded');
 
 Types[NumTypes].Kind := SETTYPE;
 Types[NumTypes].Block := BlockStack[BlockStackTop];
@@ -1160,7 +1160,7 @@ if Tok.Kind <> CBRACKETTOK then
     if Types[ValType].BaseType = ANYTYPEINDEX then
       begin
       if not (Types[ElementType].Kind in OrdinalTypes) then
-        Error('Ordinal type expected', '', EMPTYTOK);        
+        Error('Ordinal type expected');        
       Types[ValType].BaseType := ElementType;
       end  
     else  
@@ -1228,10 +1228,10 @@ case Tok.Kind of
       case Ident[IdentIndex].Kind of
       
         GOTOLABEL:
-          Error('Expected expression but found label ', Ident[IdentIndex].Name, EMPTYTOK);
+          Error('Expression expected but label ' + Ident[IdentIndex].Name + ' found');
       
         PROC:
-          Error('Expected expression but found procedure ', Ident[IdentIndex].Name, EMPTYTOK);
+          Error('Expression expected but procedure ' + Ident[IdentIndex].Name + ' found');
           
         FUNC:                                                                           // Function call
           if Ident[IdentIndex].PredefProc <> EMPTYPROC then                                    // Predefined function call
@@ -1272,13 +1272,13 @@ case Tok.Kind of
 
           if not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and 
                   (Types[ValType].Kind in CastableTypes)) then
-            Error('Invalid typecast', '', EMPTYTOK);
+            Error('Invalid typecast');
 
           ValType := Ident[IdentIndex].DataType;
           end
           
       else
-        Error('Internal fault: Illegal identifier', '', EMPTYTOK);  
+        Error('Internal fault: Illegal identifier');  
       end; // case Ident[IdentIndex].Kind
       end; // else  
 
@@ -1296,7 +1296,7 @@ case Tok.Kind of
       if Ident[IdentIndex].Kind in [PROC, FUNC] then
         begin
         if (Ident[IdentIndex].PredefProc <> EMPTYPROC) or (Ident[IdentIndex].Block <> 1) then
-          Error('Procedure or function cannot be predefined or nested', '', EMPTYTOK);
+          Error('Procedure or function cannot be predefined or nested');
           
         PushRelocConst(Ident[IdentIndex].Value, CODERELOC); // To be resolved later when code section origin is known
         NextTok;
@@ -1372,7 +1372,7 @@ case Tok.Kind of
     end
 
 else
-  Error('Expected expression but found ', '', Tok.Kind);
+  Error('Expression expected but ' + GetTokSpelling(Tok.Kind) + ' found');
 end;// case
 
 end;// CompileFactor
@@ -1397,19 +1397,19 @@ while Tok.Kind in MultiplicativeOperators do
   CompileFactor(RightValType);
 
   // Try to convert integer to real
-  if ConversionIsPossible(ValType, RightValType) then
+  if ConversionToRealIsPossible(ValType, RightValType) then
     begin
     GenerateFloat(SizeOf(Single));
     ValType := REALTYPEINDEX;
     end;
-  if ConversionIsPossible(RightValType, ValType) then
+  if ConversionToRealIsPossible(RightValType, ValType) then
     begin
     GenerateFloat(0);
     RightValType := REALTYPEINDEX;
     end;
 
   // Special case: real division of two integers
-  if (OpTok.Kind = DIVTOK) and ConversionIsPossible(ValType, REALTYPEINDEX) and ConversionIsPossible(RightValType, REALTYPEINDEX) then
+  if (OpTok.Kind = DIVTOK) and ConversionToRealIsPossible(ValType, REALTYPEINDEX) and ConversionToRealIsPossible(RightValType, REALTYPEINDEX) then
     begin
     GenerateFloat(SizeOf(Single));
     GenerateFloat(0);
@@ -1489,12 +1489,12 @@ while Tok.Kind in AdditiveOperators do
   CompileTerm(RightValType);
 
   // Try to convert integer to real
-  if ConversionIsPossible(ValType, RightValType) then
+  if ConversionToRealIsPossible(ValType, RightValType) then
     begin
     GenerateFloat(SizeOf(Single));
     ValType := REALTYPEINDEX;
     end;
-  if ConversionIsPossible(RightValType, ValType) then
+  if ConversionToRealIsPossible(RightValType, ValType) then
     begin
     GenerateFloat(0);
     RightValType := REALTYPEINDEX;
@@ -1574,12 +1574,12 @@ if Tok.Kind in RelationOperators then
   CompileSimpleExpression(RightValType);
 
   // Try to convert integer to real
-  if ConversionIsPossible(ValType, RightValType) then
+  if ConversionToRealIsPossible(ValType, RightValType) then
     begin
     GenerateFloat(SizeOf(Single));
     ValType := REALTYPEINDEX;
     end;
-  if ConversionIsPossible(RightValType, ValType) then
+  if ConversionToRealIsPossible(RightValType, ValType) then
     begin
     GenerateFloat(0);
     RightValType := REALTYPEINDEX;
@@ -1623,12 +1623,12 @@ else if Tok.Kind = INTOK then
   CompileSimpleExpression(RightValType);
   
   if Types[RightValType].Kind <> SETTYPE then
-    Error('Set expected', '', EMPTYTOK);
+    Error('Set expected');
   
   if Types[RightValType].BaseType <> ANYTYPEINDEX then
     GetCompatibleType(ValType, Types[RightValType].BaseType)
   else if not (Types[ValType].Kind in OrdinalTypes) then
-    Error('Ordinal type expected', '', EMPTYTOK);   
+    Error('Ordinal type expected');   
 
   LibProcIdentIndex := GetIdent('INSET');
   GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
@@ -1680,7 +1680,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
       if Ident[LabelIndex].Kind = GOTOLABEL then
         begin
         if Ident[LabelIndex].Block <> BlockStack[BlockStackTop] then
-          Error('Label is not declared in current procedure', '', EMPTYTOK);
+          Error('Label is not declared in current procedure');
         
         Ident[LabelIndex].Value := CodeSize;        
         Ident[LabelIndex].IsUnresolvedForward := FALSE;
@@ -1697,13 +1697,23 @@ procedure CompileStatement{(LoopNesting: Integer)};
   
   procedure CompileAssignment(DesignatorType: Integer);
   var
-    ExpressionType: Integer;   
+    ExpressionType: Integer;
+    TreatCharAsString: Boolean;
   begin
-  NextTok;                       
-  CompileExpression(ExpressionType);
+  NextTok;
+
+  TreatCharAsString := (Tok.Kind = CHARLITERALTOK) and (DesignatorType = STRINGTYPEINDEX);
+  if TreatCharAsString then
+    begin                                                       // Special case
+    PushVarPtr(Tok.StrAddress, GLOBAL, 0, INITDATARELOC);
+    ExpressionType := STRINGTYPEINDEX;
+    NextTok;
+    end
+  else                                                          
+    CompileExpression(ExpressionType);                          // General rule: right-hand side expression
 
   // Try to convert integer to real
-  if ConversionIsPossible(ExpressionType, DesignatorType) then
+  if ConversionToRealIsPossible(ExpressionType, DesignatorType) then
     begin
     GenerateFloat(0);
     ExpressionType := REALTYPEINDEX;
@@ -1775,7 +1785,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
   
   CompileExpression(SelectorType);
   if not (Types[SelectorType].Kind in OrdinalTypes) then
-    Error('Ordinal variable expected as CASE selector', '', EMPTYTOK);
+    Error('Ordinal variable expected as CASE selector');
   
   EatTok(OFTOK);
 
@@ -1903,10 +1913,10 @@ procedure CompileStatement{(LoopNesting: Integer)};
   if (Ident[CounterIndex].Kind <> VARIABLE) or
     ((Ident[CounterIndex].NestingLevel <> 1) and (Ident[CounterIndex].NestingLevel <> BlockStackTop)) or
      (Ident[CounterIndex].PassMethod <> VALPASSING) then
-    Error('Simple local variable expected as FOR loop counter', '', EMPTYTOK);
+    Error('Simple local variable expected as FOR loop counter');
 
   if not (Types[Ident[CounterIndex].DataType].Kind in OrdinalTypes) then
-    Error('Ordinal variable expected as FOR loop counter', '', EMPTYTOK);
+    Error('Ordinal variable expected as FOR loop counter');
 
   // Assign initial value to the counter
   NextTok;
@@ -1917,7 +1927,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
   CompileAssignment(Ident[CounterIndex].DataType);
 
   if not (Tok.Kind in [TOTOK, DOWNTOTOK]) then
-    Error('Expected TO or DOWNTO but found ', '', Tok.Kind);
+    CheckTok(TOTOK);
 
   Down := Tok.Kind = DOWNTOTOK;
   NextTok;
@@ -1973,10 +1983,10 @@ procedure CompileStatement{(LoopNesting: Integer)};
   LabelIndex := GetIdent(Tok.Name);
   
   if Ident[LabelIndex].Kind <> GOTOLABEL then
-    Error('Label expected', '', EMPTYTOK);
+    Error('Label expected');
     
   if Ident[LabelIndex].Block <> BlockStack[BlockStackTop] then
-    Error('Label is not declared in current procedure', '', EMPTYTOK);
+    Error('Label is not declared in current procedure');
     
   GenerateGoto(LabelIndex);
 
@@ -2003,7 +2013,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
     
     CompileDesignator(DesignatorType);
     if Types[DesignatorType].Kind <> RECORDTYPE then
-      Error('Record expected', '', EMPTYTOK);
+      Error('Record expected');
       
     GenerateAssignment(POINTERTYPEINDEX);
 
@@ -2012,7 +2022,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
     Inc(WithNesting);
     
     if WithNesting > MAXWITHNESTING then
-      Error('Maximum WITH block nesting exceeded', '', EMPTYTOK);
+      Error('Maximum WITH block nesting exceeded');
     
     WithStack[WithNesting].TempPointer := TempStorageAddr;
     WithStack[WithNesting].DataType := DesignatorType;    
@@ -2064,7 +2074,7 @@ case Tok.Kind of
           if Ident[IdentIndex].PredefProc <> EMPTYPROC then             // Predefined procedure
             begin
             if Ident[IdentIndex].Kind <> PROC then
-              Error('Expected procedure but found predefined function ', Ident[IdentIndex].Name, EMPTYTOK);            
+              Error('Procedure expected but predefined function ' + Ident[IdentIndex].Name + ' found');            
             CompilePredefinedProc(Ident[IdentIndex].PredefProc, LoopNesting)
             end
           else                                                          // User-defined procedure or function
@@ -2074,7 +2084,7 @@ case Tok.Kind of
             if Tok.Kind = ASSIGNTOK then                                // Special case: assignment to a function name
               begin
               if (Ident[IdentIndex].Kind <> FUNC) or (Ident[IdentIndex].ProcAsBlock <> BlockStack[BlockStackTop]) then
-                Error('Expected current function name but found ', Ident[IdentIndex].Name, EMPTYTOK);
+                Error('Current function name expected but ' + Ident[IdentIndex].Name + ' found');
 
               ResultIdentIndex := GetIdent('RESULT');
               PushVarPtr(Ident[ResultIdentIndex].Value, LOCAL, 0, UNINITDATARELOC);
@@ -2088,7 +2098,7 @@ case Tok.Kind of
             end  
               
       else
-        Error('Expected statement but found ', Ident[IdentIndex].Name, EMPTYTOK);
+        Error('Statement expected but ' + Ident[IdentIndex].Name + ' found');
       end // case Ident[IdentIndex].Kind
       end; // else
     end;    
@@ -2134,7 +2144,7 @@ procedure CompileType{(var DataType: Integer)};
   // Add new anonymous type
   Inc(NumTypes);
   if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded', '', EMPTYTOK);
+    Error('Maximum number of types exceeded');
     
   Types[NumTypes].Kind := ENUMERATEDTYPE;
   DataType := NumTypes;
@@ -2149,7 +2159,7 @@ procedure CompileType{(var DataType: Integer)};
     
     Inc(ConstIndex);
     if ConstIndex > MAXENUMELEMENTS - 1 then
-      Error('Too many enumeration elements', '', EMPTYTOK);
+      Error('Too many enumeration elements');
       
     NextTok;
     
@@ -2174,7 +2184,7 @@ procedure CompileType{(var DataType: Integer)};
   // Add new anonymous type
   Inc(NumTypes);
   if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded', '', EMPTYTOK);
+    Error('Maximum number of types exceeded');
     
   Types[NumTypes].Kind := POINTERTYPE;
   DataType := NumTypes;
@@ -2203,7 +2213,7 @@ procedure CompileType{(var DataType: Integer)};
     // Add new anonymous type
     Inc(NumTypes);
     if NumTypes > MAXTYPES then
-      Error('Maximum number of types exceeded', '', EMPTYTOK);
+      Error('Maximum number of types exceeded');
     
     Types[NumTypes].Kind := ARRAYTYPE;
     Types[NumTypes].Block := BlockStack[BlockStackTop];
@@ -2212,7 +2222,7 @@ procedure CompileType{(var DataType: Integer)};
 
     CompileType(IndexType);
     if not (Types[IndexType].Kind in OrdinalTypes) then
-      Error('Ordinal type expected', '', EMPTYTOK);
+      Error('Ordinal type expected');
     Types[ArrType].IndexType := IndexType;
 
     if Tok.Kind <> COMMATOK then Break;
@@ -2240,7 +2250,7 @@ procedure CompileType{(var DataType: Integer)};
     begin
     for i := 1 to Types[RecType].NumFields do
       if Types[RecType].Field[i]^.Name = Name then
-        Error('Duplicate field', '', EMPTYTOK);
+        Error('Duplicate field ' + Name);
 
     // Add new field
     Inc(Types[RecType].NumFields);
@@ -2262,7 +2272,7 @@ procedure CompileType{(var DataType: Integer)};
   // Add new anonymous type
   Inc(NumTypes);
   if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded', '', EMPTYTOK);  
+    Error('Maximum number of types exceeded');  
   
   Types[NumTypes].Kind := RECORDTYPE;
   DataType := NumTypes;
@@ -2310,7 +2320,7 @@ procedure CompileType{(var DataType: Integer)};
   // Add new anonymous type
   Inc(NumTypes);
   if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded', '', EMPTYTOK);
+    Error('Maximum number of types exceeded');
   
   Types[NumTypes].Kind := SETTYPE;
   Types[NumTypes].Block := BlockStack[BlockStackTop];
@@ -2322,7 +2332,7 @@ procedure CompileType{(var DataType: Integer)};
   CompileType(NestedDataType);
   
   if (LowBound(NestedDataType) < 0) or (HighBound(NestedDataType) > MAXSETELEMENTS - 1) then
-    Error('Too many set elements', '', EMPTYTOK);
+    Error('Too many set elements');
   
   Types[DataType].BaseType := NestedDataType; 
   end; // CompileSetType
@@ -2338,27 +2348,27 @@ procedure CompileType{(var DataType: Integer)};
   // Add new anonymous type
   Inc(NumTypes);
   if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded', '', EMPTYTOK);    
+    Error('Maximum number of types exceeded');    
   
   Types[NumTypes].Kind := SUBRANGETYPE;
   DataType := NumTypes;
 
   CompileConstExpression(ConstVal, LowBoundType);                               // Subrange lower bound
   if not (Types[LowBoundType].Kind in OrdinalTypes + [SUBRANGETYPE]) then
-    Error('Ordinal type expected', '', EMPTYTOK);
+    Error('Ordinal type expected');
   Types[DataType].Low := ConstVal.Value;
 
   EatTok(RANGETOK);
 
   CompileConstExpression(ConstVal, HighBoundType);                              // Subrange upper bound
   if not (Types[HighBoundType].Kind in OrdinalTypes + [SUBRANGETYPE]) then
-    Error('Ordinal type expected', '', EMPTYTOK);
+    Error('Ordinal type expected');
   Types[DataType].High := ConstVal.Value;
 
   GetCompatibleType(LowBoundType, HighBoundType);
 
   if Types[DataType].High < Types[DataType].Low then
-    Error('Illegal subrange bounds', '', EMPTYTOK);
+    Error('Illegal subrange bounds');
 
   Types[DataType].HostType := LowBoundType;
   Types[DataType].Block := BlockStack[BlockStackTop];  
@@ -2371,7 +2381,7 @@ procedure CompileType{(var DataType: Integer)};
   begin
   Inc(NumTypes);
   if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded', '', EMPTYTOK);    
+    Error('Maximum number of types exceeded');    
   
   Types[NumTypes].Kind := PROCEDURALTYPE;
   Types[NumTypes].Block := BlockStack[BlockStackTop];
@@ -2395,7 +2405,7 @@ if Tok.Kind = PACKEDTOK then        // PACKED has no effect
   begin
   NextTok;
   if not (Tok.Kind in [ARRAYTOK, RECORDTOK, SETTOK, FILETOK]) then
-    Error('PACKED is not allowed here', '', EMPTYTOK);
+    Error('PACKED is not allowed here');
   end;
  
 case Tok.Kind of
@@ -2532,7 +2542,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   // Add new anonymous type: 1 .. MAXSTRLENGTH + 1
   Inc(NumTypes);
   if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded', '', EMPTYTOK);
+    Error('Maximum number of types exceeded');
   
   Types[NumTypes].Kind     := SUBRANGETYPE;
   Types[NumTypes].HostType := INTEGERTYPEINDEX;
@@ -2556,7 +2566,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   for TypeIndex := 1 to NumTypes do
     if (Types[TypeIndex].Kind = FORWARDTYPE) and
        (Types[TypeIndex].Block = BlockStack[BlockStackTop]) then
-      Error('Unresolved forward reference to type ', Types[TypeIndex].TypeIdentName, EMPTYTOK);
+      Error('Unresolved forward reference to type ' + Types[TypeIndex].TypeIdentName);
   end; // CheckForwardResolutions
   
   
@@ -2705,7 +2715,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
         end        
      
       else
-        Error('Illegal type', '', EMPTYTOK);         
+        Error('Illegal type');         
  
       end; // CompileTypedConstConstructor  
     
@@ -2837,7 +2847,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     if Tok.Name = 'EXTERNAL' then      // External (Windows API) declaration  
       begin
       if BlockStackTop <> 1 then
-        Error('External declaration must be global', '', EMPTYTOK);
+        Error('External declaration must be global');
         
       // Read import library name
       NextTok;      
@@ -2846,7 +2856,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       
       // Read import function name
       if (Tok.Kind <> IDENTTOK) or (Tok.Name <> 'NAME') then
-        Error('Expected NAME but found ', '', Tok.Kind);
+        Error('NAME expected but ' + GetTokSpelling(Tok.Kind) + ' found');
       NextTok;
       ImportFuncName := Tok.Name;
       EatTok(STRINGLITERALTOK);
@@ -2859,7 +2869,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       begin
       Inc(NumBlocks);
       if NumBlocks > MAXBLOCKS then
-        Error('Maximum number of blocks exceeded', '', EMPTYTOK);
+        Error('Maximum number of blocks exceeded');
         
       Ident[NumIdent].ProcAsBlock := NumBlocks;
       Ident[NumIdent].IsUnresolvedForward := TRUE;
@@ -2867,7 +2877,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       NextTok;
       end
     else
-      Error('Unknown directive ', Tok.Name, EMPTYTOK);  
+      Error('Unknown directive ' + Tok.Name);  
     end; // CompileDirective
     
     
@@ -2914,7 +2924,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       begin
       Inc(NumBlocks);
       if NumTypes > MAXBLOCKS then
-        Error('Maximum number of blocks exceeded', '', EMPTYTOK);
+        Error('Maximum number of blocks exceeded');
       
       Ident[NumIdent].ProcAsBlock := NumBlocks;
       CompileBlock(NumIdent);
@@ -3029,7 +3039,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   while (IdentIndex > 0) and (Ident[IdentIndex].Block = BlockStack[BlockStackTop]) do
     begin
     if (Ident[IdentIndex].Kind in [GOTOLABEL, PROC, FUNC]) and Ident[IdentIndex].IsUnresolvedForward then
-      Error('Unresolved declaration of ', Ident[IdentIndex].Name, EMPTYTOK);
+      Error('Unresolved declaration of ' + Ident[IdentIndex].Name);
     Dec(IdentIndex);
     end;
   end; // CheckUnresolvedDeclarations  
@@ -3122,7 +3132,7 @@ GenerateExitEpilog;                            // Direct all Exit procedure call
 GenerateGotoEpilog;
 
 if ForLoopNesting <> 0 then
-  Error('Internal fault: Illegal FOR loop nesting', '', EMPTYTOK);
+  Error('Internal fault: Illegal FOR loop nesting');
 
 // If function, return Result value via the EAX register
 if (BlockStack[BlockStackTop] <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) then
@@ -3174,7 +3184,7 @@ NextTok;
 
 Inc(NumBlocks);
 if NumBlocks > MAXBLOCKS then
-  Error('Maximum number of blocks exceeded', '', EMPTYTOK);
+  Error('Maximum number of blocks exceeded');
   
 CompileBlock(0);
 

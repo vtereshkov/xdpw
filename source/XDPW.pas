@@ -91,7 +91,7 @@ Assign(OutFile, ExeName);
 Rewrite(OutFile, 1);
 
 if IOResult <> 0 then
-  Error('Unable to open output file ', ExeName, EMPTYTOK);
+  Error('Unable to open output file ' + ExeName);
   
 BlockWrite(OutFile, Headers, SizeOf(Headers));
 Pad(OutFile, SizeOf(Headers), FILEALIGN);

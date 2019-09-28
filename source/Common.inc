@@ -459,38 +459,39 @@ end;
 
 
 
-procedure WriteToken(TokKind: TTokenKind);
+function GetTokSpelling(TokKind: TTokenKind): TString;
 begin
 case TokKind of
-  EMPTYTOK:                          Write('no token');
-  OPARTOK:                           Write('(');
-  CPARTOK:                           Write(')');
-  MULTOK:                            Write('*');
-  PLUSTOK:                           Write('+');
-  COMMATOK:                          Write(',');
-  MINUSTOK:                          Write('-');
-  PERIODTOK:                         Write('.');
-  RANGETOK:                          Write('..');
-  DIVTOK:                            Write('/');
-  COLONTOK:                          Write(':');
-  ASSIGNTOK:                         Write(':=');
-  SEMICOLONTOK:                      Write(';');
-  LTTOK:                             Write('<');
-  LETOK:                             Write('<=');
-  NETOK:                             Write('<>');
-  EQTOK:                             Write('=');
-  GTTOK:                             Write('>');
-  GETOK:                             Write('>=');
-  ADDRESSTOK:                        Write('@');
-  OBRACKETTOK:                       Write('[');
-  CBRACKETTOK:                       Write(']');
-  DEREFERENCETOK:                    Write('^');
-  ANDTOK..XORTOK:                    Write(Keyword[Ord(TokKind) - Ord(ANDTOK) + 1]);
-  IDENTTOK:                          Write('identifier');
-  INTNUMBERTOK, FRACNUMBERTOK:       Write('number');
-  CHARLITERALTOK, STRINGLITERALTOK:  Write('literal')
+  EMPTYTOK:                          Result := 'no token';
+  OPARTOK:                           Result := '(';
+  CPARTOK:                           Result := ')';
+  MULTOK:                            Result := '*';
+  PLUSTOK:                           Result := '+';
+  COMMATOK:                          Result := ',';
+  MINUSTOK:                          Result := '-';
+  PERIODTOK:                         Result := '.';
+  RANGETOK:                          Result := '..';
+  DIVTOK:                            Result := '/';
+  COLONTOK:                          Result := ':';
+  ASSIGNTOK:                         Result := ':=';
+  SEMICOLONTOK:                      Result := ';';
+  LTTOK:                             Result := '<';
+  LETOK:                             Result := '<=';
+  NETOK:                             Result := '<>';
+  EQTOK:                             Result := '=';
+  GTTOK:                             Result := '>';
+  GETOK:                             Result := '>=';
+  ADDRESSTOK:                        Result := '@';
+  OBRACKETTOK:                       Result := '[';
+  CBRACKETTOK:                       Result := ']';
+  DEREFERENCETOK:                    Result := '^';
+  ANDTOK..XORTOK:                    Result := Keyword[Ord(TokKind) - Ord(ANDTOK) + 1];
+  IDENTTOK:                          Result := 'identifier';
+  INTNUMBERTOK, FRACNUMBERTOK:       Result := 'number';
+  CHARLITERALTOK:                    Result := 'character literal';
+  STRINGLITERALTOK:                  Result := 'string literal'
 else
-  Write('unknown token');
+  Result := 'unknown token';
 end; //case
 end;
 
@@ -498,14 +499,12 @@ end;
 
 
   
-procedure Error(const Msg, Name: TString; TokKind: TTokenKind);
+procedure Error(const Msg: TString);
 begin
 if UnitStackTop >= 1 then
-  Write('Error ', UnitStack[UnitStackTop].FileName, ' ', UnitStack[UnitStackTop].Line, ': ', Msg, Name)
+  WriteLn('Error ', UnitStack[UnitStackTop].FileName, ' ', UnitStack[UnitStackTop].Line, ': ', Msg)
 else
-  Write('Error: ', Msg, Name);  
-if TokKind > EMPTYTOK then WriteToken(TokKind);
-WriteLn;
+  WriteLn('Error: ', Msg);  
 
 DisposeAll;
 Halt(1);
@@ -526,7 +525,7 @@ for i := 1 to Length(StrValue) do
   InitializedGlobalData[InitializedGlobalDataSize] := StrValue[i];
   Inc(InitializedGlobalDataSize);
   if InitializedGlobalDataSize > MAXINITIALIZEDDATASIZE - 1 then
-    Error('Maximum string data size exceeded', '', EMPTYTOK);
+    Error('Maximum string data size exceeded');
   end;
 
 // Add string termination character
@@ -551,7 +550,7 @@ case Types[DataType].Kind of
   SUBRANGETYPE:   Result :=  Types[DataType].Low;
   ENUMERATEDTYPE: Result :=  Types[DataType].Low
 else
-  Error('Ordinal type expected', '', EMPTYTOK)
+  Error('Ordinal type expected')
 end;// case
 end;
                         
@@ -572,7 +571,7 @@ case Types[DataType].Kind of
   SUBRANGETYPE:   Result := Types[DataType].High;
   ENUMERATEDTYPE: Result := Types[DataType].High
 else
-  Error('Ordinal type expected', '', EMPTYTOK)
+  Error('Ordinal type expected')
 end;// case
 end;
 
@@ -597,7 +596,7 @@ case Types[DataType].Kind of
   FILETYPE:       Result := SizeOf(TString) + SizeOf(Integer);  // Name + Handle
   SUBRANGETYPE:   Result := SizeOf(Integer);
   ARRAYTYPE:      if Types[DataType].IsOpenArray then
-                    Error('Illegal type', '', EMPTYTOK)
+                    Error('Illegal type')
                   else  
                     Result := (HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1) * TypeSize(Types[DataType].BaseType);
   RECORDTYPE:     begin
@@ -609,7 +608,7 @@ case Types[DataType].Kind of
   ENUMERATEDTYPE: Result := SizeOf(Byte);                
   PROCEDURALTYPE: Result := SizeOf(Pointer)               
 else
-  Error('Illegal type', '', EMPTYTOK)
+  Error('Illegal type')
 end;// case
 end;    
 
@@ -670,7 +669,7 @@ else                                         // Special cases
   end; // if
 
 if Result = 0 then
-  Error('Incompatible types', '', EMPTYTOK);  
+  Error('Incompatible types');  
 end;
 
 
@@ -703,13 +702,13 @@ else                                         // Special cases
   end; // if  
 
 if Result = 0 then
-  Error('Incompatible types', '', EMPTYTOK);  
+  Error('Incompatible types');  
 end;
 
 
 
 
-function ConversionIsPossible(SrcType, DestType: Integer): Boolean;
+function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
 begin
 // Implicit type conversion is possible if DestType is real and SrcType is integer or a subrange of integer
 Result := (Types[DestType].Kind = REALTYPE) and
@@ -731,7 +730,7 @@ else
     (Types[DataType].Kind <> POINTERTYPE) and
     (Types[DataType].Kind <> PROCEDURALTYPE) 
   then
-    Error('Operator is not applicable', '', EMPTYTOK);
+    Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
    
   if ((Types[DataType].Kind in IntegerTypes)  and not (Tok.Kind in OperatorsForIntegers)) or
      ((Types[DataType].Kind = REALTYPE)       and not (Tok.Kind in OperatorsForReals)) or   
@@ -741,7 +740,7 @@ else
      ((Types[DataType].Kind = ENUMERATEDTYPE) and not (Tok.Kind in RelationOperators)) or
      ((Types[DataType].Kind = PROCEDURALTYPE) and not (Tok.Kind in RelationOperators)) 
   then
-    Error('Operator is not applicable', '', EMPTYTOK);
+    Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
   end;  
 end;  
 
@@ -797,7 +796,7 @@ function GetIdent(const Name: TString): Integer;
 begin
 Result := GetIdentUnsafe(Name);
 if Result = 0 then
-  Error('Unknown identifier: ', Name, EMPTYTOK);
+  Error('Unknown identifier ' + Name);
 end;
 
 
@@ -813,11 +812,11 @@ if BlockStack[BlockStackTop] = 1 then Scope := GLOBAL else Scope := LOCAL;
 i := GetIdentUnsafe(Name);
 
 if (i > 0) and (Ident[i].Block = BlockStack[BlockStackTop]) then
-  Error('Duplicate identifier ', Name, EMPTYTOK);
+  Error('Duplicate identifier ' + Name);
 
 Inc(NumIdent);
 if NumIdent > MAXIDENTS then
-  Error('Maximum number of identifiers exceeded', '', EMPTYTOK);
+  Error('Maximum number of identifiers exceeded');
   
 Ident[NumIdent].Name := Name;
 Ident[NumIdent].Kind := Kind;
@@ -896,16 +895,16 @@ end;// case
 
 
 if InitializedGlobalDataSize >= MAXINITIALIZEDDATASIZE then
-  Error('Maximum initialized data size exceeded', '', EMPTYTOK);
+  Error('Maximum initialized data size exceeded');
 
 if UninitializedGlobalDataSize >= MAXUNINITIALIZEDDATASIZE then
-  Error('Maximum uninitialized data size exceeded', '', EMPTYTOK);
+  Error('Maximum uninitialized data size exceeded');
 
 if LocalDataSize >= MAXSTACKSIZE then
-  Error('Maximum local data size exceeded', '', EMPTYTOK);
+  Error('Maximum local data size exceeded');
 
 if ParamDataSize >= MAXSTACKSIZE then
-  Error('Maximum parameter data size exceeded', '', EMPTYTOK);
+  Error('Maximum parameter data size exceeded');
 
 end;
 
@@ -934,7 +933,7 @@ function GetField(RecType: Integer; const Name: TString): Integer;
 begin
 Result := GetFieldUnsafe(RecType, Name);
 if Result = 0 then
-  Error('Unknown field: ', Name, EMPTYTOK);
+  Error('Unknown field ' + Name);
 end;
 
 
