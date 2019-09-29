@@ -2088,7 +2088,10 @@ case Tok.Kind of
 
               ResultIdentIndex := GetIdent('RESULT');
               PushVarPtr(Ident[ResultIdentIndex].Value, LOCAL, 0, UNINITDATARELOC);
+              
               DesignatorType := Ident[ResultIdentIndex].DataType;
+              if Types[DesignatorType].Kind in StructuredTypes then 
+                DerefPtr(POINTERTYPEINDEX);                        
 
               CompileAssignment(DesignatorType);
               end
