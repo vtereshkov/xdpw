@@ -160,7 +160,7 @@ end;
 
 
 
-// Heap operations
+// Heap routines
 
 
 procedure GetMem(var P: Pointer; Size: Integer);
@@ -179,7 +179,7 @@ end;
 
 
 
-// Mathematical routines
+// Random number generator routines
 
 
 procedure Randomize;
@@ -194,38 +194,6 @@ function Random: Real;
 begin
 RandSeed := 1975433173 * RandSeed;
 Result := 0.5 * (RandSeed / $7FFFFFFF + 1.0);
-end;
-
-
-
-
-function Min(x, y: Real): Real;
-begin
-if x < y then Result := x else Result := y;
-end;
-
-
-
-
-function IMin(x, y: Integer): Integer;
-begin
-if x < y then Result := x else Result := y;
-end;
-
-
-
-
-function Max(x, y: Real): Real;
-begin
-if x > y then Result := x else Result := y;
-end;
-
-
-
-
-function IMax(x, y: Integer): Integer;
-begin
-if x > y then Result := x else Result := y;
 end;
 
 
@@ -822,44 +790,6 @@ end;
 
 
 
-procedure ConcatStrChar(const s1: string; ch: Char; var s: string);
-var
-  s2: string;
-begin
-s2[1] := ch;  
-s2[2] := #0;
-ConcatStr(s1, s2, s);
-end;
-
-
-
-
-procedure ConcatCharStr(ch: Char; const s2: string; var s: string);
-var
-  s1: string;
-begin
-s1[1] := ch;  
-s1[2] := #0;
-ConcatStr(s1, s2, s);
-end;
-
-
-
-
-procedure ConcatChar(ch1, ch2: Char; var s: string);
-var
-  s1, s2: string;
-begin
-s1[1] := ch1;  
-s1[2] := #0;
-s2[1] := ch2;  
-s2[2] := #0;
-ConcatStr(s1, s2, s);
-end;
-
-
-
-
 function CompareStr(const s1, s2: string): Integer;
 var
   i: Integer;
@@ -870,30 +800,6 @@ repeat
   Inc(i);
   Result := Integer(s1[i]) - Integer(s2[i]);
 until (s1[i] = #0) or (s2[i] = #0) or (Result <> 0);
-end;
-
-
-
-
-function CompareStrChar(const s: string; ch: Char): Integer;
-var
-  s2: string;
-begin
-s2[1] := ch;  
-s2[2] := #0;
-Result := CompareStr(s, s2);
-end;
-
-
-
-
-function CompareCharStr(ch: Char; const s: string): Integer;
-var
-  s1: string;
-begin
-s1[1] := ch;  
-s1[2] := #0;
-Result := CompareStr(s1, s);
 end;
 
 
