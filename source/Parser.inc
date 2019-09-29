@@ -1048,7 +1048,7 @@ if ValType = 0 then
     begin
     DerefPtr(Ident[IdentIndex].DataType);
     
-    TempStorageAddr := AllocateTempStorage(TypeSize(STRINGTYPEINDEX));    
+    TempStorageAddr := AllocateTempStorage(2 * SizeOf(Char));    
     PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
     
     GetCharAsTempString;    
@@ -1326,7 +1326,7 @@ case Tok.Kind of
     
     if ForceCharToString then
       begin
-      TempStorageAddr := AllocateTempStorage(TypeSize(STRINGTYPEINDEX));    
+      TempStorageAddr := AllocateTempStorage(2 * SizeOf(Char));    
       PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
     
       GetCharAsTempString;    
