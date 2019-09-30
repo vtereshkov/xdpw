@@ -435,9 +435,8 @@ else
   begin
   Tok.Kind := STRINGLITERALTOK;
   Tok.Name := Text;
+  DefineStaticString(Tok, Text);
   end;
-
-DefineStaticString(Tok, Text);    // A character literal is also copied to a single-character static string so this string can be passed to subroutines
 
 ReadValidChar(ch);
 end;
@@ -563,7 +562,7 @@ end; // NextTok
 procedure CheckTok(ExpectedTokKind: TTokenKind);
 begin
 if Tok.Kind <> ExpectedTokKind then
-  Error('' + GetTokSpelling(ExpectedTokKind) + ' expected but ' + GetTokSpelling(Tok.Kind) + ' found');
+  Error(GetTokSpelling(ExpectedTokKind) + ' expected but ' + GetTokSpelling(Tok.Kind) + ' found');
 end;
 
 

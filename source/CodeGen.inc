@@ -276,6 +276,18 @@ end;
 
 
 
+procedure GetCharAsTempString;
+begin
+Gen($5E);                                                         // pop esi                  ; Temporary string address
+Gen($58);                                                         // pop eax                  ; Character
+Gen($88); Gen($06);                                               // mov byte ptr [esi], al
+Gen($C6); Gen($46); Gen($01); Gen($00);                           // mov byte ptr [esi + 1], 0
+Gen($56);                                                         // push esi
+end;
+
+
+
+
 procedure SaveStackTopToEAX;
 begin
 Gen($58);                                                                               // pop eax
