@@ -152,7 +152,7 @@ for i := 0 to DataLength - 1 do
 Spectrum(x, S);
 
 for i := 0 to DataLength shr 1 - 1 do  
-  WriteLn('Freq ', i, ' Mag ', S[i] * 2 / DataLength);
+  WriteLn('Freq ', i: 5, '   Mag ', S[i] * 2 / DataLength: 10: 4);
 
 ReadLn;
 end.

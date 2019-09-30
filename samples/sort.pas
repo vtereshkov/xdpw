@@ -163,8 +163,8 @@ Randomize;
 for i := 1 to DataLength do
   begin
   RandomData[i] := Round((Random - 0.5) * 1000000);
-  Write(RandomData[i]);
-  if i mod 6 <> 0 then Write(#9) else WriteLn;
+  Write(RandomData[i]: 8);
+  if i mod 6 = 0 then WriteLn;
   end;
 
 WriteLn;
@@ -221,8 +221,8 @@ WriteLn;
 
 for i := 1 to DataLength do
   begin
-  Write(RandomData[i]); 
-  if i mod 6 <> 0 then Write(#9) else WriteLn;
+  Write(RandomData[i]: 8); 
+  if i mod 6 = 0 then WriteLn;
   end;
 WriteLn;
 

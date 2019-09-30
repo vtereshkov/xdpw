@@ -199,7 +199,161 @@ end;
 
 
 
+// String manipulation routines
+
+
+function Length(const s: string): Integer;
+begin
+Result := 0;
+while s[Result + 1] <> #0 do Inc(Result);
+end;
+
+
+
+
+procedure SetLength(var s: string; NewLength: Integer);
+begin
+if NewLength >= 0 then s[NewLength + 1] := #0;
+end;
+
+
+
+
+procedure AppendStr(var Dest: string; const Source: string);
+var
+  DestLen, i: Integer;
+begin
+DestLen := Length(Dest);
+i := 0;
+repeat 
+  Inc(i);
+  Dest[DestLen + i] := Source[i];
+until Source[i] = #0;
+end;
+
+
+
+
+procedure ConcatStr(const s1, s2: string; var s: string);
+begin
+s := s1;
+AppendStr(s, s2);
+end;
+
+
+
+
+function CompareStr(const s1, s2: string): Integer;
+var
+  i: Integer;
+begin
+Result := 0;
+i := 0;
+repeat 
+  Inc(i);
+  Result := Integer(s1[i]) - Integer(s2[i]);
+until (s1[i] = #0) or (s2[i] = #0) or (Result <> 0);
+end;
+
+
+
+
+procedure Move(const Source; var Dest; Count: Integer);
+var
+  S, D: ^string;
+  i: Integer;
+begin
+S := @Source;
+D := @Dest;
+
+if S = D then Exit;
+
+for i := 1 to Count do
+  D^[i] := S^[i];
+end;
+
+
+
+
+procedure FillChar(var Data; Count: Integer; Value: Char);
+var
+  D: ^string;
+  i: Integer;
+begin
+D := @Data;
+for i := 1 to Count do
+  D^[i] := Value;
+end;
+
+
+
+
+function ParseCmdLine(Index: Integer; var Str: string): Integer;
+var
+  CmdLine: string;
+  CmdLinePtr: ^string;
+  Param: string;
+  ParamPtr: array [0..7] of ^string;
+  i, NumParam, CmdLineLen: Integer;
+
+begin
+CmdLinePtr := GetCommandLineA;
+CmdLine := CmdLinePtr^;
+CmdLineLen := Length(CmdLine);
+
+NumParam := 1;
+ParamPtr[NumParam - 1] := @CmdLine;
+
+for i := 1 to CmdLineLen do
+  begin
+  if CmdLine[i] <= ' ' then
+    CmdLine[i] := #0;
+    
+  if (i > 1) and (CmdLine[i] > ' ') and (CmdLine[i - 1] = #0) then
+    begin
+    Inc(NumParam);
+    ParamPtr[NumParam - 1] := @CmdLine[i];
+    end;
+  end;
+  
+if Index < NumParam then
+  Str := ParamPtr[Index]^
+else
+  Str := '';
+
+Result := NumParam;  
+end;
+
+
+
+
+function ParamCount: Integer;
+var
+  Str: string;
+begin  
+Result := ParseCmdLine(0, Str) - 1;
+end; 
+
+
+
+
+function ParamStr(Index: Integer): string;
+var
+  NumParam: Integer;
+begin  
+NumParam := ParseCmdLine(Index, Result);
+end;   
+
+
+
+
 // File and console I/O routines
+
+
+procedure IStr(Number: Integer; var s: string); forward;
+procedure Str(Number: Real; var s: string; DecPlaces: Integer); forward;
+
+
 
 
 procedure WriteConsole(Ch: Char);
@@ -371,6 +525,33 @@ end;
 
 
 
+procedure WriteString(var F: file; P: PStream; const S: string);
+var
+  i: Integer;
+begin
+i := 1;
+while S[i] <> #0 do
+  begin
+  WriteCh(F, P, S[i]);
+  Inc(i);
+  end; 
+end;
+
+
+
+
+procedure WriteStringF(var F: file; P: PStream; const S: string; MinWidth, DecPlaces: Integer);
+var
+  i: Integer;
+begin
+for i := 1 to MinWidth - Length(S) do
+  WriteCh(F, P, ' '); 
+WriteString(F, P, S);
+end;
+
+
+
+
 procedure WriteInt(var F: file; P: PStream; Number: Integer);
 var
   Digit, Weight: Integer;
@@ -410,6 +591,17 @@ end;
 
 
 
+procedure WriteIntF(var F: file; P: PStream; Number: Integer; MinWidth, DecPlaces: Integer);
+var
+  S: string;
+begin
+IStr(Number, S);
+WriteStringF(F, P, S, MinWidth, DecPlaces);
+end;
+  
+
+
+
 procedure WriteHex(var F: file; P: PStream; Number: Integer; Digits: ShortInt);
 var
   i, Digit: ShortInt;
@@ -425,7 +617,6 @@ end;
 
 
 
-
 procedure WritePointer(var F: file; P: PStream; Number: Integer);
 begin
 WriteHex(F, P, Number, 8);
@@ -434,12 +625,23 @@ end;
 
 
 
+procedure WritePointerF(var F: file; P: PStream; Number: Integer; MinWidth, DecPlaces: Integer);
+var
+  i: Integer;
+begin
+for i := 1 to MinWidth - 8 do
+  WriteCh(F, P, ' ');
+WritePointer(F, P, Number);
+end;
 
-procedure WriteReal(var F: file; P: PStream; Number: Real);
+
+
+
+procedure WriteReal(var F: file; P: PStream; Number: Real; DecPlaces: Integer);
 const
   FracBits = 16;
 var
-  Integ, Frac, InvWeight, Digit, IntegExpon: Integer;
+  Integ, Frac, InvWeight, FinalInvWeight, Digit, IntegExpon, i: Integer;
   Expon: Real;
 
 begin
@@ -452,7 +654,7 @@ if Number < 0 then
 
 // Normalize number
 if Number = 0 then Expon := 0 else Expon := ln(Number) / ln(10);
-if (Expon > 8) or (Expon < -3) then
+if ((Expon > 8) or (Expon < -3)) and (DecPlaces <= 0) then
   begin
   IntegExpon := Trunc(Expon);
   if IntegExpon < 0 then Dec(IntegExpon);
@@ -470,7 +672,11 @@ WriteInt(F, P, Integ);  WriteCh(F, P, '.');
 // Write fractional part
 InvWeight := 10;
 
-while InvWeight <= 10000 do
+FinalInvWeight := 1;
+for i := 1 to DecPlaces do
+  FinalInvWeight := FinalInvWeight * 10;
+
+while InvWeight <= FinalInvWeight do
   begin
   Digit := (Frac * InvWeight) shr FracBits;
   if Digit > 9 then Digit := 9;
@@ -490,16 +696,12 @@ end;
 
 
 
-procedure WriteString(var F: file; P: PStream; const s: string);
+procedure WriteRealF(var F: file; P: PStream; Number: Real; MinWidth, DecPlaces: Integer);
 var
-  i: Integer;
+  S: string;
 begin
-i := 1;
-while s[i] <> #0 do
-  begin
-  WriteCh(F, P, s[i]);
-  Inc(i);
-  end; 
+Str(Number, S, DecPlaces);
+WriteStringF(F, P, S, MinWidth, DecPlaces);
 end;
 
 
@@ -508,6 +710,14 @@ end;
 procedure WriteBoolean(var F: file; P: PStream; Flag: Boolean);
 begin
 if Flag then WriteString(F, P, 'TRUE') else WriteString(F, P, 'FALSE');
+end;
+
+
+
+
+procedure WriteBooleanF(var F: file; P: PStream; Flag: Boolean; MinWidth, DecPlaces: Integer);
+begin
+if Flag then WriteStringF(F, P, 'TRUE', MinWidth, DecPlaces) else WriteStringF(F, P, 'FALSE', MinWidth, DecPlaces);
 end;
 
 
@@ -746,154 +956,6 @@ end;
 
 
 
-// String manipulation routines
-
-
-function Length(const s: string): Integer;
-begin
-Result := 0;
-while s[Result + 1] <> #0 do Inc(Result);
-end;
-
-
-
-
-procedure SetLength(var s: string; NewLength: Integer);
-begin
-if NewLength >= 0 then s[NewLength + 1] := #0;
-end;
-
-
-
-
-procedure AppendStr(var Dest: string; const Source: string);
-var
-  DestLen, i: Integer;
-begin
-DestLen := Length(Dest);
-i := 0;
-repeat 
-  Inc(i);
-  Dest[DestLen + i] := Source[i];
-until Source[i] = #0;
-end;
-
-
-
-
-procedure ConcatStr(const s1, s2: string; var s: string);
-begin
-s := s1;
-AppendStr(s, s2);
-end;
-
-
-
-
-function CompareStr(const s1, s2: string): Integer;
-var
-  i: Integer;
-begin
-Result := 0;
-i := 0;
-repeat 
-  Inc(i);
-  Result := Integer(s1[i]) - Integer(s2[i]);
-until (s1[i] = #0) or (s2[i] = #0) or (Result <> 0);
-end;
-
-
-
-
-procedure Move(const Source; var Dest; Count: Integer);
-var
-  S, D: ^string;
-  i: Integer;
-begin
-S := @Source;
-D := @Dest;
-
-if S = D then Exit;
-
-for i := 1 to Count do
-  D^[i] := S^[i];
-end;
-
-
-
-
-procedure FillChar(var Data; Count: Integer; Value: Char);
-var
-  D: ^string;
-  i: Integer;
-begin
-D := @Data;
-for i := 1 to Count do
-  D^[i] := Value;
-end;
-
-
-
-
-function ParseCmdLine(Index: Integer; var Str: string): Integer;
-var
-  CmdLine: string;
-  CmdLinePtr: ^string;
-  Param: string;
-  ParamPtr: array [0..7] of ^string;
-  i, NumParam, CmdLineLen: Integer;
-
-begin
-CmdLinePtr := GetCommandLineA;
-CmdLine := CmdLinePtr^;
-CmdLineLen := Length(CmdLine);
-
-NumParam := 1;
-ParamPtr[NumParam - 1] := @CmdLine;
-
-for i := 1 to CmdLineLen do
-  begin
-  if CmdLine[i] <= ' ' then
-    CmdLine[i] := #0;
-    
-  if (i > 1) and (CmdLine[i] > ' ') and (CmdLine[i - 1] = #0) then
-    begin
-    Inc(NumParam);
-    ParamPtr[NumParam - 1] := @CmdLine[i];
-    end;
-  end;
-  
-if Index < NumParam then
-  Str := ParamPtr[Index]^
-else
-  Str := '';
-
-Result := NumParam;  
-end;
-
-
-
-
-function ParamCount: Integer;
-var
-  Str: string;
-begin  
-Result := ParseCmdLine(0, Str) - 1;
-end; 
-
-
-
-
-function ParamStr(Index: Integer): string;
-var
-  NumParam: Integer;
-begin  
-NumParam := ParseCmdLine(Index, Result);
-end;   
-
-
-
-
 // Conversion routines
 
 
@@ -912,14 +974,14 @@ end;
 
 
 
-procedure Str(Number: Real; var s: string);
+procedure Str{(Number: Real; var s: string; DecPlaces: Integer)};
 var
   Stream: TStream;
 begin
 Stream.Data := @s;
 Stream.Index := 0;
 
-WriteReal(StdOutputFile, @Stream, Number);
+WriteReal(StdOutputFile, @Stream, Number, DecPlaces);
 s[Stream.Index + 1] := #0;
 end;
 
@@ -941,7 +1003,7 @@ end;
 
 
 
-procedure IStr(Number: Integer; var s: string);
+procedure IStr{(Number: Integer; var s: string)};
 var
   Stream: TStream;
 begin

@@ -338,20 +338,20 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
   
   if (Types[DataType].Kind in IntegerTypes) or
     ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].HostType].Kind in IntegerTypes)) then
-        Result := GetIdent('WRITEINT')                 // Integer argument
+        Result := GetIdent('WRITEINTF')                 // Integer argument
         
   else if (Types[DataType].Kind = BOOLEANTYPE) or
     ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].HostType].Kind = BOOLEANTYPE)) then
-        Result := GetIdent('WRITEBOOLEAN')             // Boolean argument
+        Result := GetIdent('WRITEBOOLEANF')             // Boolean argument
         
   else if Types[DataType].Kind = REALTYPE then
-        Result := GetIdent('WRITEREAL')                // Real argument
+        Result := GetIdent('WRITEREALF')                // Real argument
         
   else if Types[DataType].Kind = POINTERTYPE then
-        Result := GetIdent('WRITEPOINTER')             // Pointer argument
+        Result := GetIdent('WRITEPOINTERF')             // Pointer argument
         
   else if (Types[DataType].Kind = ARRAYTYPE) and (Types[DataType].BaseType = CHARTYPEINDEX) then
-        Result := GetIdent('WRITESTRING')              // String argument
+        Result := GetIdent('WRITESTRINGF')              // String argument
         
   else
     Error('Incompatible types');
@@ -361,7 +361,8 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
  
 
 var
-  DesignatorType, ExpressionType: Integer;
+  Formatter: TConst;
+  DesignatorType, ExpressionType, FormatterType: Integer;
   LibProcIdentIndex, ConsoleIndex: Integer;
   IsFirstParam, FileSpecified: Boolean;
   
@@ -477,16 +478,44 @@ case proc of
         
         // 3rd argument - expression
         CompileExpression(ExpressionType, TRUE);
-
+        
         if Types[ExpressionType].Kind = FILETYPE then           // Text file handle
           begin
           if not IsFirstParam then
             Error('Incompatible types');
           FileSpecified := TRUE;
           end
-        else                                                        // Any output expression
+        else                                                    // Any output expression
           begin
-          // Call the specific output subroutine. Interface: FileHandle; StreamHandle; Expression
+          // 4th argument - minimum width
+          if Tok.Kind = COLONTOK then
+            begin
+            NextTok;
+            CompileConstExpression(Formatter, FormatterType);
+            GetCompatibleType(FormatterType, INTEGERTYPEINDEX);
+            
+            PushConst(Formatter.Value);
+            
+            // 5th argument - number of decimal places
+            if (Tok.Kind = COLONTOK) and (Types[ExpressionType].Kind = REALTYPE) then
+              begin
+              NextTok;
+              CompileConstExpression(Formatter, FormatterType);
+              GetCompatibleType(FormatterType, INTEGERTYPEINDEX);
+              
+              PushConst(Formatter.Value);
+              end
+            else
+              PushConst(0);
+ 
+            end            
+          else
+            begin
+            PushConst(0);
+            PushConst(0);
+            end;
+          
+          // Call the specific output subroutine. Interface: FileHandle; StreamHandle; Expression; MinWidth; DecPlaces
           LibProcIdentIndex := GetWriteProcIdent(ExpressionType);
           GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
           end; // else

@@ -64,7 +64,7 @@ for i := 1 to m do
   for j := 1 to m + 1 do
     begin
     Read(DatFile, A[i, j]);
-    Write(A[i, j], ' ');
+    Write(A[i, j]: 9: 1);
     end;
   ReadLn(DatFile);  
   WriteLn;
@@ -81,7 +81,7 @@ WriteLn;
 for i := 1 to m do
   begin
   for j := 1 to m + 1 do
-    Write(A[i, j], ' ');
+    Write(A[i, j]: 9: 1);
   WriteLn;
   end;
 
@@ -90,7 +90,7 @@ WriteLn('Solution: ');
 WriteLn;
 
 for i := 1 to m do
-  WriteLn('x', i, ' = ', x[i]);
+  WriteLn('x', i, ' = ', x[i]: 10: 4);
 
 WriteLn;
 WriteLn('Done.');
