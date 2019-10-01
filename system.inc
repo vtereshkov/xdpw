@@ -351,7 +351,7 @@ end;
 
 
 procedure IStr(Number: Integer; var s: string); forward;
-procedure Str(Number: Real; var s: string; DecPlaces: Integer); forward;
+procedure Str(Number: Real; var s: string; DecPlaces: Integer = 0); forward;
 
 
 
@@ -388,7 +388,7 @@ end;
 
 
 
-procedure Rewrite(var F: file; BlockSize: Integer);
+procedure Rewrite(var F: file; BlockSize: Integer = 1);
 var
   FileRecPtr: PFileRec;
 begin
@@ -400,7 +400,7 @@ end;
 
 
 
-procedure Reset(var F: file; BlockSize: Integer);
+procedure Reset(var F: file; BlockSize: Integer = 1);
 var
   FileRecPtr: PFileRec;
 begin
@@ -974,7 +974,7 @@ end;
 
 
 
-procedure Str{(Number: Real; var s: string; DecPlaces: Integer)};
+procedure Str{(Number: Real; var s: string; DecPlaces: Integer = 0)};
 var
   Stream: TStream;
 begin

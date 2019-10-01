@@ -38,7 +38,7 @@ Write('File name   : '); ReadLn(DatName);
 WriteLn;
 
 Assign(DatFile, DatName);
-Reset(DatFile, 1);
+Reset(DatFile);
 
 Err := IOResult;
 if Err <> 0 then

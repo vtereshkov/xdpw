@@ -126,6 +126,11 @@ type
     FracValue: Single;
     StrAddress: Integer;
     StrLength: Integer;
+  end;
+
+  TConst = record
+    Value: LongInt;       // For ordinal types 
+    FracValue: Single;    // For real type
   end;   
   
   TPassMethod = (EMPTYPASSING, VALPASSING, CONSTPASSING, VARPASSING); 
@@ -134,6 +139,7 @@ type
     Name: TString;
     DataType: Integer;
     PassMethod: TPassMethod;
+    Default: TConst;
   end;
 
   PParam = ^TParam;
@@ -195,6 +201,7 @@ type
     RelocType: TRelocType;
     PassMethod: TPassMethod;           // Value, CONST or VAR parameter status
     NumParams: Integer;
+    NumDefaultParams: Integer;
     Param: PParams;
     ProcAsBlock: Integer;
     PredefProc: TPredefProc;
@@ -230,6 +237,7 @@ type
     
     // For procedural types
     NumParams: Integer;
+    NumDefaultParams: Integer;
     Param: PParams;
     ResultType: Integer;
     
@@ -249,11 +257,6 @@ type
     Size, Pos, Line: Integer;
   end;  
   
-  TConst = record
-    Value: LongInt;       // For integer numbers 
-    FracValue: Single;    // For floating-point numbers
-  end;
-
   TGoto = record
     Pos: LongInt;
     LabelIndex: Integer;

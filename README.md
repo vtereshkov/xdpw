@@ -31,6 +31,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * The compiler is self-hosting
 * Functions can return arrays, records or sets (Delphi style)
 * Functions can be called as procedures (Delphi style)
+* Parameters can have default values (Delphi style)
 * The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
 * Single-line comments (`//`) are supported (Delphi style)
 
@@ -47,7 +48,6 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Arrays, records and sets cannot be passed to subroutines without `const` or `var`
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical
-* `Reset` and `Rewrite` always require the block size 1 as the second parameter
 
 #### Formal grammar
 ```
@@ -90,7 +90,8 @@ ActualParams = "(" [ (Expression | Designator) |
 
 FormalParams = "(" FormalParamList {";" FormalParamList} ")" .
               
-FormalParamList = ["const" | "var"] IdentList [":" ["array" "of"] TypeIdent] .             
+FormalParamList = ["const" | "var"] IdentList [":" ["array" "of"] TypeIdent] 
+                                              ["=" ConstExpression] .             
 
 IdentList = Ident {"," Ident} .
 
@@ -221,8 +222,8 @@ function Timer: Integer;
 procedure Randomize;
 function Random: Real;
 procedure Assign(var F: file; const Name: string);
-procedure Rewrite(var F: file; BlockSize: Integer);
-procedure Reset(var F: file; BlockSize: Integer);
+procedure Rewrite(var F: file[; BlockSize: Integer]);
+procedure Reset(var F: file[; BlockSize: Integer]);
 procedure Close(var F: file);
 procedure BlockRead(var F: file; var Buf; Len: Integer; var LenRead: Integer);
 procedure BlockWrite(var F: file; var Buf; Len: Integer);
@@ -239,7 +240,7 @@ procedure FillChar(var Data; Count: Integer; Value: Char);
 function ParamCount: Integer;
 function ParamStr(Index: Integer): string;
 procedure Val(const s: string; var Number: Real; var Code: Integer);
-procedure Str(Number: Real; var s: string; DecPlaces: Integer);
+procedure Str(Number: Real; var s: string[; DecPlaces: Integer]);
 procedure IVal(const s: string; var Number: Integer; var Code: Integer);
 procedure IStr(Number: Integer; var s: string);
 function UpCase(ch: Char): Char;

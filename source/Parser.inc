@@ -780,16 +780,18 @@ end; // CompileTypeIdent
 
 
 
-procedure CompileFormalParametersAndResult(IsFunction: Boolean; var NumFormalParams: Integer; var FormalParam: PParams; var ResultType: Integer);
+procedure CompileFormalParametersAndResult(IsFunction: Boolean; var NumFormalParams, NumDefaultFormalParams: Integer; var FormalParam: PParams; var ResultType: Integer);
 var
   IdentInListName: array [1..MAXPARAMS] of TString;
   NumIdentInList, IdentInListIndex: Integer;  
-  ParamType: Integer;    
+  ParamType, DefaultValueType: Integer;    
   ListPassMethod: TPassMethod;
   IsOpenArrayList: Boolean;
+  Default: TConst;
   
 begin
 NumFormalParams := 0;
+NumDefaultFormalParams := 0;
   
 if Tok.Kind = OPARTOK then
   begin
@@ -876,7 +878,26 @@ if Tok.Kind = OPARTOK then
       Error('Structured parameters cannot be passed by value');
       
     if (ListPassMethod = VALPASSING) and (ParamType = ANYTYPEINDEX) then
-      Error('Untyped parameters cannot be passed by value');          
+      Error('Untyped parameters cannot be passed by value');
+      
+
+    // Default parameter value
+    if (Tok.Kind = EQTOK) or (NumDefaultFormalParams > 0) then
+      begin
+      EatTok(EQTOK);
+      
+      if not (Types[ParamType].Kind in OrdinalTypes + [REALTYPE]) then
+        Error('Ordinal or real type expected for default parameter');
+        
+      if ListPassMethod <> VALPASSING then
+        Error('Default parameters cannot be passed by reference');
+
+      CompileConstExpression(Default, DefaultValueType);
+      GetCompatibleType(ParamType, DefaultValueType);
+        
+      Inc(NumDefaultFormalParams);
+      end;
+      
 
     for IdentInListIndex := 1 to NumIdentInList do
       begin
@@ -890,7 +911,17 @@ if Tok.Kind = OPARTOK then
       FormalParam[NumFormalParams]^.DataType   := ParamType;
       FormalParam[NumFormalParams]^.PassMethod := ListPassMethod;
       FormalParam[NumFormalParams]^.Name       := IdentInListName[IdentInListIndex];
+      
+      // Default parameter value
+      if (NumDefaultFormalParams > 0) and (IdentInListIndex = 1) then
+        begin
+        if NumIdentInList > 1 then
+          Error('Default parameters cannot be grouped');          
+        FormalParam[NumFormalParams]^.Default := Default; 
+        end;
+        
       end;// for
+      
 
     if Tok.Kind <> SEMICOLONTOK then Break;
     NextTok;
@@ -913,15 +944,19 @@ end; // CompileFormalParametersAndResult
 
 
 
-procedure CompileActualParameters(NumFormalParams: Integer; var FormalParam: PParams; ResultType: Integer);
+procedure CompileActualParameters(NumFormalParams, NumDefaultFormalParams: Integer; var FormalParam: PParams; ResultType: Integer);
 var
   NumActualParams: Integer;
   ActualParamType: Integer;
+  DefaultParamIndex: Integer;
   TempStorageAddr: Integer;
   IsRefParam: Boolean;
   CurParam: PParam;
+  FictitiousIntegerPtr: ^Integer;
+  
 begin
 NumActualParams := 0;
+
 
 if Tok.Kind = OPARTOK then                            // Actual parameter list found
   begin
@@ -966,9 +1001,25 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
 
   EatTok(CPARTOK);
   end;// if Tok.Kind = OPARTOK
+  
 
-if NumActualParams < NumFormalParams then
+if NumActualParams < NumFormalParams - NumDefaultFormalParams then
   Error('Too few actual parameters');
+  
+  
+// Push default parameters
+for DefaultParamIndex := NumActualParams + 1 to NumFormalParams do
+  begin
+  CurParam := FormalParam[DefaultParamIndex];
+  if Types[CurParam^.DataType].Kind = REALTYPE then
+    begin
+    FictitiousIntegerPtr := Pointer(@CurParam^.Default.FracValue);
+    PushConst(Integer(FictitiousIntegerPtr^));
+    end
+  else
+    PushConst(CurParam^.Default.Value);
+  end; // for  
+
   
 // Allocate space for structured Result as a hidden VAR parameter
 if ResultType <> 0 then
@@ -991,7 +1042,7 @@ if Ident[IdentIndex].Kind = FUNC then
 else  
   ResultType := 0;
   
-CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].Param, ResultType);
+CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].NumDefaultParams, Ident[IdentIndex].Param, ResultType);
   
 if Ident[IdentIndex].IsExternal then
   GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams)
@@ -1011,7 +1062,7 @@ if (Types[ProcVarType].Kind <> PROCEDURALTYPE) or (FunctionOnly and (Types[ProcV
 
 DerefPtr(ProcVarType);
 
-CompileActualParameters(Types[ProcVarType].NumParams, Types[ProcVarType].Param, Types[ProcVarType].ResultType);
+CompileActualParameters(Types[ProcVarType].NumParams, Types[ProcVarType].NumDefaultParams, Types[ProcVarType].Param, Types[ProcVarType].ResultType);
 
 TotalNumParams := Types[ProcVarType].NumParams;
 if Types[Types[ProcVarType].ResultType].Kind in StructuredTypes then
@@ -2387,7 +2438,7 @@ procedure CompileType{(var DataType: Integer)};
   
   NextTok;
   
-  CompileFormalParametersAndResult(IsFunction, Types[DataType].NumParams, Types[DataType].Param, Types[DataType].ResultType);  
+  CompileFormalParametersAndResult(IsFunction, Types[DataType].NumParams, Types[DataType].NumDefaultParams, Types[DataType].Param, Types[DataType].ResultType);  
   end; // CompileProceduralType
   
   
@@ -2907,7 +2958,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
 
     NextTok;
 
-    CompileFormalParametersAndResult(IsFunction, Ident[NumIdent].NumParams, Ident[NumIdent].Param, Ident[NumIdent].DataType);
+    CompileFormalParametersAndResult(IsFunction, Ident[NumIdent].NumParams, Ident[NumIdent].NumDefaultParams, Ident[NumIdent].Param, Ident[NumIdent].DataType);
     end// if ForwardIdentIndex = 0
   else
     NextTok;
