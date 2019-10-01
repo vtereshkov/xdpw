@@ -608,7 +608,8 @@ case proc of
       PushConst(0);
       
     LibProcIdentIndex := GetIdent('EXITPROCESS');
-    GenerateExternalCall(Ident[LibProcIdentIndex].Value, Ident[LibProcIdentIndex].NumParams);
+    InverseStack(Ident[LibProcIdentIndex].NumParams);
+    GenerateExternalCall(Ident[LibProcIdentIndex].Value);
     end;
 
 end;// case
@@ -780,7 +781,7 @@ end; // CompileTypeIdent
 
 
 
-procedure CompileFormalParametersAndResult(IsFunction: Boolean; var NumFormalParams, NumDefaultFormalParams: Integer; var FormalParam: PParams; var ResultType: Integer);
+procedure CompileFormalParametersAndResult(IsFunction: Boolean; var NumFormalParams, NumDefaultFormalParams: Integer; var FormalParam: PParams; var ResultType: Integer; var IsStdCall: Boolean);
 var
   IdentInListName: array [1..MAXPARAMS] of TString;
   NumIdentInList, IdentInListIndex: Integer;  
@@ -939,6 +940,17 @@ if IsFunction then
   EatTok(COLONTOK);  
   CompileTypeIdent(ResultType, FALSE);
   end;
+  
+  
+// Call modifier
+if (Tok.Kind = IDENTTOK) and (Tok.Name = 'STDCALL') then
+  begin
+  IsStdCall := TRUE;
+  NextTok;
+  end
+else  
+  IsStdCall := FALSE;
+  
 end; // CompileFormalParametersAndResult
 
 
@@ -1043,9 +1055,12 @@ else
   ResultType := 0;
   
 CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].NumDefaultParams, Ident[IdentIndex].Param, ResultType);
+
+if Ident[IdentIndex].IsStdCall then
+  InverseStack(Ident[IdentIndex].NumParams);
   
 if Ident[IdentIndex].IsExternal then
-  GenerateExternalCall(Ident[IdentIndex].Value, Ident[IdentIndex].NumParams)
+  GenerateExternalCall(Ident[IdentIndex].Value)
 else 
   GenerateCall(Ident[IdentIndex].Value, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
 end; // CompileCall
@@ -1067,6 +1082,9 @@ CompileActualParameters(Types[ProcVarType].NumParams, Types[ProcVarType].NumDefa
 TotalNumParams := Types[ProcVarType].NumParams;
 if Types[Types[ProcVarType].ResultType].Kind in StructuredTypes then
   Inc(TotalNumParams);  //   Allocate space for structured Result as a hidden VAR parameter
+
+if Types[ProcVarType].IsStdCall then
+  InverseStack(TotalNumParams);
 
 GenerateIndirectCall(TotalNumParams);
 end; // CompileIndirectCall
@@ -2438,7 +2456,12 @@ procedure CompileType{(var DataType: Integer)};
   
   NextTok;
   
-  CompileFormalParametersAndResult(IsFunction, Types[DataType].NumParams, Types[DataType].NumDefaultParams, Types[DataType].Param, Types[DataType].ResultType);  
+  CompileFormalParametersAndResult(IsFunction, 
+                                   Types[DataType].NumParams, 
+                                   Types[DataType].NumDefaultParams, 
+                                   Types[DataType].Param, 
+                                   Types[DataType].ResultType, 
+                                   Types[DataType].IsStdCall);  
   end; // CompileProceduralType
   
   
@@ -2958,7 +2981,12 @@ procedure CompileBlock(BlockIdentIndex: Integer);
 
     NextTok;
 
-    CompileFormalParametersAndResult(IsFunction, Ident[NumIdent].NumParams, Ident[NumIdent].NumDefaultParams, Ident[NumIdent].Param, Ident[NumIdent].DataType);
+    CompileFormalParametersAndResult(IsFunction, 
+                                     Ident[NumIdent].NumParams, 
+                                     Ident[NumIdent].NumDefaultParams, 
+                                     Ident[NumIdent].Param, 
+                                     Ident[NumIdent].DataType, 
+                                     Ident[NumIdent].IsStdCall);
     end// if ForwardIdentIndex = 0
   else
     NextTok;
@@ -3201,7 +3229,8 @@ if BlockStack[BlockStackTop] = 1 then          // Main program
   GenerateProgramEpilog;    
   LibProcIdentIndex := GetIdent('EXITPROCESS');  
   PushConst(0);
-  GenerateExternalCall(Ident[LibProcIdentIndex].Value, Ident[LibProcIdentIndex].NumParams);
+  InverseStack(Ident[LibProcIdentIndex].NumParams);
+  GenerateExternalCall(Ident[LibProcIdentIndex].Value);
   end
 else
   begin

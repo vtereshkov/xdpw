@@ -682,6 +682,22 @@ end;
 
 
 
+procedure InverseStack(Depth: Integer);
+var
+  i: Integer;
+begin
+for i := 0 to Depth div 2 - 1 do
+  begin
+  Gen($8B); Gen($84); Gen($24); GenDWord(SizeOf(LongInt) * i);                        // mov eax, [esp + 4 * i]
+  Gen($8B); Gen($9C); Gen($24); GenDWord(SizeOf(LongInt) * (Depth - i - 1));          // mov ebx, [esp + 4 * (Depth - i - 1)]
+  Gen($89); Gen($84); Gen($24); GenDWord(SizeOf(LongInt) * (Depth - i - 1));          // mov [esp + 4 * (Depth - i - 1)], eax
+  Gen($89); Gen($9C); Gen($24); GenDWord(SizeOf(LongInt) * i);                        // mov [esp + 4 * i], ebx  
+  end;
+end;
+
+
+
+
 procedure GenerateCall(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer);
 const
   StaticLinkAddr = 2 * 4;
@@ -724,27 +740,9 @@ end;
 
 
 
-procedure InverseStack(Depth: Integer);
-var
-  i: Integer;
+procedure GenerateExternalCall(EntryPoint: LongInt);
 begin
-for i := 0 to Depth div 2 - 1 do
-  begin
-  Gen($8B); Gen($84); Gen($24); GenDWord(SizeOf(LongInt) * i);                        // mov eax, [esp + 4 * i]
-  Gen($8B); Gen($9C); Gen($24); GenDWord(SizeOf(LongInt) * (Depth - i - 1));          // mov ebx, [esp + 4 * (Depth - i - 1)]
-  Gen($89); Gen($84); Gen($24); GenDWord(SizeOf(LongInt) * (Depth - i - 1));          // mov [esp + 4 * (Depth - i - 1)], eax
-  Gen($89); Gen($9C); Gen($24); GenDWord(SizeOf(LongInt) * i);                        // mov [esp + 4 * i], ebx  
-  end;
-end;
-
-
-
-
-
-procedure GenerateExternalCall(EntryPoint: LongInt; NumParams: Integer);
-begin
-InverseStack(NumParams);
-Gen($FF); Gen($15); GenDWord(EntryPoint);                               // call ds:[EntryPoint]
+Gen($FF); Gen($15); GenDWord(EntryPoint);                                 // call ds:[EntryPoint]
 end;
 
 

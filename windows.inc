@@ -77,14 +77,14 @@ type
   
 
   
-function GetModuleHandleA(lpModuleName: Pointer): LongInt; external 'KERNEL32.DLL' name 'GetModuleHandleA';  
+function GetModuleHandleA(lpModuleName: Pointer): LongInt stdcall; external 'KERNEL32.DLL' name 'GetModuleHandleA';  
 
 function MessageBoxA(hWnd: LongInt; const lpText, lpCaption: string;
-                     uType: LongInt): Integer; external 'USER32.DLL' name 'MessageBoxA';
+                     uType: LongInt): Integer stdcall; external 'USER32.DLL' name 'MessageBoxA';
 
-function LoadCursorA(hInstance: LongInt; lpCursorName: Pointer): LongInt; external 'USER32.DLL' name 'LoadCursorA';
+function LoadCursorA(hInstance: LongInt; lpCursorName: Pointer): LongInt stdcall; external 'USER32.DLL' name 'LoadCursorA';
 
-function RegisterClassA(var lpWndClass: WNDCLASSA): Integer; external 'USER32.DLL' name 'RegisterClassA';
+function RegisterClassA(var lpWndClass: WNDCLASSA): Integer stdcall; external 'USER32.DLL' name 'RegisterClassA';
 
 function CreateWindowExA(dwExStyle: LongInt;
                          const lpClassName: string;
@@ -97,27 +97,27 @@ function CreateWindowExA(dwExStyle: LongInt;
                          hWndParent: LongInt;
                          hMenu: LongInt;
                          hInstance: LongInt;
-                         lpParam: Pointer): LongInt; external 'USER32.DLL' name 'CreateWindowExA';
+                         lpParam: Pointer): LongInt stdcall; external 'USER32.DLL' name 'CreateWindowExA';
                          
-function ShowWindow(hWnd: LongInt; nCmdShow: Integer): Integer; external 'USER32.DLL' name 'ShowWindow';
+function ShowWindow(hWnd: LongInt; nCmdShow: Integer): Integer stdcall; external 'USER32.DLL' name 'ShowWindow';
 
 function GetMessageA(var lpMsg: MSG; hWnd: LongInt; 
-                     wMsgFilterMin, wMsgFilterMax: Integer): Integer; external 'USER32.DLL' name 'GetMessageA'; 
+                     wMsgFilterMin, wMsgFilterMax: Integer): Integer stdcall; external 'USER32.DLL' name 'GetMessageA'; 
 
-function TranslateMessage(var lpMsg: MSG): Integer; external 'USER32.DLL' name 'TranslateMessage';
+function TranslateMessage(var lpMsg: MSG): Integer stdcall; external 'USER32.DLL' name 'TranslateMessage';
 
-function DispatchMessageA(var lpMsg: MSG): Integer; external 'USER32.DLL' name 'DispatchMessageA';
+function DispatchMessageA(var lpMsg: MSG): Integer stdcall; external 'USER32.DLL' name 'DispatchMessageA';
                          
-function DefWindowProcA(hWnd, uMsg, wParam, lParam: LongInt): Integer; external 'USER32.DLL' name 'DefWindowProcA';
+function DefWindowProcA(hWnd, uMsg, wParam, lParam: LongInt): Integer stdcall; external 'USER32.DLL' name 'DefWindowProcA';
 
-function BeginPaint(hWnd: LongInt; var lpPaint: PAINTSTRUCT): LongInt; external 'USER32.DLL' name 'BeginPaint';
+function BeginPaint(hWnd: LongInt; var lpPaint: PAINTSTRUCT): LongInt stdcall; external 'USER32.DLL' name 'BeginPaint';
 
-procedure EndPaint(hWnd: LongInt; var lpPaint: PAINTSTRUCT); external 'USER32.DLL' name 'EndPaint';
+procedure EndPaint(hWnd: LongInt; var lpPaint: PAINTSTRUCT) stdcall; external 'USER32.DLL' name 'EndPaint';
 
-procedure FillRect(hDC: LongInt; var lprc: RECT; hbr: LongInt); external 'USER32.DLL' name 'FillRect';
+procedure FillRect(hDC: LongInt; var lprc: RECT; hbr: LongInt) stdcall; external 'USER32.DLL' name 'FillRect';
 
-procedure InvalidateRect(hWnd: LongInt; lpRect: Pointer; bErase: Integer); external 'USER32.DLL' name 'InvalidateRect';
+procedure InvalidateRect(hWnd: LongInt; lpRect: Pointer; bErase: Integer) stdcall; external 'USER32.DLL' name 'InvalidateRect';
 
-procedure Ellipse(hDC: LongInt; left, top, right, bottom: Integer); external 'GDI32.DLL' name 'Ellipse';
+procedure Ellipse(hDC: LongInt; left, top, right, bottom: Integer) stdcall; external 'GDI32.DLL' name 'Ellipse';
 
-procedure PostQuitMessage(nExitCode: Integer); external 'USER32.DLL' name 'PostQuitMessage';
+procedure PostQuitMessage(nExitCode: Integer) stdcall; external 'USER32.DLL' name 'PostQuitMessage';

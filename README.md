@@ -39,7 +39,6 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Strings are null-terminated arrays of characters (C style), but indexed from 1 for Pascal compatibility
 * The `Text` type is equivalent to `file`. It can be used for both text and untyped files
 * Calls via procedural variables require parentheses even for empty parameter lists
-* The `external` directive implies the `stdcall` calling convention
 
 #### Limitations
 * No object-oriented programming
@@ -80,8 +79,8 @@ TypeDeclarations = "type" Ident "=" Type ";" {Ident "=" Type ";"} .
 
 VarDeclarations = "var" IdentList ":" Type ";" {IdentList ":" Type ";"} .
 
-ProcFuncDeclarations = ("procedure" | "function") Ident [FormalParams] [":" TypeIdent] ";" 
-                       (Directive | Block) .
+ProcFuncDeclarations = ("procedure" | "function") Ident [FormalParams] [":" TypeIdent] 
+                       ["stdcall"] ";" (Directive | Block) .
 
 Directive = ("forward" | ("external" StringLiteral "name" StringLiteral)) ";" .         
 
@@ -101,7 +100,7 @@ Type = "(" Ident {"," Ident} ")" |
        ["packed"] "record" IdentList ":" Type {";" IdentList ":" Type} [";"] "end" |
        ["packed"] "set" "of" Type |
        ConstExpression ".." ConstExpression |
-       ("procedure" | "function") [FormalParams] [":" TypeIdent] |
+       ("procedure" | "function") [FormalParams] [":" TypeIdent] ["stdcall"] |
        Ident .
        
 TypeIdent = "string" | "file" | Ident .       

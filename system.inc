@@ -70,22 +70,22 @@ var
   
 // Windows API functions
 
-function GetCommandLineA: Pointer; external 'KERNEL32.DLL' name 'GetCommandLineA';
+function GetCommandLineA: Pointer stdcall; external 'KERNEL32.DLL' name 'GetCommandLineA';
 
-function GetProcessHeap: LongInt; external 'KERNEL32.DLL' name 'GetProcessHeap';
+function GetProcessHeap: LongInt stdcall; external 'KERNEL32.DLL' name 'GetProcessHeap';
 
 function HeapAlloc(hHeap,
                    dwFlags,
-                   dwBytes: LongInt): Pointer; external 'KERNEL32.DLL' name 'HeapAlloc';
+                   dwBytes: LongInt): Pointer stdcall; external 'KERNEL32.DLL' name 'HeapAlloc';
 
 procedure HeapFree(hHeap,
                    dwFlags: LongInt; 
-                   lpMem: Pointer); external 'KERNEL32.DLL' name 'HeapFree';
+                   lpMem: Pointer) stdcall; external 'KERNEL32.DLL' name 'HeapFree';
 
-function GetStdHandle(nStdHandle: Integer): LongInt; external 'KERNEL32.DLL' name 'GetStdHandle';
+function GetStdHandle(nStdHandle: Integer): LongInt stdcall; external 'KERNEL32.DLL' name 'GetStdHandle';
 
 procedure SetConsoleMode(hConsoleHandle: LongInt; 
-                         dwMode: LongInt); external 'KERNEL32.DLL' name 'SetConsoleMode';
+                         dwMode: LongInt) stdcall; external 'KERNEL32.DLL' name 'SetConsoleMode';
 
 function CreateFileA(const lpFileName: string; 
                      dwDesiredAccess: LongInt;
@@ -93,35 +93,35 @@ function CreateFileA(const lpFileName: string;
                      lpSecurityAttributes: Pointer; 
                      dwCreationDisposition, 
                      dwFlagsAndAttributes, 
-                     hTemplateFile: LongInt): LongInt; external 'KERNEL32.DLL' name 'CreateFileA';
+                     hTemplateFile: LongInt): LongInt stdcall; external 'KERNEL32.DLL' name 'CreateFileA';
                      
 function SetFilePointer(hFile: LongInt; 
                         lDistanceToMove: LongInt; 
                         pDistanceToMoveHigh: Pointer; 
-                        dwMoveMethod: LongInt): LongInt; external 'KERNEL32.DLL' name 'SetFilePointer';
+                        dwMoveMethod: LongInt): LongInt stdcall; external 'KERNEL32.DLL' name 'SetFilePointer';
 
 function GetFileSize(hFile: LongInt; 
-                     lpFileSizeHigh: Pointer): LongInt; external 'KERNEL32.DLL' name 'GetFileSize';        
+                     lpFileSizeHigh: Pointer): LongInt stdcall; external 'KERNEL32.DLL' name 'GetFileSize';        
                      
 procedure WriteFile(hFile: LongInt;
                     lpBuffer: Pointer;
                     nNumberOfBytesToWrite: LongInt;
                     var lpNumberOfBytesWritten: LongInt;
-                    lpOverlapped: LongInt); external 'KERNEL32.DLL' name 'WriteFile';
+                    lpOverlapped: LongInt) stdcall; external 'KERNEL32.DLL' name 'WriteFile';
                     
 procedure ReadFile(hFile: LongInt;
                    lpBuffer: Pointer;
                    nNumberOfBytesToRead: LongInt;
                    var lpNumberOfBytesRead: LongInt;
-                   lpOverlapped: LongInt); external 'KERNEL32.DLL' name 'ReadFile';
+                   lpOverlapped: LongInt) stdcall; external 'KERNEL32.DLL' name 'ReadFile';
 
-procedure CloseHandle(hObject: LongInt); external 'KERNEL32.DLL' name 'CloseHandle';
+procedure CloseHandle(hObject: LongInt) stdcall; external 'KERNEL32.DLL' name 'CloseHandle';
 
-function GetLastError: LongInt; external 'KERNEL32.DLL' name 'GetLastError';
+function GetLastError: LongInt stdcall; external 'KERNEL32.DLL' name 'GetLastError';
 
-function GetTickCount: LongInt; external 'KERNEL32.DLL' name 'GetTickCount';
+function GetTickCount: LongInt stdcall; external 'KERNEL32.DLL' name 'GetTickCount';
 
-procedure ExitProcess(uExitCode: Integer); external 'KERNEL32.DLL' name 'ExitProcess';
+procedure ExitProcess(uExitCode: Integer) stdcall; external 'KERNEL32.DLL' name 'ExitProcess';
 
 
 
