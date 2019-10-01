@@ -107,8 +107,8 @@ Init;
 repeat   
   Redraw;
   Regenerate;
-  Read(ch);
-until ch = ' ';
+  ReadLn(ch);
+until ch = 'q';
 
 end.
 

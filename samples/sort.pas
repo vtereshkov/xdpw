@@ -169,7 +169,7 @@ for i := 1 to DataLength do
 
 WriteLn;
 WriteLn;
-Write('Select order (A - ascending, D - descending): '); Read(Order);
+Write('Select order (A - ascending, D - descending): '); ReadLn(Order);
 WriteLn;
 
 case Order of
@@ -185,12 +185,13 @@ case Order of
     end
 else
   WriteLn('Order is not selected.');
+  Ordered := nil;
   ReadLn;
   Halt;     
 end;
 
 WriteLn;
-Write('Select method (Q - quick, B - bubble, S - selection): '); Read(Method);
+Write('Select method (Q - quick, B - bubble, S - selection): '); ReadLn(Method);
 WriteLn;
 
 case Method of
