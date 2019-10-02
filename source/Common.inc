@@ -206,7 +206,6 @@ type
     ProcAsBlock: Integer;
     PredefProc: TPredefProc;
     IsUnresolvedForward: Boolean;
-    IsExternal: Boolean;
     IsStdCall: Boolean;
     ForLoopNesting: Integer;           // Number of nested FOR loops where the label is defined
   end;
@@ -833,7 +832,6 @@ Ident[NumIdent].NestingLevel := BlockStackTop;
 Ident[NumIdent].NumParams := 0;
 Ident[NumIdent].PassMethod := PassMethod;
 Ident[NumIdent].IsUnresolvedForward := FALSE;
-Ident[NumIdent].IsExternal := FALSE;
 Ident[NumIdent].IsStdCall := FALSE;
 Ident[NumIdent].ForLoopNesting := 0;
 

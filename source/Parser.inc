@@ -609,7 +609,7 @@ case proc of
       
     LibProcIdentIndex := GetIdent('EXITPROCESS');
     InverseStack(Ident[LibProcIdentIndex].NumParams);
-    GenerateExternalCall(Ident[LibProcIdentIndex].Value);
+    GenerateCall(Ident[LibProcIdentIndex].Value, 1, 1);
     end;
 
 end;// case
@@ -1063,10 +1063,7 @@ CompileActualParameters(Ident[IdentIndex].NumParams, Ident[IdentIndex].NumDefaul
 if Ident[IdentIndex].IsStdCall then
   InverseStack(Ident[IdentIndex].NumParams);
   
-if Ident[IdentIndex].IsExternal then
-  GenerateExternalCall(Ident[IdentIndex].Value)
-else 
-  GenerateCall(Ident[IdentIndex].Value, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
+GenerateCall(Ident[IdentIndex].Value, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
 end; // CompileCall
 
 
@@ -1394,7 +1391,7 @@ case Tok.Kind of
         if (Ident[IdentIndex].PredefProc <> EMPTYPROC) or (Ident[IdentIndex].Block <> 1) then
           Error('Procedure or function cannot be predefined or nested');
           
-        PushRelocConst(Ident[IdentIndex].Value, CODERELOC); // To be resolved later when code section origin is known
+        PushRelocConst(Ident[IdentIndex].Value, CODERELOC); // To be resolved later when code section origin is known        
         NextTok;
         end
       else  
@@ -2938,8 +2935,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       EatTok(STRINGLITERALTOK);
 
       // Register import function
-      Ident[NumIdent].IsExternal := TRUE;
-      Ident[NumIdent].Value := AddImportFunc(ImportLibName, ImportFuncName);
+      GenerateImportFuncStub(AddImportFunc(ImportLibName, ImportFuncName));
       end
     else if Tok.Name = 'FORWARD' then  // Forward declaration
       begin
@@ -3241,7 +3237,7 @@ if BlockStack[BlockStackTop] = 1 then          // Main program
   LibProcIdentIndex := GetIdent('EXITPROCESS');  
   PushConst(0);
   InverseStack(Ident[LibProcIdentIndex].NumParams);
-  GenerateExternalCall(Ident[LibProcIdentIndex].Value);
+  GenerateCall(Ident[LibProcIdentIndex].Value, 1, 1);
   end
 else
   begin

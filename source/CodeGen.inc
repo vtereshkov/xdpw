@@ -698,6 +698,14 @@ end;
 
 
 
+procedure GenerateImportFuncStub(EntryPoint: LongInt);
+begin
+Gen($FF); Gen($25); GenDWord(EntryPoint);        // jmp ds:EntryPoint             
+end;
+
+
+
+
 procedure GenerateCall(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer);
 const
   StaticLinkAddr = 2 * 4;
@@ -735,14 +743,6 @@ procedure GenerateIndirectCall(NumParam: Integer);
 begin
 Gen($FF); Gen($94); Gen($24); GenDWord(SizeOf(LongInt) * NumParam);       // call dword ptr [esp + 4 * NumParam]
 Gen($59);                                                                 // pop ecx  ; pop and discard call address
-end;
-
-
-
-
-procedure GenerateExternalCall(EntryPoint: LongInt);
-begin
-Gen($FF); Gen($15); GenDWord(EntryPoint);                                 // call ds:[EntryPoint]
 end;
 
 
