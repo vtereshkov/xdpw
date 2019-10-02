@@ -36,8 +36,8 @@ type
     hIcon: LongInt;
     hCursor: LongInt;
     hbrBackground: LongInt;
-    lpszMenuName: ^string;
-    lpszClassName: ^string;
+    lpszMenuName: PChar;
+    lpszClassName: PChar;
   end;   
   
   
@@ -79,7 +79,7 @@ type
   
 function GetModuleHandleA(lpModuleName: Pointer): LongInt stdcall; external 'KERNEL32.DLL' name 'GetModuleHandleA';  
 
-function MessageBoxA(hWnd: LongInt; const lpText, lpCaption: string;
+function MessageBoxA(hWnd: LongInt; lpText, lpCaption: PChar;
                      uType: LongInt): Integer stdcall; external 'USER32.DLL' name 'MessageBoxA';
 
 function LoadCursorA(hInstance: LongInt; lpCursorName: Pointer): LongInt stdcall; external 'USER32.DLL' name 'LoadCursorA';
@@ -87,8 +87,8 @@ function LoadCursorA(hInstance: LongInt; lpCursorName: Pointer): LongInt stdcall
 function RegisterClassA(var lpWndClass: WNDCLASSA): Integer stdcall; external 'USER32.DLL' name 'RegisterClassA';
 
 function CreateWindowExA(dwExStyle: LongInt;
-                         const lpClassName: string;
-                         const lpWindowName: string;
+                         lpClassName: PChar;
+                         lpWindowName: PChar;
                          dwStyle: LongInt;
                          X: Integer;
                          Y: Integer;
@@ -121,3 +121,19 @@ procedure InvalidateRect(hWnd: LongInt; lpRect: Pointer; bErase: Integer) stdcal
 procedure Ellipse(hDC: LongInt; left, top, right, bottom: Integer) stdcall; external 'GDI32.DLL' name 'Ellipse';
 
 procedure PostQuitMessage(nExitCode: Integer) stdcall; external 'USER32.DLL' name 'PostQuitMessage';
+
+
+
+
+// Auxiliary routines
+
+
+procedure StrToChars(const S: string; var Chars: array of Char);
+var
+  Len: Integer;
+begin
+Len := Length(S);
+Move(S[1], Chars, Len);
+Chars[Len] := #0;
+end;
+
