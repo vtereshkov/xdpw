@@ -1,12 +1,11 @@
 // Linear equations solver
 
+{$APPTYPE CONSOLE}
 
 program LinEq;
 
 
-
 {$I samples\gauss.inc}
-
 
 
 procedure Error;

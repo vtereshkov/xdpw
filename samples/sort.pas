@@ -1,5 +1,6 @@
 // Sorting demo
 
+{$APPTYPE CONSOLE}
 
 program Sort;
 

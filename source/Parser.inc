@@ -945,6 +945,10 @@ if IsFunction then
 // Call modifier
 if (Tok.Kind = IDENTTOK) and (Tok.Name = 'STDCALL') then
   begin
+  if IsFunction then
+    if Types[ResultType].Kind in StructuredTypes then
+      Error('STDCALL function cannot return structured result');
+      
   IsStdCall := TRUE;
   NextTok;
   end
@@ -3023,7 +3027,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   procedure CompileDeclarations;
   var
     DeclTok: TToken;
-    ParamIndex: Integer;
+    ParamIndex, StackParamIndex: Integer;
     TotalNumParams: Integer;
     NestedProcsFound: Boolean;
    
@@ -3046,14 +3050,21 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       Inc(TotalNumParams);                          // Allocate space for structured Result as a hidden VAR parameter
     
     for ParamIndex := 1 to Ident[BlockIdentIndex].NumParams do
-      DeclareIdent(Ident[BlockIdentIndex].Param[ParamIndex]^.Name,
+      begin
+      if Ident[BlockIdentIndex].IsStdCall then
+        StackParamIndex := Ident[BlockIdentIndex].NumParams - ParamIndex + 1    // Inverse parameter stack for STDCALL procedures (structured Result is not allowed anyway)
+      else
+        StackParamIndex := ParamIndex;
+  
+      DeclareIdent(Ident[BlockIdentIndex].Param[StackParamIndex]^.Name,
                    VARIABLE,
                    TotalNumParams,
-                   Ident[BlockIdentIndex].Param[ParamIndex]^.DataType,
-                   Ident[BlockIdentIndex].Param[ParamIndex]^.PassMethod,
+                   Ident[BlockIdentIndex].Param[StackParamIndex]^.DataType,
+                   Ident[BlockIdentIndex].Param[StackParamIndex]^.PassMethod,
                    0,
                    0.0,
                    EMPTYPROC);
+      end;             
 
     // Allocate Result variable if the current block is a function
     if Ident[BlockIdentIndex].Kind = FUNC then

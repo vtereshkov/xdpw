@@ -1,5 +1,6 @@
 // Fast Fourier Transform demo program
 
+{$APPTYPE CONSOLE}
 
 program FFT;
 

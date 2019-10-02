@@ -6,9 +6,7 @@
 program GUI;
 
 
-
 {$I windows.inc}
-
 
 
 const
@@ -43,9 +41,7 @@ end;
 
  
 
-// Callback function: parameters reversed for compatibiity with 'stdcall'
-function WindowProc(lParam, wParam, uMsg, hWnd: LongInt): Integer;
-//function WindowProc(hWnd, uMsg, wParam, lParam: LongInt): Integer stdcall; 
+function WindowProc(hWnd, uMsg, wParam, lParam: LongInt): Integer stdcall; 
 begin
 case uMsg of
   WM_PAINT:

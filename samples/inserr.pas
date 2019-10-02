@@ -1,5 +1,6 @@
 // Inertial navigation system error estimator demo
 
+{$APPTYPE CONSOLE}
 
 program INSErr;
 

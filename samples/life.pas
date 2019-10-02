@@ -1,5 +1,6 @@
 // The Game of Life
 
+{$APPTYPE CONSOLE}
 
 program Life;
 
