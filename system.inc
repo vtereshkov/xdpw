@@ -119,6 +119,11 @@ procedure CloseHandle(hObject: LongInt) stdcall; external 'KERNEL32.DLL' name 'C
 
 function GetLastError: LongInt stdcall; external 'KERNEL32.DLL' name 'GetLastError';
 
+function LoadLibraryA(const lpLibFileName: string): LongInt stdcall; external 'KERNEL32.DLL' name 'LoadLibraryA';
+
+function GetProcAddress(hModule: LongInt; 
+                        const lpProcName: string): Pointer stdcall; external 'KERNEL32.DLL' name 'GetProcAddress';
+
 function GetTickCount: LongInt stdcall; external 'KERNEL32.DLL' name 'GetTickCount';
 
 procedure ExitProcess(uExitCode: Integer) stdcall; external 'KERNEL32.DLL' name 'ExitProcess';
