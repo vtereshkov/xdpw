@@ -43,7 +43,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 #### Limitations
 * No object-oriented programming
 * No `uses` clause. The `$I` directive should be used instead (Turbo Pascal 3 style)
-* No double-precision floating-point numbers, variant records, typed files 
+* No double-precision floating-point numbers, variant records 
 * Arrays, records and sets cannot be passed to subroutines without `const` or `var`
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical
@@ -99,6 +99,7 @@ Type = "(" Ident {"," Ident} ")" |
        ["packed"] "array" "[" Type {"," Type} "]" "of" Type |
        ["packed"] "record" IdentList ":" Type {";" IdentList ":" Type} [";"] "end" |
        ["packed"] "set" "of" Type |
+       ["packed"] "file" ["of" Type] |
        ConstExpression ".." ConstExpression |
        ("procedure" | "function") [FormalParams] [":" TypeIdent] ["stdcall"] |
        Ident .

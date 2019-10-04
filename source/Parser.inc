@@ -362,9 +362,9 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
 
 var
   Formatter: TConst;
-  DesignatorType, ExpressionType, FormatterType: Integer;
+  DesignatorType, FileVarType, ExpressionType, FormatterType: Integer;
   LibProcIdentIndex, ConsoleIndex: Integer;
-  IsFirstParam, FileSpecified: Boolean;
+  IsFirstParam: Boolean;
   
   
 begin // CompilePredefinedProc
@@ -381,10 +381,11 @@ case proc of
     EatTok(CPARTOK);
     end;
 
+
   READPROC, READLNPROC:
     begin
     ConsoleIndex := GetIdent('STDINPUTFILE');
-    FileSpecified := FALSE;                       // By default, use standard input device, i.e. console
+    FileVarType := ANYTYPEINDEX;
     IsFirstParam := TRUE;
 
     if Tok.Kind = OPARTOK then
@@ -392,7 +393,7 @@ case proc of
       NextTok;
       repeat
         // 1st argument - file handle
-        if FileSpecified then
+        if FileVarType <> ANYTYPEINDEX then
           DuplicateStackTop
         else
           PushVarPtr(Ident[ConsoleIndex].Value, 
@@ -406,16 +407,28 @@ case proc of
         // 3rd argument - designator
         CompileDesignator(DesignatorType, FALSE);
 
-        if Types[DesignatorType].Kind = FILETYPE then           // Text file handle
+        if Types[DesignatorType].Kind = FILETYPE then               // File handle
           begin
-          if not IsFirstParam then
-            Error('Incompatible types');
-          FileSpecified := TRUE;
+          if not IsFirstParam or ((proc = READLNPROC) and (Types[DesignatorType].BaseType <> ANYTYPEINDEX)) then
+            Error('Incompatible types');            
+          FileVarType := DesignatorType;          
           end
-        else                                                        // Any output expression
+        else                                                        // Any input variable
           begin
-          // Call the specific output subroutine. Interface: FileHandle; StreamHandle; var Designator
-          LibProcIdentIndex := GetReadProcIdent(DesignatorType);          
+          // Select input subroutine
+          if (Types[FileVarType].Kind = FILETYPE) and (Types[FileVarType].BaseType <> ANYTYPEINDEX) then      // Read from typed file
+            begin            
+            GetCompatibleRefType(Types[FileVarType].BaseType, DesignatorType);
+            
+            // 4th argument - record length 
+            PushConst(TypeSize(Types[FileVarType].BaseType));
+ 
+            LibProcIdentIndex := GetIdent('READREC');
+            end
+          else                                                                                                // Read from text file 
+            LibProcIdentIndex := GetReadProcIdent(DesignatorType);  
+            
+          // Call selected input subroutine. Interface: FileHandle; StreamHandle; var Designator [; Length]  
           GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
           end; // else
 
@@ -424,16 +437,16 @@ case proc of
         if Tok.Kind <> COMMATOK then Break;
         NextTok;
       until FALSE;
+      
       EatTok(CPARTOK);
       end; // if OPARTOR
+      
       
     // Add CR+LF, if necessary
     if proc = READLNPROC then
       begin
-      LibProcIdentIndex := GetIdent('READNEWLINE');
-      
       // 1st argument - file handle
-      if FileSpecified then
+      if FileVarType <> ANYTYPEINDEX then
         DuplicateStackTop
       else
         PushVarPtr(Ident[ConsoleIndex].Value, 
@@ -442,13 +455,14 @@ case proc of
                    Ident[ConsoleIndex].RelocType);
         
       // 2nd argument - stream handle
-      PushConst(0);        
-
+      PushConst(0);  
+      
+      LibProcIdentIndex := GetIdent('READNEWLINE');      
       GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
       end;
       
     // Remove first 3 arguments if they correspond to a file variable 
-    if FileSpecified then
+    if FileVarType <> ANYTYPEINDEX then
       DiscardStackTop(3);
 
     end;// READPROC, READLNPROC
@@ -457,7 +471,7 @@ case proc of
   WRITEPROC, WRITELNPROC:
     begin
     ConsoleIndex := GetIdent('STDOUTPUTFILE');
-    FileSpecified := FALSE;                       // By default, use standard output device, i.e. console
+    FileVarType := ANYTYPEINDEX;
     IsFirstParam := TRUE;
 
     if Tok.Kind = OPARTOK then
@@ -465,7 +479,7 @@ case proc of
       NextTok;
       repeat
         // 1st argument - file handle
-        if FileSpecified then
+        if FileVarType <> ANYTYPEINDEX then
           DuplicateStackTop
         else
           PushVarPtr(Ident[ConsoleIndex].Value, 
@@ -476,20 +490,26 @@ case proc of
         // 2nd argument - stream handle
         PushConst(0);
         
-        // 3rd argument - expression
-        CompileExpression(ExpressionType, TRUE);
+        // 3rd argument - expression (for untyped/text files) or designator (for typed files)
+        if (Types[FileVarType].Kind = FILETYPE) and (Types[FileVarType].BaseType <> ANYTYPEINDEX) then
+          CompileDesignator(ExpressionType, FALSE)
+        else
+          CompileExpression(ExpressionType, TRUE);
         
-        if Types[ExpressionType].Kind = FILETYPE then           // Text file handle
+        if Types[ExpressionType].Kind = FILETYPE then           // File handle
           begin
-          if not IsFirstParam then
+          if not IsFirstParam or ((proc = WRITELNPROC) and (Types[ExpressionType].BaseType <> ANYTYPEINDEX)) then
             Error('Incompatible types');
-          FileSpecified := TRUE;
+          FileVarType := ExpressionType;
           end
         else                                                    // Any output expression
           begin
           // 4th argument - minimum width
           if Tok.Kind = COLONTOK then
             begin
+            if (Types[FileVarType].Kind = FILETYPE) and (Types[FileVarType].BaseType <> ANYTYPEINDEX) then
+              Error('Format specifiers are not allowed for typed files');
+              
             NextTok;
             CompileConstExpression(Formatter, FormatterType);
             GetCompatibleType(FormatterType, INTEGERTYPEINDEX);
@@ -513,10 +533,25 @@ case proc of
             begin
             PushConst(0);
             PushConst(0);
-            end;
+            end;            
           
-          // Call the specific output subroutine. Interface: FileHandle; StreamHandle; Expression; MinWidth; DecPlaces
-          LibProcIdentIndex := GetWriteProcIdent(ExpressionType);
+          // Select output subroutine
+          if (Types[FileVarType].Kind = FILETYPE) and (Types[FileVarType].BaseType <> ANYTYPEINDEX) then      // Write to typed file                                                     
+            begin           
+            GetCompatibleRefType(Types[FileVarType].BaseType, ExpressionType);
+            
+            // Discard 4th and 5th arguments - format specifiers
+            DiscardStackTop(2); 
+  
+            // 4th argument - record length 
+            PushConst(TypeSize(Types[FileVarType].BaseType));
+            
+            LibProcIdentIndex := GetIdent('WRITEREC');
+            end 
+          else                                                                                                // Write to text file
+            LibProcIdentIndex := GetWriteProcIdent(ExpressionType);
+            
+          // Call selected output subroutine. Interface: FileHandle; StreamHandle; (Designator | Expression); (Length; | MinWidth; DecPlaces)
           GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
           end; // else
 
@@ -525,8 +560,10 @@ case proc of
         if Tok.Kind <> COMMATOK then Break;
         NextTok;
       until FALSE;
+      
       EatTok(CPARTOK);
       end; // if OPARTOR
+      
       
     // Add CR+LF, if necessary
     if proc = WRITELNPROC then
@@ -534,7 +571,7 @@ case proc of
       LibProcIdentIndex := GetIdent('WRITENEWLINE');
       
       // 1st argument - file handle
-      if FileSpecified then
+      if FileVarType <> ANYTYPEINDEX then
         DuplicateStackTop
       else
         PushVarPtr(Ident[ConsoleIndex].Value, 
@@ -549,7 +586,7 @@ case proc of
       end;
 
     // Remove first 3 arguments if they correspond to a file variable 
-    if FileSpecified then
+    if FileVarType <> ANYTYPEINDEX then
       DiscardStackTop(3);
     
     end;// WRITEPROC, WRITELNPROC
@@ -2404,7 +2441,40 @@ procedure CompileType{(var DataType: Integer)};
   
   Types[DataType].BaseType := NestedDataType; 
   end; // CompileSetType
-
+  
+  
+  
+  
+  procedure CompileFileType(var DataType: Integer);
+  var
+    NestedDataType: Integer;
+  begin
+  NextTok;
+  
+  if Tok.Kind = OFTOK then          // Typed file
+    begin
+    NextTok;
+    CompileType(NestedDataType);
+    
+    if Types[NestedDataType].Kind = FILETYPE then
+      Error('Incompatible types'); 
+   
+    // Add new anonymous type
+    Inc(NumTypes);
+    if NumTypes > MAXTYPES then
+      Error('Maximum number of types exceeded');
+  
+    Types[NumTypes].Kind := FILETYPE;
+    Types[NumTypes].Block := BlockStack[BlockStackTop];    
+    Types[NumTypes].BaseType := NestedDataType;
+    
+    DataType := NumTypes;
+    end
+  else                              // Untyped/text file
+    DataType := FILETYPEINDEX; 
+ 
+  end; // CompileFileType
+  
 
 
 
@@ -2505,10 +2575,7 @@ case Tok.Kind of
     end;
     
   FILETOK:
-    begin 
-    DataType := FILETYPEINDEX;
-    NextTok;
-    end;
+    CompileFileType(DataType);
     
   PROCEDURETOK, FUNCTIONTOK:
     CompileProceduralType(DataType, Tok.Kind = FUNCTIONTOK)
@@ -2610,7 +2677,8 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   Types[FILETYPEINDEX].Kind     := FILETYPE;
   Types[STRINGTYPEINDEX].Kind   := ARRAYTYPE;
 
-  Types[POINTERTYPEINDEX].BaseType  := ANYTYPEINDEX;
+  Types[POINTERTYPEINDEX].BaseType := ANYTYPEINDEX;
+  Types[FILETYPEINDEX].BaseType    := ANYTYPEINDEX;
   
   // Add new anonymous type: 1 .. MAXSTRLENGTH + 1
   Inc(NumTypes);

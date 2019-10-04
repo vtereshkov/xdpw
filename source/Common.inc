@@ -227,7 +227,7 @@ type
     HostType: Integer;
     Low, High: Integer;    
     
-    // For pointers, arrays and sets 
+    // For pointers, arrays, sets and typed files 
     BaseType, IndexType: Integer;
     IsOpenArray: Boolean;
       
@@ -279,7 +279,7 @@ type
   
 const    
   // Predefined type indices
-  ANYTYPEINDEX          = 1;      // Untyped parameter, or base type for untyped pointers
+  ANYTYPEINDEX          = 1;      // Untyped parameter, or base type for untyped pointers and files
   INTEGERTYPEINDEX      = 2;
   SMALLINTTYPEINDEX     = 3;
   SHORTINTTYPEINDEX     = 4;
@@ -289,7 +289,7 @@ const
   BOOLEANTYPEINDEX      = 8;
   REALTYPEINDEX         = 9;
   POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other
-  FILETYPEINDEX         = 11;     // Universal file type
+  FILETYPEINDEX         = 11;     // Untyped file, compatible with text files
   STRINGTYPEINDEX       = 12;
 
   // Keywords
@@ -699,6 +699,12 @@ else                                         // Special cases
      (Types[LeftType].BaseType = ANYTYPEINDEX) 
   then  
     Result := RightType;
+    
+  // Untyped files are compatible with any other files 
+  if (Types[LeftType].Kind = FILETYPE) and (Types[RightType].Kind = FILETYPE) and
+     (Types[LeftType].BaseType = ANYTYPEINDEX) 
+  then  
+    Result := RightType;    
     
   // Untyped parameters are compatible with any type
   if Types[LeftType].Kind = ANYTYPE then

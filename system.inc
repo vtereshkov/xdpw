@@ -508,6 +508,14 @@ end;
 
 
 
+procedure WriteRec(var F: file; P: PStream; var Buf; Len: Integer);
+begin
+BlockWrite(F, Buf, Len);
+end;
+
+
+
+
 procedure WriteCh(var F: file; P: PStream; ch: Char);
 var
   Dest: PChar;
@@ -731,6 +739,16 @@ end;
 procedure WriteNewLine(var F: file; P: PStream);
 begin
 WriteCh(F, P, #13);  WriteCh(F, P, #10);
+end;
+
+
+
+
+procedure ReadRec(var F: file; P: PStream; var Buf; Len: Integer);
+var
+  LenRead: Integer;
+begin
+BlockRead(F, Buf, Len, LenRead);
 end;
 
 
