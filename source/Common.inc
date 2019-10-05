@@ -120,17 +120,42 @@ type
     );
     
   TToken = record
-    Kind: TTokenKind;
     Name: TString;
-    Value: LongInt;
-    FracValue: Single;
-    StrAddress: Integer;
-    StrLength: Integer;
+  case Kind: TTokenKind of  
+    INTNUMBERTOK:     (Value: LongInt);       // For all ordinal types
+    FRACNUMBERTOK:    (FracValue: Single);
+    STRINGLITERALTOK: (StrAddress: Integer;
+                       StrLength: Integer);
   end;
+  
+  TTypeKind = (EMPTYTYPE, ANYTYPE, INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE, CHARTYPE, BOOLEANTYPE, REALTYPE,
+               POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, PROCEDURALTYPE, FORWARDTYPE);  
 
+
+
+
+const
+  // Predefined type indices
+  ANYTYPEINDEX          = 1;      // Untyped parameter, or base type for untyped pointers and files
+  INTEGERTYPEINDEX      = 2;
+  SMALLINTTYPEINDEX     = 3;
+  SHORTINTTYPEINDEX     = 4;
+  WORDTYPEINDEX         = 5;
+  BYTETYPEINDEX         = 6;  
+  CHARTYPEINDEX         = 7;
+  BOOLEANTYPEINDEX      = 8;
+  REALTYPEINDEX         = 9;
+  POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other
+  FILETYPEINDEX         = 11;     // Untyped file, compatible with text files
+  STRINGTYPEINDEX       = 12;
+
+
+
+type
   TConst = record
-    Value: LongInt;       // For ordinal types 
-    FracValue: Single;    // For real type
+  case Kind: TTypeKind of
+    INTEGERTYPE: (Value: LongInt);            // For all ordinal types 
+    REALTYPE:    (FracValue: Single);    
   end;   
   
   TPassMethod = (EMPTYPASSING, VALPASSING, CONSTPASSING, VARPASSING); 
@@ -191,15 +216,12 @@ type
   TIdentifier = record
     Kind: TIdentKind;
     Name: TString;
-    Value: LongInt;                    // Value for a constant, address for a label, variable, procedure or function
-    FracValue: Single;
-    Block: Integer;                    // Index of a block in which the identifier is defined
-    NestingLevel: Byte;
-    DataType: Integer;
-    RecType: Integer;                  // Parent record type code for a field
+    Block: Integer;                       // Index of a block in which the identifier is defined
+    NestingLevel: Byte;    
+    RecType: Integer;                     // Parent record type code for a field
     Scope: TScope;
     RelocType: TRelocType;
-    PassMethod: TPassMethod;           // Value, CONST or VAR parameter status
+    PassMethod: TPassMethod;              // Value, CONST or VAR parameter status
     NumParams: Integer;
     NumDefaultParams: Integer;
     Param: PParams;
@@ -207,7 +229,10 @@ type
     PredefProc: TPredefProc;
     IsUnresolvedForward: Boolean;
     IsStdCall: Boolean;
-    ForLoopNesting: Integer;           // Number of nested FOR loops where the label is defined
+    ForLoopNesting: Integer;              // Number of nested FOR loops where the label is defined
+  case DataType: Integer of
+    INTEGERTYPEINDEX: (Value: LongInt);   // Value for an ordinal constant, address for a label, variable, procedure or function
+    REALTYPEINDEX:    (FracValue: Single);// Value for a real constant
   end;
 
   TField = record
@@ -215,9 +240,6 @@ type
     DataType: Integer;
     Offset: Integer;
   end;    
-
-  TTypeKind = (EMPTYTYPE, ANYTYPE, INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE, CHARTYPE, BOOLEANTYPE, REALTYPE,
-               POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, PROCEDURALTYPE, FORWARDTYPE);
 
   TType = record    
     Block: Integer;
@@ -271,23 +293,7 @@ type
   
   
 
-  
-const    
-  // Predefined type indices
-  ANYTYPEINDEX          = 1;      // Untyped parameter, or base type for untyped pointers and files
-  INTEGERTYPEINDEX      = 2;
-  SMALLINTTYPEINDEX     = 3;
-  SHORTINTTYPEINDEX     = 4;
-  WORDTYPEINDEX         = 5;
-  BYTETYPEINDEX         = 6;  
-  CHARTYPEINDEX         = 7;
-  BOOLEANTYPEINDEX      = 8;
-  REALTYPEINDEX         = 9;
-  POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other
-  FILETYPEINDEX         = 11;     // Untyped file, compatible with text files
-  STRINGTYPEINDEX       = 12;
-
-  // Keywords
+const
   Keyword: array [1..NUMKEYWORDS] of TKeyName = 
     (
     'AND',

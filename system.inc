@@ -683,8 +683,9 @@ Frac  := Round((Number - Integ) * (1 shl FracBits));
 WriteInt(F, P, Integ);  WriteCh(F, P, '.');
 
 // Write fractional part
-InvWeight := 10;
+if DecPlaces <= 0 then DecPlaces := 4;
 
+InvWeight := 10;
 FinalInvWeight := 1;
 for i := 1 to DecPlaces do
   FinalInvWeight := FinalInvWeight * 10;

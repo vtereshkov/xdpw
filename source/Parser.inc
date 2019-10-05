@@ -1005,7 +1005,6 @@ var
   TempStorageAddr: Integer;
   IsRefParam: Boolean;
   CurParam: PParam;
-  FictitiousIntegerPtr: ^Integer;
   
 begin
 NumActualParams := 0;
@@ -1064,13 +1063,7 @@ if NumActualParams < NumFormalParams - NumDefaultFormalParams then
 for DefaultParamIndex := NumActualParams + 1 to NumFormalParams do
   begin
   CurParam := FormalParam[DefaultParamIndex];
-  if Types[CurParam^.DataType].Kind = REALTYPE then
-    begin
-    FictitiousIntegerPtr := Pointer(@CurParam^.Default.FracValue);
-    PushConst(Integer(FictitiousIntegerPtr^));
-    end
-  else
-    PushConst(CurParam^.Default.Value);
+  PushConst(CurParam^.Default.Value);
   end; // for  
 
   
@@ -1337,7 +1330,6 @@ procedure CompileFactor(var ValType: Integer; ForceCharToString: Boolean);
   
 var
   IdentIndex: Integer;
-  FictitiousIntegerPtr: ^Integer;
   TempStorageAddr: LongInt;
   NotOpTok: TToken;
 
@@ -1383,13 +1375,7 @@ case Tok.Kind of
         CONSTANT:                                                                       // Constant
           begin
           ValType := Ident[IdentIndex].DataType;
-          if Types[ValType].Kind = REALTYPE then
-            begin
-            FictitiousIntegerPtr := Pointer(@Ident[IdentIndex].FracValue);
-            PushConst(Integer(FictitiousIntegerPtr^));
-            end
-          else
-            PushConst(Ident[IdentIndex].Value);
+          PushConst(Ident[IdentIndex].Value);
           NextTok;
           end;
           
@@ -1449,8 +1435,7 @@ case Tok.Kind of
 
   FRACNUMBERTOK:
     begin
-    FictitiousIntegerPtr := Pointer(@Tok.FracValue);
-    PushConst(Integer(FictitiousIntegerPtr^));
+    PushConst(Tok.Value);
     ValType := REALTYPEINDEX;
     NextTok;
     end;
