@@ -219,31 +219,26 @@ type
   TTypeKind = (EMPTYTYPE, ANYTYPE, INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE, CHARTYPE, BOOLEANTYPE, REALTYPE,
                POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, PROCEDURALTYPE, FORWARDTYPE);
 
-  TType = record
-    Kind: TTypeKind;
+  TType = record    
     Block: Integer;
+    BaseType: Integer;
     
-    // For subranges
-    HostType: Integer;
-    Low, High: Integer;    
-    
-    // For pointers, arrays, sets and typed files 
-    BaseType, IndexType: Integer;
-    IsOpenArray: Boolean;
-      
-    // For records  
-    NumFields: Integer;
-    Field: array [1..MAXFIELDS] of ^TField;
-    
-    // For procedural types
-    NumParams: Integer;
-    NumDefaultParams: Integer;
-    Param: PParams;
-    ResultType: Integer;
-    IsStdCall: Boolean;
-    
-    // For forward types
-    TypeIdentName: TString;   
+  case Kind: TTypeKind of     
+    SUBRANGETYPE:    (Low, High: Integer);
+  
+    ARRAYTYPE:       (IndexType: Integer;
+                      IsOpenArray: Boolean);
+                      
+    RECORDTYPE:      (NumFields: Integer;
+                      Field: array [1..MAXFIELDS] of ^TField);
+                      
+    PROCEDURALTYPE:  (NumParams: Integer;
+                      NumDefaultParams: Integer;
+                      Param: PParams;
+                      ResultType: Integer;
+                      IsStdCall: Boolean);
+  
+    FORWARDTYPE:     (TypeIdentName: TString);   
   end;
   
   TRelocatable = record
@@ -584,6 +579,7 @@ end;
 
 function TypeSize(DataType: Integer): Integer;
 var
+  CurSize: Integer;
   i: Integer;
 begin
 Result := 0;
@@ -603,11 +599,11 @@ case Types[DataType].Kind of
                     Error('Illegal type')
                   else  
                     Result := (HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1) * TypeSize(Types[DataType].BaseType);
-  RECORDTYPE:     begin
-                  Result := 0;
-                  for i := 1 to Types[DataType].NumFields do
-                    Result := Result + TypeSize(Types[DataType].Field[i]^.DataType);
-                  end;
+  RECORDTYPE:     for i := 1 to Types[DataType].NumFields do
+                    begin
+                    CurSize := Types[DataType].Field[i]^.Offset + TypeSize(Types[DataType].Field[i]^.DataType);
+                    if CurSize > Result then Result := CurSize;
+                    end;  
   SETTYPE:        Result := MAXSETELEMENTS;
   ENUMERATEDTYPE: Result := SizeOf(Byte);                
   PROCEDURALTYPE: Result := SizeOf(Pointer)               
@@ -653,9 +649,9 @@ else                                         // Special cases
 
   // Subranges are compatible with their host types
   if Types[LeftType].Kind = SUBRANGETYPE then
-    Result := GetCompatibleType(Types[LeftType].HostType, RightType);
+    Result := GetCompatibleType(Types[LeftType].BaseType, RightType);
   if Types[RightType].Kind = SUBRANGETYPE then
-    Result := GetCompatibleType(LeftType, Types[RightType].HostType);
+    Result := GetCompatibleType(LeftType, Types[RightType].BaseType);
 
   // Integers
   if (Types[LeftType].Kind in IntegerTypes) and (Types[RightType].Kind in IntegerTypes) then
@@ -723,7 +719,7 @@ begin
 // Implicit type conversion is possible if DestType is real and SrcType is integer or a subrange of integer
 Result := (Types[DestType].Kind = REALTYPE) and
           ((Types[SrcType].Kind in IntegerTypes) or
-           ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].HostType].Kind in IntegerTypes)));
+           ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind in IntegerTypes)));
 end;
 
 
@@ -732,7 +728,7 @@ end;
 procedure CheckOperator(const Tok: TToken; DataType: Integer); 
 begin
 if Types[DataType].Kind = SUBRANGETYPE then
-  CheckOperator(Tok, Types[DataType].HostType)
+  CheckOperator(Tok, Types[DataType].BaseType)
 else 
   begin
   if not (Types[DataType].Kind in OrdinalTypes) and 

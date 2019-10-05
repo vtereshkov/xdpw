@@ -292,31 +292,31 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
   Result := 0;
 
   if (Types[DataType].Kind = INTEGERTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].HostType].Kind = INTEGERTYPE)) then
+    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = INTEGERTYPE)) then
         Result := GetIdent('READINT')                 // Integer argument
         
   else if (Types[DataType].Kind = SMALLINTTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].HostType].Kind = SMALLINTTYPE)) then
+    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = SMALLINTTYPE)) then
         Result := GetIdent('READSMALLINT')            // Small integer argument
         
   else if (Types[DataType].Kind = SHORTINTTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].HostType].Kind = SHORTINTTYPE)) then
+    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = SHORTINTTYPE)) then
         Result := GetIdent('READSHORTINT')            // Short integer argument
         
   else if (Types[DataType].Kind = WORDTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].HostType].Kind = WORDTYPE)) then
+    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = WORDTYPE)) then
         Result := GetIdent('READWORD')                // Word argument
 
   else if (Types[DataType].Kind = BYTETYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].HostType].Kind = BYTETYPE)) then
+    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = BYTETYPE)) then
         Result := GetIdent('READBYTE')                // Byte argument
        
   else if (Types[DataType].Kind = BOOLEANTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].HostType].Kind = BOOLEANTYPE)) then
+    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = BOOLEANTYPE)) then
         Result := GetIdent('READBOOLEAN')             // Boolean argument
   
   else if (Types[DataType].Kind = CHARTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].HostType].Kind = CHARTYPE)) then
+    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = CHARTYPE)) then
         Result := GetIdent('READCH')                  // Character argument
         
   else if Types[DataType].Kind = REALTYPE then
@@ -337,11 +337,11 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
   Result := 0;
   
   if (Types[DataType].Kind in IntegerTypes) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].HostType].Kind in IntegerTypes)) then
+    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind in IntegerTypes)) then
         Result := GetIdent('WRITEINTF')                 // Integer argument
         
   else if (Types[DataType].Kind = BOOLEANTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].HostType].Kind = BOOLEANTYPE)) then
+    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = BOOLEANTYPE)) then
         Result := GetIdent('WRITEBOOLEANF')             // Boolean argument
         
   else if Types[DataType].Kind = REALTYPE then
@@ -747,7 +747,7 @@ case func of
     if (func = ABSFUNC) or (func = SQRFUNC) then                          // Abs and Sqr accept real or integer parameters
       begin
       if not ((Types[ValType].Kind in NumericTypes) or
-             ((Types[ValType].Kind = SUBRANGETYPE) and (Types[Types[ValType].HostType].Kind in NumericTypes))) then
+             ((Types[ValType].Kind = SUBRANGETYPE) and (Types[Types[ValType].BaseType].Kind in NumericTypes))) then
         Error('Numeric type expected')
       end
     else
@@ -890,7 +890,7 @@ if Tok.Kind = OPARTOK then
         
         Types[NumTypes].Kind        := SUBRANGETYPE;
         Types[NumTypes].Block       := BlockStack[BlockStackTop];
-        Types[NumTypes].HostType    := INTEGERTYPEINDEX;
+        Types[NumTypes].BaseType    := INTEGERTYPEINDEX;
         Types[NumTypes].Low         := 0;
         Types[NumTypes].High        := 0;
         
@@ -2349,7 +2349,7 @@ procedure CompileType{(var DataType: Integer)};
   procedure CompileRecordType(var DataType: Integer);
   
 
-    procedure DeclareField(const Name: TString; RecType, FieldType: Integer);
+    procedure DeclareField(const Name: TString; RecType, FieldType: Integer; var NextFieldOffset: Integer);
     var
       i: Integer;
     begin
@@ -2363,56 +2363,114 @@ procedure CompileType{(var DataType: Integer)};
     
     Types[RecType].Field[Types[RecType].NumFields]^.Name     := Name;
     Types[RecType].Field[Types[RecType].NumFields]^.DataType := FieldType;
-    Types[RecType].Field[Types[RecType].NumFields]^.Offset   := TypeSize(RecType) - TypeSize(FieldType);
-    end;
+    Types[RecType].Field[Types[RecType].NumFields]^.Offset   := NextFieldOffset;
     
+    NextFieldOffset := NextFieldOffset + TypeSize(FieldType);
+    end; // DeclareField
+    
+    
+    
+    procedure CompileFields(RecType: Integer; var NextFieldOffset: Integer);
+    var
+      FieldInListName: array [1..MAXFIELDS] of TString;
+      NumFieldsInList, FieldInListIndex: Integer;
+      FieldType: Integer;
+      
+    begin
+    while not (Tok.Kind in [CASETOK, ENDTOK, CPARTOK]) do
+      begin
+      NumFieldsInList := 0;
+      
+      repeat
+        AssertIdent;
+
+        Inc(NumFieldsInList);
+        FieldInListName[NumFieldsInList] := Tok.Name;
+
+        NextTok;
+
+        if Tok.Kind <> COMMATOK then Break;
+        NextTok;
+      until FALSE;
+
+      EatTok(COLONTOK);
+
+      CompileType(FieldType);
+
+      for FieldInListIndex := 1 to NumFieldsInList do
+        DeclareField(FieldInListName[FieldInListIndex], DataType, FieldType, NextFieldOffset);
+
+      if Tok.Kind <> SEMICOLONTOK then Break; 
+      NextTok;
+      end; // while
+    
+    end; // CompileFields
+    
+
   
   var
-    FieldInListName: array [1..MAXFIELDS] of TString;
-    NumFieldsInList, FieldInListIndex: Integer;
-    FieldType: Integer;
-  
+    TagName: TString;
+    TagVal: TConst;
+    TagType, TagValType: Integer;
+    NextFieldOffset, VariantStartOffset: Integer;
+    
   
   begin // CompileRecordType
+  NextFieldOffset := 0;
+  
   // Add new anonymous type
   Inc(NumTypes);
   if NumTypes > MAXTYPES then
     Error('Maximum number of types exceeded');  
   
   Types[NumTypes].Kind := RECORDTYPE;
+  Types[NumTypes].Block := BlockStack[BlockStackTop];
+  Types[NumTypes].NumFields := 0;
   DataType := NumTypes;
 
   NextTok;
-
-  Types[DataType].NumFields := 0;
-  repeat
-    NumFieldsInList := 0;
-    repeat
-      AssertIdent;
-
-      Inc(NumFieldsInList);
-      FieldInListName[NumFieldsInList] := Tok.Name;
-
-      NextTok;
-
-      if Tok.Kind <> COMMATOK then Break;
-      NextTok;
-    until FALSE;
-
-    EatTok(COLONTOK);
-
-    CompileType(FieldType);
-
-    for FieldInListIndex := 1 to NumFieldsInList do
-      DeclareField(FieldInListName[FieldInListIndex], DataType, FieldType);
-
-    if Tok.Kind <> SEMICOLONTOK then Break; 
+  
+  // Fixed fields
+  CompileFields(DataType, NextFieldOffset);
+  
+  // Variant fields
+  if Tok.Kind = CASETOK then
+    begin   
     NextTok;
-  until Tok.Kind = ENDTOK;
-
+    
+    // Tag field
+    AssertIdent;
+    TagName := Tok.Name;
+    NextTok;
+    EatTok(COLONTOK);
+    
+    CompileType(TagType);    
+    if not (Types[TagType].Kind in OrdinalTypes) then
+      Error('Ordinal type expected');
+      
+    DeclareField(TagName, DataType, TagType, NextFieldOffset);
+    VariantStartOffset := NextFieldOffset;
+    
+    EatTok(OFTOK);
+    
+    // Variants
+    repeat
+      CompileConstExpression(TagVal, TagValType);
+      GetCompatibleType(TagType, TagValType);
+      EatTok(COLONTOK);
+      EatTok(OPARTOK);
+      
+      NextFieldOffset := VariantStartOffset;
+      CompileFields(DataType, NextFieldOffset);
+      
+      EatTok(CPARTOK);      
+      if Tok.Kind <> SEMICOLONTOK then Break; 
+      NextTok;      
+    until Tok.Kind = ENDTOK;
+    
+    end; // if
+    
   EatTok(ENDTOK);
-
-  Types[DataType].Block := BlockStack[BlockStackTop];
   end; // CompileRecordType
 
 
@@ -2508,7 +2566,7 @@ procedure CompileType{(var DataType: Integer)};
   if Types[DataType].High < Types[DataType].Low then
     Error('Illegal subrange bounds');
 
-  Types[DataType].HostType := LowBoundType;
+  Types[DataType].BaseType := LowBoundType;
   Types[DataType].Block := BlockStack[BlockStackTop];  
   end; // CompileSubrangeType
   
@@ -2686,7 +2744,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     Error('Maximum number of types exceeded');
   
   Types[NumTypes].Kind     := SUBRANGETYPE;
-  Types[NumTypes].HostType := INTEGERTYPEINDEX;
+  Types[NumTypes].BaseType := INTEGERTYPEINDEX;
   Types[NumTypes].Low      := 1;
   Types[NumTypes].High     := MAXSTRLENGTH + 1;
   Types[NumTypes].Block    := BlockStack[BlockStackTop];
