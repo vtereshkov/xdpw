@@ -6,11 +6,12 @@
 
  
 const
-  IMGBASE    = $400000;
-  SECTALIGN  = $1000;
-  FILEALIGN  = $200;
+  IMGBASE           = $400000;
+  SECTALIGN         = $1000;
+  FILEALIGN         = $200;
   
-  MAXIMPORTS = 64;
+  MAXIMPORTLIBS     = 16;
+  MAXIMPORTS        = 64;
   
 
     
@@ -113,9 +114,9 @@ type
 
   
   TImportSection = packed record
-    DirectoryTable: array [0..MAXIMPORTS] of TImportDirectoryTableEntry;
-    LibraryNames: array [0..MAXIMPORTS - 1, 0..15] of Char;
-    LookupTable: array [0..MAXIMPORTS - 1, 0..1] of LongInt;
+    DirectoryTable: array [0..MAXIMPORTLIBS] of TImportDirectoryTableEntry;
+    LibraryNames: array [0..MAXIMPORTLIBS - 1, 0..15] of Char;
+    LookupTable: array [0..MAXIMPORTS + MAXIMPORTLIBS - 1] of LongInt;
     NameTable: array [0..MAXIMPORTS - 1] of TImportNameTableEntry;
   end;
   
@@ -200,7 +201,7 @@ with Headers do
   with PEOptionalHeader do
     begin 
     Magic                         := $10B;                                                // PE32
-    MajorLinkerVersion            := 4; 
+    MajorLinkerVersion            := 3; 
     SizeOfCode                    := CodeSize;
     SizeOfInitializedData         := InitializedDataSize;
     SizeOfUninitializedData       := UninitializedDataSize;    
@@ -216,9 +217,9 @@ with Headers do
     SizeOfHeaders                 := Align(SizeOf(Headers), FILEALIGN);
     Subsystem                     := 2 + IsConsoleProgram;                                // Win32 GUI/console
     SizeOfStackReserve            := $1000000;
-    SizeOfStackCommit             := $1000000;
+    SizeOfStackCommit             := $10000;
     SizeOfHeapReserve             := $1000000;
-    SizeOfHeapCommit              := $1000000;
+    SizeOfHeapCommit              := $10000;
     NumberOfRvaAndSizes           := 16;
     end;
 
@@ -289,34 +290,59 @@ with Headers do
 end;
 
 
-
-
+    
 
 function AddImportFunc(const ImportLibName, ImportFuncName: TString): LongInt;
+const
+  NumImportLibs: Integer = 0;
+  NumImports: Integer = 0;
+  NumLookupEntries: Integer = 0; 
+  LastImportLibName: TString = '';
+  
 var
   VirtualAddress: LongInt;
+  
 begin
 VirtualAddress := Align(SizeOf(Headers), SECTALIGN);
 
-ImportSection.DirectoryTable[NumImports].Name        := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
-                                                                       + SizeOf(ImportSection.LibraryNames[0]) * NumImports;
-                                                                       
-ImportSection.DirectoryTable[NumImports].FirstThunk  := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
-                                                                       + SizeOf(ImportSection.LibraryNames)
-                                                                       + SizeOf(ImportSection.LookupTable[0]) * NumImports;
+// Add new import library
+if (NumImportLibs = 0) or (ImportLibName <> LastImportLibName) then
+  begin
+  if NumImportLibs <> 0 then Inc(NumLookupEntries);  // Add null entry before the first thunk of a new library    
+  
+  ImportSection.DirectoryTable[NumImportLibs].Name := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
+                                                                     + SizeOf(ImportSection.LibraryNames[0]) * NumImportLibs;
+                                                                         
+  ImportSection.DirectoryTable[NumImportLibs].FirstThunk := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
+                                                                           + SizeOf(ImportSection.LibraryNames)
+                                                                           + SizeOf(ImportSection.LookupTable[0]) * NumLookupEntries;
 
-Move(ImportLibName[1], ImportSection.LibraryNames[NumImports], Length(ImportLibName));
+  Move(ImportLibName[1], ImportSection.LibraryNames[NumImportLibs], Length(ImportLibName));
+  
+  Inc(NumImportLibs);
+  if NumImportLibs >= MAXIMPORTLIBS then
+    Error('Maximum number of import libraries exceeded');
+  end; // if
+  
+LastImportLibName := ImportLibName;  
 
-ImportSection.LookupTable[NumImports, 0] := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
-                                                           + SizeOf(ImportSection.LibraryNames)
-                                                           + SizeOf(ImportSection.LookupTable)
-                                                           + SizeOf(ImportSection.NameTable[0]) * NumImports;                                              
+// Add new import function
+ImportSection.LookupTable[NumLookupEntries] := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
+                                                              + SizeOf(ImportSection.LibraryNames)
+                                                              + SizeOf(ImportSection.LookupTable)
+                                                              + SizeOf(ImportSection.NameTable[0]) * NumImports;                                              
 
 Move(ImportFuncName[1], ImportSection.NameTable[NumImports].Name, Length(ImportFuncName));
 
-Result := IMGBASE + VirtualAddress + LongInt(@ImportSection.LookupTable[NumImports, 0]) - LongInt(@ImportSection);
-Inc(NumImports);
-end;
+Result := IMGBASE + VirtualAddress + LongInt(@ImportSection.LookupTable[NumLookupEntries]) - LongInt(@ImportSection);
+
+Inc(NumLookupEntries);
+if NumLookupEntries >= MAXIMPORTS + MAXIMPORTLIBS - 1 then
+  Error('Maximum number of lookup entries exceeded');
   
-    
+Inc(NumImports);
+if NumImports >= MAXIMPORTS then
+  Error('Maximum number of import functions exceeded');  
+end;
+
 

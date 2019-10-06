@@ -11,6 +11,7 @@ program XDPW;
 {$APPTYPE CONSOLE}
 {$I-}
 {$H-}
+{$J+}
 
 
 {$I Common.inc}

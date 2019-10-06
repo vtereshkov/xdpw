@@ -361,7 +361,7 @@ var
   
   IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of TTypeKind;
 
-  NumIdent, NumTypes, NumImports, NumBlocks, BlockStackTop, NumRelocs, NumGotos, ForLoopNesting, WithNesting,
+  NumIdent, NumTypes, NumBlocks, BlockStackTop, NumRelocs, NumGotos, ForLoopNesting, WithNesting,
   CodeSize, CodePosStackTop, 
   InitializedGlobalDataSize, UninitializedGlobalDataSize, LocalDataSize, ParamDataSize, TempDataSize,
   ProgramEntryPoint,
@@ -381,7 +381,6 @@ FillChar(InitializedGlobalData, SizeOf(InitializedGlobalData), #0);
 
 NumIdent                    := 0; 
 NumTypes                    := 0; 
-NumImports                  := 0; 
 NumBlocks                   := 0; 
 BlockStackTop               := 0; 
 NumRelocs                   := 0;

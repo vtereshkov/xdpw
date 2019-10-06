@@ -36,6 +36,7 @@ var
   i, j: Integer;
   ch: Char;
 begin
+WriteLn;
 for i := 1 to FieldSize do
   begin
   for j := 1 to FieldSize do
@@ -108,8 +109,8 @@ Init;
 repeat   
   Redraw;
   Regenerate;
-  ReadLn(ch);
-until ch = 'q';
+  Write('Enter Q for quit: '); ReadLn(ch);
+until (ch = 'Q') or (ch = 'q');
 
 end.
 
