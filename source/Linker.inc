@@ -89,7 +89,7 @@ type
     PEHeader: TPEHeader;
     PEOptionalHeader: TPEOptionalHeader;
     DataDirectories: array [0..15] of TDataDirectory;
-    ImportSectionHeader, DataSectionHeader, CodeSectionHeader: TPESectionHeader;	
+    ImportSectionHeader, DataSectionHeader, BSSSectionHeader, CodeSectionHeader: TPESectionHeader;	
   end;
   
   
@@ -180,12 +180,7 @@ const
   IMAGE_SCN_MEM_READ                = $40000000;
   IMAGE_SCN_MEM_WRITE               = $80000000;
 
-var
-  DataSize: Integer;
-  
 begin
-DataSize := InitializedDataSize + UninitializedDataSize;
-
 FillChar(Headers, SizeOf(Headers), #0);
 
 with Headers do
@@ -197,7 +192,7 @@ with Headers do
     PE[0]                         := 'P';  
     PE[1]                         := 'E';
     Machine                       := IMAGE_FILE_MACHINE_I386;
-    NumberOfSections              := 3;
+    NumberOfSections              := 4;
     SizeOfOptionalHeader          := SizeOf(PEOptionalHeader) + SizeOf(DataDirectories);
     Characteristics               := IMAGE_FILE_RELOCS_STRIPPED or IMAGE_FILE_EXECUTABLE_IMAGE or IMAGE_FILE_32BIT_MACHINE;
     end;
@@ -205,13 +200,19 @@ with Headers do
   with PEOptionalHeader do
     begin 
     Magic                         := $10B;                                                // PE32
-    AddressOfEntryPoint           := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN) + Align(DataSize, SECTALIGN) + ProgramEntryPoint;
+    MajorLinkerVersion            := 4; 
+    SizeOfCode                    := CodeSize;
+    SizeOfInitializedData         := InitializedDataSize;
+    SizeOfUninitializedData       := UninitializedDataSize;    
+    AddressOfEntryPoint           := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN) + Align(InitializedDataSize, SECTALIGN) + Align(UninitializedDataSize, SECTALIGN) + ProgramEntryPoint;
+    BaseOfCode                    := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN) + Align(InitializedDataSize, SECTALIGN) + Align(UninitializedDataSize, SECTALIGN);
+    BaseOfData                    := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN);
     ImageBase                     := IMGBASE;
     SectionAlignment              := SECTALIGN;
     FileAlignment                 := FILEALIGN;
     MajorOperatingSystemVersion   := 4;
     MajorSubsystemVersion         := 4;
-    SizeOfImage                   := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN) + Align(DataSize, SECTALIGN) + Align(CodeSize, SECTALIGN);
+    SizeOfImage                   := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN) + Align(InitializedDataSize, SECTALIGN) + Align(UninitializedDataSize, SECTALIGN) + Align(CodeSize, SECTALIGN);
     SizeOfHeaders                 := Align(SizeOf(Headers), FILEALIGN);
     Subsystem                     := 2 + IsConsoleProgram;                                // Win32 GUI/console
     SizeOfStackReserve            := $1000000;
@@ -249,12 +250,25 @@ with Headers do
     Name[2]                       := 'a';
     Name[3]                       := 't';
     Name[4]                       := 'a';
-    VirtualSize                   := DataSize;
+    VirtualSize                   := InitializedDataSize;
     VirtualAddress                := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN);
     SizeOfRawData                 := Align(InitializedDataSize, FILEALIGN);
     PointerToRawData              := Align(SizeOf(Headers), FILEALIGN) + Align(SizeOf(TImportSection), FILEALIGN);
-    Characteristics               := LongInt(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE);
+    Characteristics               := LongInt(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE);
     end;
+    
+  with BSSSectionHeader do
+    begin
+    Name[0]                       := '.';
+    Name[1]                       := 'b';
+    Name[2]                       := 's';
+    Name[3]                       := 's';
+    VirtualSize                   := UninitializedDataSize;
+    VirtualAddress                := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN) + Align(InitializedDataSize, SECTALIGN);
+    SizeOfRawData                 := 0;
+    PointerToRawData              := Align(SizeOf(Headers), FILEALIGN) + Align(SizeOf(TImportSection), FILEALIGN) + Align(InitializedDataSize, FILEALIGN);
+    Characteristics               := LongInt(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE);
+    end;    
 
   with CodeSectionHeader do
     begin
@@ -264,7 +278,7 @@ with Headers do
     Name[3]                       := 'x';
     Name[4]                       := 't';
     VirtualSize                   := CodeSize;
-    VirtualAddress                := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN) + Align(DataSize, SECTALIGN);
+    VirtualAddress                := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN) + Align(InitializedDataSize, SECTALIGN) + Align(UninitializedDataSize, SECTALIGN);
     SizeOfRawData                 := Align(CodeSize, FILEALIGN);
     PointerToRawData              := Align(SizeOf(Headers), FILEALIGN) + Align(SizeOf(TImportSection), FILEALIGN) + Align(InitializedDataSize, FILEALIGN);
     Characteristics               := LongInt(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE);

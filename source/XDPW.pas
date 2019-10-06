@@ -82,7 +82,7 @@ FillHeaders(CodeSize, InitializedGlobalDataSize, UninitializedGlobalDataSize);
 
 Relocate(IMGBASE + Headers.CodeSectionHeader.VirtualAddress,
          IMGBASE + Headers.DataSectionHeader.VirtualAddress,
-         IMGBASE + Headers.DataSectionHeader.VirtualAddress + InitializedGlobalDataSize);
+         IMGBASE + Headers.BSSSectionHeader.VirtualAddress);
 
 
 // Write output file
