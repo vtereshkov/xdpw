@@ -95,7 +95,6 @@ type
   
   
   TImportFuncName = array [0..31] of Char;
-  TImportFuncNames = array [0..255] of TImportFuncName;
 
 
   TImportDirectoryTableEntry = packed record
