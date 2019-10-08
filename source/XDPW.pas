@@ -83,7 +83,10 @@ FillHeaders(CodeSize, InitializedGlobalDataSize, UninitializedGlobalDataSize);
 
 Relocate(IMGBASE + Headers.CodeSectionHeader.VirtualAddress,
          IMGBASE + Headers.DataSectionHeader.VirtualAddress,
-         IMGBASE + Headers.BSSSectionHeader.VirtualAddress);
+         IMGBASE + Headers.BSSSectionHeader.VirtualAddress,
+         IMGBASE + Headers.ImportSectionHeader.VirtualAddress);
+
+FixupImportSection(Headers.ImportSectionHeader.VirtualAddress);
 
 
 // Write output file
@@ -97,15 +100,15 @@ if IOResult <> 0 then
 BlockWrite(OutFile, Headers, SizeOf(Headers));
 Pad(OutFile, SizeOf(Headers), FILEALIGN);
 
-BlockWrite(OutFile, ImportSection, SizeOf(ImportSection));
-Pad(OutFile, SizeOf(ImportSection), FILEALIGN);
+BlockWrite(OutFile, Code, CodeSize);
+Pad(OutFile, CodeSize, FILEALIGN);
 
 BlockWrite(OutFile, InitializedGlobalData, InitializedGlobalDataSize);
 Pad(OutFile, InitializedGlobalDataSize, FILEALIGN);
 
-BlockWrite(OutFile, Code, CodeSize);
-Pad(OutFile, CodeSize, FILEALIGN);
-  
+BlockWrite(OutFile, ImportSection, SizeOf(ImportSection));
+Pad(OutFile, SizeOf(ImportSection), FILEALIGN);
+
 Close(OutFile);
 
 

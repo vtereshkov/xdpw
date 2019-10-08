@@ -111,7 +111,7 @@ end;
 
 
 
-procedure Relocate(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr: Integer);
+procedure Relocate(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr, ImportDeltaAddr: Integer);
 var
   i, DeltaAddr: Integer;
 begin
@@ -122,7 +122,8 @@ for i := 1 to NumRelocs do
   case Reloc[i].RelocType of
     CODERELOC:        DeltaAddr := CodeDeltaAddr;
     INITDATARELOC:    DeltaAddr := InitDataDeltaAddr;
-    UNINITDATARELOC:  DeltaAddr := UninitDataDeltaAddr
+    UNINITDATARELOC:  DeltaAddr := UninitDataDeltaAddr;
+    IMPORTRELOC:      DeltaAddr := ImportDeltaAddr
   else 
     Error('Internal fault: Illegal relocation type');
   end;  
@@ -700,7 +701,7 @@ end;
 
 procedure GenerateImportFuncStub(EntryPoint: LongInt);
 begin
-Gen($FF); Gen($25); GenDWord(EntryPoint);        // jmp ds:EntryPoint             
+Gen($FF); Gen($25); GenRelocDWord(EntryPoint, IMPORTRELOC);                           // jmp ds:EntryPoint  ; relocatable
 end;
 
 
