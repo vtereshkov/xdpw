@@ -652,11 +652,11 @@ end;
 
 procedure WriteReal(var F: file; P: PStream; Number: Real; DecPlaces: Integer);
 const
-  FracBits = 16;
   MaxDecPlaces = 7;
+  
 var
-  Integ, Frac, InvWeight, FinalInvWeight, Digit, IntegExpon, i: Integer;
-  Expon: Real;
+  Integ, Digit, IntegExpon: Integer;
+  Expon, Frac: Real;
   WriteExpon: Boolean;
 
 begin
@@ -702,23 +702,21 @@ else
 
 // Write integer part
 Integ := Trunc(Number);
-Frac  := Round((Number - Integ) * (1 shl FracBits));
+Frac  := Number - Integ;
 
 WriteInt(F, P, Integ);  WriteCh(F, P, '.');
 
 // Write fractional part
-InvWeight := 10;
-FinalInvWeight := 1;
-for i := 1 to DecPlaces do
-  FinalInvWeight := FinalInvWeight * 10;
-
-while InvWeight <= FinalInvWeight do
+while DecPlaces > 0 do
   begin
-  Digit := (Frac * InvWeight) shr FracBits;
+  Frac := Frac * 10;
+  Digit := Trunc(Frac);
   if Digit > 9 then Digit := 9;
+  
   WriteCh(F, P,  Char(ShortInt('0') + Digit));
-  Frac := Frac - (Digit shl FracBits) div InvWeight;
-  InvWeight := InvWeight * 10;
+  
+  Frac := Frac - Digit;  
+  Dec(DecPlaces);
   end; // while
 
 // Write exponent
