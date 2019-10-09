@@ -98,8 +98,9 @@ Type = "(" Ident {"," Ident} ")" |
        "^" TypeIdent |
        ["packed"] "array" "[" Type {"," Type} "]" "of" Type |
        ["packed"] "record" Fields 
-          ["case" Ident ":" Type "of" ConstExpression ":" "(" Fields ")"
-                                 {";" ConstExpression ":" "(" Fields ")"} [";"] "end" |
+          ["case" Ident ":" Type "of" 
+               ConstExpression, {"," ConstExpression} ":" "(" Fields ")"
+          {";" ConstExpression, {"," ConstExpression} ":" "(" Fields ")"} [";"] "end" |
        ["packed"] "set" "of" Type |
        ["packed"] "file" ["of" Type] |
        ConstExpression ".." ConstExpression |
