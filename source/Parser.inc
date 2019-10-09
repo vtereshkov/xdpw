@@ -16,8 +16,11 @@ procedure CompileType(var DataType: Integer); forward;
 
 function AllocateTempStorage(Size: Integer): Integer;
 begin
-TempDataSize := TempDataSize + Size;    
-Result := -LocalDataSize - TempDataSize;
+with BlockStack[BlockStackTop] do
+  begin
+  TempDataSize := TempDataSize + Size;    
+  Result := -LocalDataSize - TempDataSize;
+  end;
 end; // AllocateTempStorage
 
 
@@ -796,7 +799,7 @@ else
     
     Types[NumTypes].Kind := FORWARDTYPE;
     Types[NumTypes].TypeIdentName := Tok.Name;
-    Types[NumTypes].Block := BlockStack[BlockStackTop];
+    Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
     DataType := NumTypes;
     end
   else
@@ -884,7 +887,7 @@ if Tok.Kind = OPARTOK then
           Error('Maximum number of types exceeded');
         
         Types[NumTypes].Kind        := SUBRANGETYPE;
-        Types[NumTypes].Block       := BlockStack[BlockStackTop];
+        Types[NumTypes].Block       := BlockStack[BlockStackTop].Index;
         Types[NumTypes].BaseType    := INTEGERTYPEINDEX;
         Types[NumTypes].Low         := 0;
         Types[NumTypes].High        := 0;
@@ -895,7 +898,7 @@ if Tok.Kind = OPARTOK then
           Error('Maximum number of types exceeded');
         
         Types[NumTypes].Kind        := ARRAYTYPE;
-        Types[NumTypes].Block       := BlockStack[BlockStackTop];
+        Types[NumTypes].Block       := BlockStack[BlockStackTop].Index;
         Types[NumTypes].BaseType    := ParamType;
         Types[NumTypes].IndexType   := NumTypes - 1;
         Types[NumTypes].IsOpenArray := TRUE;
@@ -1267,7 +1270,7 @@ if NumTypes > MAXTYPES then
   Error('Maximum number of types exceeded');
 
 Types[NumTypes].Kind := SETTYPE;
-Types[NumTypes].Block := BlockStack[BlockStackTop];
+Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
 Types[NumTypes].BaseType := ANYTYPEINDEX;
 ValType := NumTypes;
 
@@ -1775,7 +1778,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
     if LabelIndex <> 0 then
       if Ident[LabelIndex].Kind = GOTOLABEL then
         begin
-        if Ident[LabelIndex].Block <> BlockStack[BlockStackTop] then
+        if Ident[LabelIndex].Block <> BlockStack[BlockStackTop].Index then
           Error('Label is not declared in current procedure');
         
         Ident[LabelIndex].Value := CodeSize;        
@@ -2004,14 +2007,18 @@ procedure CompileStatement{(LoopNesting: Integer)};
 
   if not (Types[Ident[CounterIndex].DataType].Kind in OrdinalTypes) then
     Error('Ordinal variable expected as FOR loop counter');
-
-  // Assign initial value to the counter
-  NextTok;
-  CheckTok(ASSIGNTOK);
-  
+    
   PushVarPtr(Ident[CounterIndex].Value, Ident[CounterIndex].Scope, 0, Ident[CounterIndex].RelocType);
   
-  CompileAssignment(Ident[CounterIndex].DataType);
+  NextTok;
+  EatTok(ASSIGNTOK);
+  
+  // Initial counter value
+  CompileExpression(ExpressionType, FALSE);
+  GetCompatibleType(ExpressionType, Ident[CounterIndex].DataType);  
+
+  // Two instances of initial value: one for computing the number of iterations, another for assignment to the counter
+  DuplicateStackTop;
 
   if not (Tok.Kind in [TOTOK, DOWNTOTOK]) then
     CheckTok(TOTOK);
@@ -2019,13 +2026,15 @@ procedure CompileStatement{(LoopNesting: Integer)};
   Down := Tok.Kind = DOWNTOTOK;
   NextTok;
   
-  // Compute and save the total number of iterations
-  PushVarPtr(Ident[CounterIndex].Value, Ident[CounterIndex].Scope, 0, Ident[CounterIndex].RelocType);
-  DerefPtr(Ident[CounterIndex].DataType);
-  
+  // Final counter value
   CompileExpression(ExpressionType, FALSE);
   GetCompatibleType(ExpressionType, Ident[CounterIndex].DataType);
+  
+  // Compute and save the total number of iterations
   GenerateForNumberOfIterations(Down);
+  
+  // Assign initial value to the counter
+  GenerateForAssignment(Ident[CounterIndex].DataType);
   
   // Save return address used by GenerateForEpilog
   Inc(CodePosStackTop);
@@ -2072,7 +2081,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
   if Ident[LabelIndex].Kind <> GOTOLABEL then
     Error('Label expected');
     
-  if Ident[LabelIndex].Block <> BlockStack[BlockStackTop] then
+  if Ident[LabelIndex].Block <> BlockStack[BlockStackTop].Index then
     Error('Label is not declared in current procedure');
     
   GenerateGoto(LabelIndex);
@@ -2170,7 +2179,7 @@ case Tok.Kind of
             
             if Tok.Kind = ASSIGNTOK then                                // Special case: assignment to a function name
               begin
-              if (Ident[IdentIndex].Kind <> FUNC) or (Ident[IdentIndex].ProcAsBlock <> BlockStack[BlockStackTop]) then
+              if (Ident[IdentIndex].Kind <> FUNC) or (Ident[IdentIndex].ProcAsBlock <> BlockStack[BlockStackTop].Index) then
                 Error('Current function name expected but ' + Ident[IdentIndex].Name + ' found');
 
               ResultIdentIndex := GetIdent('RESULT');
@@ -2259,7 +2268,7 @@ procedure CompileType{(var DataType: Integer)};
   
   EatTok(CPARTOK);
   
-  Types[DataType].Block := BlockStack[BlockStackTop];
+  Types[DataType].Block := BlockStack[BlockStackTop].Index;
   Types[DataType].Low := 0;
   Types[DataType].High := ConstIndex - 1;
   end; // CompileEnumeratedType
@@ -2284,7 +2293,7 @@ procedure CompileType{(var DataType: Integer)};
   CompileTypeIdent(NestedDataType, TRUE);
     
   Types[DataType].BaseType := NestedDataType;
-  Types[DataType].Block := BlockStack[BlockStackTop];
+  Types[DataType].Block := BlockStack[BlockStackTop].Index;
   end; // CompileTypedPointerType
   
   
@@ -2306,7 +2315,7 @@ procedure CompileType{(var DataType: Integer)};
       Error('Maximum number of types exceeded');
     
     Types[NumTypes].Kind := ARRAYTYPE;
-    Types[NumTypes].Block := BlockStack[BlockStackTop];
+    Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
     Types[NumTypes].IsOpenArray := FALSE;
     ArrType := NumTypes;
 
@@ -2409,7 +2418,7 @@ procedure CompileType{(var DataType: Integer)};
     Error('Maximum number of types exceeded');  
   
   Types[NumTypes].Kind := RECORDTYPE;
-  Types[NumTypes].Block := BlockStack[BlockStackTop];
+  Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
   Types[NumTypes].NumFields := 0;
   DataType := NumTypes;
 
@@ -2476,7 +2485,7 @@ procedure CompileType{(var DataType: Integer)};
     Error('Maximum number of types exceeded');
   
   Types[NumTypes].Kind := SETTYPE;
-  Types[NumTypes].Block := BlockStack[BlockStackTop];
+  Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
   DataType := NumTypes;
   
   NextTok;
@@ -2513,7 +2522,7 @@ procedure CompileType{(var DataType: Integer)};
       Error('Maximum number of types exceeded');
   
     Types[NumTypes].Kind := FILETYPE;
-    Types[NumTypes].Block := BlockStack[BlockStackTop];    
+    Types[NumTypes].Block := BlockStack[BlockStackTop].Index;    
     Types[NumTypes].BaseType := NestedDataType;
     
     DataType := NumTypes;
@@ -2557,7 +2566,7 @@ procedure CompileType{(var DataType: Integer)};
     Error('Illegal subrange bounds');
 
   Types[DataType].BaseType := LowBoundType;
-  Types[DataType].Block := BlockStack[BlockStackTop];  
+  Types[DataType].Block := BlockStack[BlockStackTop].Index;  
   end; // CompileSubrangeType
   
   
@@ -2570,7 +2579,7 @@ procedure CompileType{(var DataType: Integer)};
     Error('Maximum number of types exceeded');    
   
   Types[NumTypes].Kind := PROCEDURALTYPE;
-  Types[NumTypes].Block := BlockStack[BlockStackTop];
+  Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
   DataType := NumTypes;
   
   NextTok;
@@ -2737,7 +2746,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   Types[NumTypes].BaseType := INTEGERTYPEINDEX;
   Types[NumTypes].Low      := 1;
   Types[NumTypes].High     := MAXSTRLENGTH + 1;
-  Types[NumTypes].Block    := BlockStack[BlockStackTop];
+  Types[NumTypes].Block    := BlockStack[BlockStackTop].Index;
 
   Types[STRINGTYPEINDEX].BaseType    := CHARTYPEINDEX;
   Types[STRINGTYPEINDEX].IndexType   := NumTypes;
@@ -2754,7 +2763,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   // Search for unresolved forward references
   for TypeIndex := 1 to NumTypes do
     if (Types[TypeIndex].Kind = FORWARDTYPE) and
-       (Types[TypeIndex].Block = BlockStack[BlockStackTop]) then
+       (Types[TypeIndex].Block = BlockStack[BlockStackTop].Index) then
       Error('Unresolved forward reference to type ' + Types[TypeIndex].TypeIdentName);
   end; // CheckForwardResolutions
   
@@ -2968,7 +2977,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     for TypeIndex := 1 to NumTypes do
       if (Types[TypeIndex].Kind = FORWARDTYPE) and
          (Types[TypeIndex].TypeIdentName = NameTok.Name) and
-         (Types[TypeIndex].Block = BlockStack[BlockStackTop]) then
+         (Types[TypeIndex].Block = BlockStack[BlockStackTop].Index) then
         begin
         // Forward type reference resolution
         Types[TypeIndex] := Types[VarType];
@@ -3082,7 +3091,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   ForwardIdentIndex := GetIdentUnsafe(Tok.Name);
   if ForwardIdentIndex <> 0 then
     if not Ident[ForwardIdentIndex].IsUnresolvedForward or
-       (Ident[ForwardIdentIndex].Block <> BlockStack[BlockStackTop]) or
+       (Ident[ForwardIdentIndex].Block <> BlockStack[BlockStackTop].Index) or
        ((Ident[ForwardIdentIndex].Kind <> PROC) and not IsFunction) or
        ((Ident[ForwardIdentIndex].Kind <> FUNC) and IsFunction) then
      ForwardIdentIndex := 0;                                      // Found an identifier of another kind or scope, or it is already resolved
@@ -3144,12 +3153,9 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     NestedProcsFound: Boolean;
    
   begin  
-  ParamDataSize := 0;
-  LocalDataSize := 0;
-  NestedProcsFound := FALSE;
-  
+  NestedProcsFound := FALSE;  
 
-  if BlockStack[BlockStackTop] = 1 then             // Main program
+  if BlockStack[BlockStackTop].Index = 1 then             // Main program
     begin
     DeclarePredefinedTypes;
     DeclarePredefinedIdents;
@@ -3208,7 +3214,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
         
       PROCEDURETOK, FUNCTIONTOK:
         begin
-        if (BlockStack[BlockStackTop] <> 1) and not NestedProcsFound then
+        if (BlockStack[BlockStackTop].Index <> 1) and not NestedProcsFound then
           begin
           NestedProcsFound := TRUE;
           GenerateNestedProcsProlog;
@@ -3236,7 +3242,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   begin
   IdentIndex := NumIdent;
   
-  while (IdentIndex > 0) and (Ident[IdentIndex].Block = BlockStack[BlockStackTop]) do
+  while (IdentIndex > 0) and (Ident[IdentIndex].Block = BlockStack[BlockStackTop].Index) do
     begin
     if (Ident[IdentIndex].Kind in [GOTOLABEL, PROC, FUNC]) and Ident[IdentIndex].IsUnresolvedForward then
       Error('Unresolved declaration of ' + Ident[IdentIndex].Name);
@@ -3253,7 +3259,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     
   begin  
   // Delete local identifiers to save space
-  while (NumIdent > 0) and (Ident[NumIdent].Block = BlockStack[BlockStackTop]) do
+  while (NumIdent > 0) and (Ident[NumIdent].Block = BlockStack[BlockStackTop].Index) do
     begin 
     // If procedure or function, delete parameters first
     if Ident[NumIdent].Kind in [PROC, FUNC] then
@@ -3265,7 +3271,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     end;     
     
   // Delete local types
-  while (NumTypes > 0) and (Types[NumTypes].Block = BlockStack[BlockStackTop]) do
+  while (NumTypes > 0) and (Types[NumTypes].Block = BlockStack[BlockStackTop].Index) do
     begin
     // If procedural type, delete parameters first
     if Types[NumTypes].Kind = PROCEDURALTYPE then
@@ -3294,14 +3300,17 @@ var
 begin // CompileBlock
 Inc(BlockStackTop);
 
-if BlockIdentIndex = 0 then
-  BlockStack[BlockStackTop] := 1
-else
-  BlockStack[BlockStackTop] := Ident[BlockIdentIndex].ProcAsBlock;
+with BlockStack[BlockStackTop] do
+  begin
+  if BlockIdentIndex = 0 then Index := 1 else Index := Ident[BlockIdentIndex].ProcAsBlock;    
+  LocalDataSize := 0;
+  ParamDataSize := 0; 
+  TempDataSize := 0;
+  end; 
   
 CompileDeclarations;
 
-if BlockStack[BlockStackTop] = 1 then          // Main program
+if BlockStack[BlockStackTop].Index = 1 then          // Main program
   begin
   ProgramEntryPoint := CodeSize;
   GenerateProgramProlog;
@@ -3313,12 +3322,9 @@ if BlockStack[BlockStackTop] = 1 then          // Main program
   end
 else
   begin
-  GenerateStackFrameProlog(LocalDataSize);     // Procedure or function
+  GenerateStackFrameProlog(BlockStack[BlockStackTop].LocalDataSize);     // Procedure or function
   GenerateTempStorageProlog;
   end;
-
-// Initialize variables needed to access temporary strings, sets and WITH designators
-TempDataSize := 0; 
 
 // Block body
 GenerateGotoProlog;
@@ -3335,7 +3341,7 @@ if ForLoopNesting <> 0 then
   Error('Internal fault: Illegal FOR loop nesting');
 
 // If function, return Result value via the EAX register
-if (BlockStack[BlockStackTop] <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) then
+if (BlockStack[BlockStackTop].Index <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) then
   begin
   PushVarPtr(Ident[GetIdent('RESULT')].Value, LOCAL, 0, UNINITDATARELOC);
   if Types[Ident[BlockIdentIndex].DataType].Kind in StructuredTypes then
@@ -3345,9 +3351,9 @@ if (BlockStack[BlockStackTop] <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) the
   SaveStackTopToEAX;
   end;
   
-GenerateTempStorageEpilog(TempDataSize);
+GenerateTempStorageEpilog(BlockStack[BlockStackTop].TempDataSize);
 
-if BlockStack[BlockStackTop] = 1 then          // Main program
+if BlockStack[BlockStackTop].Index = 1 then          // Main program
   begin
   GenerateProgramEpilog;    
   LibProcIdentIndex := GetIdent('EXITPROCESS');  

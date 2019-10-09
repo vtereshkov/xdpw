@@ -643,6 +643,8 @@ end;
 
 procedure GenerateAssignment(DesignatorType: Integer);
 begin
+// EBX should be preserved
+
 // Source value
 Gen($58);                                                               // pop eax
 // Destination address
@@ -662,6 +664,16 @@ else
   Error('Internal fault: Illegal designator size');
 end;
 
+end;
+
+
+
+
+procedure GenerateForAssignment(DesignatorType: Integer);
+begin
+Gen($5B);                                                               // pop ebx  ; save final counter value
+GenerateAssignment(DesignatorType);
+Gen($53);                                                               // push ebx  ; restore final counter value
 end;
 
 

@@ -267,7 +267,12 @@ type
     RelocType: TRelocType;
     Pos: LongInt;
     Value: LongInt;
-  end;       
+  end;
+
+  TBlock = record
+    Index: Integer;
+    LocalDataSize, ParamDataSize, TempDataSize: LongInt;
+  end;  
     
   TUnit = record
     FileName: TString;
@@ -347,7 +352,7 @@ var
   Code: array [0..MAXCODESIZE - 1] of Byte;
   InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of Char;
   CodePosStack: array [0..1023] of Integer;
-  BlockStack: array [1..MAXBLOCKNESTING] of Integer;
+  BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
   Reloc: array [1..MAXRELOCS] of TRelocatable;
   Gotos: array [1..MAXGOTOS] of TGoto;
   BreakCall, ContinueCall: array [1..MAXLOOPNESTING] of TBreakContinueExitCallList;
@@ -363,8 +368,7 @@ var
 
   NumIdent, NumTypes, NumBlocks, BlockStackTop, NumRelocs, NumGotos, ForLoopNesting, WithNesting,
   CodeSize, CodePosStackTop, 
-  InitializedGlobalDataSize, UninitializedGlobalDataSize, LocalDataSize, ParamDataSize, TempDataSize,
-  ProgramEntryPoint,
+  InitializedGlobalDataSize, UninitializedGlobalDataSize, ProgramEntryPoint,
   UnitStackTop: Integer;
   
   IsConsoleProgram: Integer;      // More convenient than Boolean
@@ -391,9 +395,6 @@ CodeSize                    := 0;
 CodePosStackTop             := 0;
 InitializedGlobalDataSize   := 0;
 UninitializedGlobalDataSize := 0;
-LocalDataSize               := 0;
-ParamDataSize               := 0;
-TempDataSize                := 0;
 ProgramEntryPoint           := 0;
 end;
 
@@ -791,7 +792,7 @@ var
 begin
 for BlockStackIndex := BlockStackTop downto 1 do
   for IdentIndex := NumIdent downto 1 do
-    if (Ident[IdentIndex].Name = Name) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex]) then 
+    if (Ident[IdentIndex].Name = Name) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex].Index) then 
       begin
       Result := IdentIndex;
       Exit;
@@ -818,11 +819,11 @@ var
   i, AdditionalStackItems: Integer;
   Scope: TScope;
 begin
-if BlockStack[BlockStackTop] = 1 then Scope := GLOBAL else Scope := LOCAL;
+if BlockStack[BlockStackTop].Index = 1 then Scope := GLOBAL else Scope := LOCAL;
 
 i := GetIdentUnsafe(Name);
 
-if (i > 0) and (Ident[i].Block = BlockStack[BlockStackTop]) then
+if (i > 0) and (Ident[i].Block = BlockStack[BlockStackTop].Index) then
   Error('Duplicate identifier ' + Name);
 
 Inc(NumIdent);
@@ -834,7 +835,7 @@ Ident[NumIdent].Kind := Kind;
 Ident[NumIdent].Scope := Scope;
 Ident[NumIdent].RelocType := UNINITDATARELOC;
 Ident[NumIdent].DataType := DataType;
-Ident[NumIdent].Block := BlockStack[BlockStackTop];
+Ident[NumIdent].Block := BlockStack[BlockStackTop].Index;
 Ident[NumIdent].NestingLevel := BlockStackTop;
 Ident[NumIdent].NumParams := 0;
 Ident[NumIdent].PassMethod := PassMethod;
@@ -871,14 +872,18 @@ case Kind of
          else                                                                                // Inside a nested routine
            AdditionalStackItems := 2;                                                        // Return address, static link (hidden parameter)  
 
-         Ident[NumIdent].Value := (AdditionalStackItems + TotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from EBP (>0)
-         ParamDataSize := ParamDataSize + SizeOf(LongInt);                                   // Parameters always occupy 4 bytes each
+         with BlockStack[BlockStackTop] do
+           begin
+           Ident[NumIdent].Value := (AdditionalStackItems + TotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from EBP (>0)
+           ParamDataSize := ParamDataSize + SizeOf(LongInt);                                   // Parameters always occupy 4 bytes each
+           end
          end
        else
-         begin
-         Ident[NumIdent].Value := -LocalDataSize - TypeSize(DataType);                       // Local variable offset from EBP (<0)
-         LocalDataSize := LocalDataSize + TypeSize(DataType);
-         end;
+         with BlockStack[BlockStackTop] do
+           begin
+           Ident[NumIdent].Value := -LocalDataSize - TypeSize(DataType);                       // Local variable offset from EBP (<0)
+           LocalDataSize := LocalDataSize + TypeSize(DataType);
+           end;
     end; // case
 
 
@@ -911,10 +916,10 @@ if InitializedGlobalDataSize >= MAXINITIALIZEDDATASIZE then
 if UninitializedGlobalDataSize >= MAXUNINITIALIZEDDATASIZE then
   Error('Maximum uninitialized data size exceeded');
 
-if LocalDataSize >= MAXSTACKSIZE then
+if BlockStack[BlockStackTop].LocalDataSize >= MAXSTACKSIZE then
   Error('Maximum local data size exceeded');
 
-if ParamDataSize >= MAXSTACKSIZE then
+if BlockStack[BlockStackTop].ParamDataSize >= MAXSTACKSIZE then
   Error('Maximum parameter data size exceeded');
 
 end;
