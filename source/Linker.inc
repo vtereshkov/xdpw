@@ -225,9 +225,9 @@ with Headers do
     SizeOfHeaders                 := Align(SizeOf(Headers), FILEALIGN);
     Subsystem                     := 2 + IsConsoleProgram;                                // Win32 GUI/console
     SizeOfStackReserve            := $1000000;
-    SizeOfStackCommit             := $10000;
+    SizeOfStackCommit             := $100000;
     SizeOfHeapReserve             := $1000000;
-    SizeOfHeapCommit              := $10000;
+    SizeOfHeapCommit              := $100000;
     NumberOfRvaAndSizes           := 16;
     end;
 

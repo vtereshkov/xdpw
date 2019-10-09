@@ -656,6 +656,7 @@ const
 var
   Integ, Frac, InvWeight, FinalInvWeight, Digit, IntegExpon, i: Integer;
   Expon: Real;
+  WriteExpon: Boolean;
 
 begin
 // Write sign
@@ -664,17 +665,22 @@ if Number < 0 then
   WriteCh(F, P,  '-');
   Number := -Number;
   end;
-
+  
 // Normalize number
 if Number = 0 then Expon := 0 else Expon := ln(Number) / ln(10);
-if ((Expon > 8) or (Expon < -3)) and (DecPlaces <= 0) then
+if DecPlaces > 0 then
   begin
+  WriteExpon := FALSE;
+  IntegExpon := 0;
+  end
+else  
+  begin
+  WriteExpon := TRUE;
   IntegExpon := Trunc(Expon);
   if IntegExpon < 0 then Dec(IntegExpon);
   Number := Number / exp(IntegExpon * ln(10));
-  end
-else
-  IntegExpon := 0;  
+  DecPlaces := 6;
+  end;
 
 // Write integer part
 Integ := Trunc(Number);
@@ -683,8 +689,6 @@ Frac  := Round((Number - Integ) * (1 shl FracBits));
 WriteInt(F, P, Integ);  WriteCh(F, P, '.');
 
 // Write fractional part
-if DecPlaces <= 0 then DecPlaces := 4;
-
 InvWeight := 10;
 FinalInvWeight := 1;
 for i := 1 to DecPlaces do
@@ -700,9 +704,19 @@ while InvWeight <= FinalInvWeight do
   end; // while
 
 // Write exponent
-if IntegExpon <> 0 then 
+if WriteExpon then 
   begin
-  WriteCh(F, P, 'e');  WriteInt(F, P, IntegExpon);
+  WriteCh(F, P, 'e');
+
+  if IntegExpon >= 0 then
+    WriteCh(F, P, '+')
+  else
+    begin
+    WriteCh(F, P, '-');  
+    IntegExpon := -IntegExpon;
+    end;
+       
+  WriteInt(F, P, IntegExpon);
   end;
  
 end;

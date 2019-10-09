@@ -361,7 +361,6 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
  
 
 var
-  Formatter: TConst;
   DesignatorType, FileVarType, ExpressionType, FormatterType: Integer;
   LibProcIdentIndex, ConsoleIndex: Integer;
   IsFirstParam: Boolean;
@@ -511,19 +510,15 @@ case proc of
               Error('Format specifiers are not allowed for typed files');
               
             NextTok;
-            CompileConstExpression(Formatter, FormatterType);
+            CompileExpression(FormatterType, FALSE);
             GetCompatibleType(FormatterType, INTEGERTYPEINDEX);
-            
-            PushConst(Formatter.Value);
             
             // 5th argument - number of decimal places
             if (Tok.Kind = COLONTOK) and (Types[ExpressionType].Kind = REALTYPE) then
               begin
               NextTok;
-              CompileConstExpression(Formatter, FormatterType);
+              CompileExpression(FormatterType, FALSE);
               GetCompatibleType(FormatterType, INTEGERTYPEINDEX);
-              
-              PushConst(Formatter.Value);
               end
             else
               PushConst(0);
@@ -1141,7 +1136,27 @@ if FieldIndex <> 0 then
   GetFieldPtr(RecType, FieldIndex);
   ValType := Types[RecType].Field[FieldIndex]^.DataType;    
   end;
-end; // CompileFieldInsideWith  
+end; // CompileFieldInsideWith
+
+
+
+
+procedure ConvertCharToString(var ValType: Integer; IsDesignator: Boolean);
+var
+  TempStorageAddr: LongInt;
+begin
+if Types[ValType].Kind = CHARTYPE then
+  begin
+  if IsDesignator then
+    DerefPtr(ValType);
+  
+  TempStorageAddr := AllocateTempStorage(2 * SizeOf(Char));    
+  PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+  
+  GetCharAsTempString;    
+  ValType := STRINGTYPEINDEX;
+  end;
+end; // ConvertCharToString  
 
 
 
@@ -1149,8 +1164,7 @@ end; // CompileFieldInsideWith
 procedure CompileDesignator{(var ValType: Integer; ForceCharToString: Boolean)};
 var
   IdentIndex, FieldIndex: Integer;
-  ArrayIndexType: Integer;
-  TempStorageAddr: LongInt;
+  ArrayIndexType: Integer;  
   IsRefParam: Boolean;
   
 begin
@@ -1172,20 +1186,10 @@ if ValType = 0 then
              BlockStackTop - Ident[IdentIndex].NestingLevel, 
              Ident[IdentIndex].RelocType);
   
-             
-  if ForceCharToString and (Types[Ident[IdentIndex].DataType].Kind = CHARTYPE) then    // Special case: character as string
-    begin
-    DerefPtr(Ident[IdentIndex].DataType);
-    
-    TempStorageAddr := AllocateTempStorage(2 * SizeOf(Char));    
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
-    
-    GetCharAsTempString;    
-    ValType := STRINGTYPEINDEX;
-    end
-  else                                                                              // General rule
-    ValType := Ident[IdentIndex].DataType;
-
+  ValType := Ident[IdentIndex].DataType;           
+  
+  if ForceCharToString then
+    ConvertCharToString(ValType, TRUE);
 
   if Types[Ident[IdentIndex].DataType].Kind in StructuredTypes + [ANYTYPE] then
     IsRefParam := Ident[IdentIndex].PassMethod in [CONSTPASSING, VARPASSING]    // For structured parameters, CONST is equivalent to VAR
@@ -1200,6 +1204,7 @@ if ValType = 0 then
 NextTok;
 
 while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK] do
+  begin
   case Tok.Kind of
   
     DEREFERENCETOK:                                   // Pointer dereferencing
@@ -1238,6 +1243,10 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK] do
       end;
     
   end; // case
+  
+  if ForceCharToString then
+    ConvertCharToString(ValType, TRUE);
+  end; // while  
   
 end; // CompileDesignator
 
@@ -1330,7 +1339,6 @@ procedure CompileFactor(var ValType: Integer; ForceCharToString: Boolean);
   
 var
   IdentIndex: Integer;
-  TempStorageAddr: LongInt;
   NotOpTok: TToken;
 
   
@@ -1444,18 +1452,7 @@ case Tok.Kind of
   CHARLITERALTOK:
     begin
     PushConst(Tok.Value);
-    
-    if ForceCharToString then
-      begin
-      TempStorageAddr := AllocateTempStorage(2 * SizeOf(Char));    
-      PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
-    
-      GetCharAsTempString;    
-      ValType := STRINGTYPEINDEX;
-      end
-    else  
-      ValType := CHARTYPEINDEX;
-      
+    ValType := CHARTYPEINDEX;
     NextTok;
     end;
 
@@ -1501,6 +1498,8 @@ else
   Error('Expression expected but ' + GetTokSpelling(Tok.Kind) + ' found');
 end;// case
 
+if ForceCharToString then
+  ConvertCharToString(ValType, FALSE);
 end;// CompileFactor
 
 
@@ -2440,8 +2439,13 @@ procedure CompileType{(var DataType: Integer)};
     
     // Variants
     repeat
-      CompileConstExpression(TagVal, TagValType);
-      GetCompatibleType(TagType, TagValType);
+      repeat
+        CompileConstExpression(TagVal, TagValType);
+        GetCompatibleType(TagType, TagValType);
+        if Tok.Kind <> COMMATOK then Break;
+        NextTok; 
+      until FALSE;
+  
       EatTok(COLONTOK);
       EatTok(OPARTOK);
       
