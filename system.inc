@@ -653,6 +653,7 @@ end;
 procedure WriteReal(var F: file; P: PStream; Number: Real; DecPlaces: Integer);
 const
   FracBits = 16;
+  MaxDecPlaces = 7;
 var
   Integ, Frac, InvWeight, FinalInvWeight, Digit, IntegExpon, i: Integer;
   Expon: Real;
@@ -667,19 +668,36 @@ if Number < 0 then
   end;
   
 // Normalize number
-if Number = 0 then Expon := 0 else Expon := ln(Number) / ln(10);
 if DecPlaces > 0 then
   begin
   WriteExpon := FALSE;
   IntegExpon := 0;
+  if DecPlaces > MaxDecPlaces then DecPlaces := MaxDecPlaces;
   end
 else  
   begin
-  WriteExpon := TRUE;
-  IntegExpon := Trunc(Expon);
-  if IntegExpon < 0 then Dec(IntegExpon);
-  Number := Number / exp(IntegExpon * ln(10));
-  DecPlaces := 6;
+  WriteExpon := TRUE;  
+  DecPlaces := MaxDecPlaces;
+  
+  if Number = 0 then 
+    IntegExpon := 0 
+  else 
+    begin
+    Expon := ln(Number) / ln(10);
+    IntegExpon := Trunc(Expon);
+    Number := Number / exp(IntegExpon * ln(10));
+    
+    if Number >= 10 then
+      begin
+      Number := Number / 10;
+      Inc(IntegExpon);
+      end
+    else if Number < 1 then
+      begin
+      Number := Number * 10;
+      Dec(IntegExpon);    
+      end;
+    end;  
   end;
 
 // Write integer part

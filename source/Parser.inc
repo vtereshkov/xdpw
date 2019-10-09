@@ -1145,7 +1145,8 @@ procedure ConvertCharToString(var ValType: Integer; IsDesignator: Boolean);
 var
   TempStorageAddr: LongInt;
 begin
-if Types[ValType].Kind = CHARTYPE then
+// Any character is converted into a 2-character temporary string
+if (Types[ValType].Kind = CHARTYPE) or ((Types[ValType].Kind = SUBRANGETYPE) and (Types[Types[ValType].BaseType].Kind = CHARTYPE)) then
   begin
   if IsDesignator then
     DerefPtr(ValType);
