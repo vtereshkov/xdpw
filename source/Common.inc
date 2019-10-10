@@ -551,7 +551,7 @@ case Types[DataType].Kind of
   WORDTYPE:       Result :=  0;
   BYTETYPE:       Result :=  0;
   CHARTYPE:       Result :=  0;
-  BOOLEANTYPE:    Result := -1;
+  BOOLEANTYPE:    Result :=  0;
   SUBRANGETYPE:   Result :=  Types[DataType].Low;
   ENUMERATEDTYPE: Result :=  Types[DataType].Low
 else
@@ -572,7 +572,7 @@ case Types[DataType].Kind of
   WORDTYPE:       Result := 65535;
   BYTETYPE:       Result := 255;  
   CHARTYPE:       Result := 255;
-  BOOLEANTYPE:    Result := 0;
+  BOOLEANTYPE:    Result := 1;
   SUBRANGETYPE:   Result := Types[DataType].High;
   ENUMERATEDTYPE: Result := Types[DataType].High
 else

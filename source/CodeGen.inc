@@ -494,6 +494,12 @@ else                                              // Ordinal types
       Gen($F7); Gen($D0);                                               // not eax
       end;
   end;// case
+  
+  if Types[ResultType].Kind = BOOLEANTYPE then
+    begin
+    Gen($83); Gen($E0); Gen($01);                                       // and eax, 1
+    end;
+    
   Gen($50);                                                             // push eax
   end;// else
   
@@ -585,6 +591,11 @@ else                                          // Ordinal types
 
   end;// case
 
+  if Types[ResultType].Kind = BOOLEANTYPE then
+    begin
+    Gen($83); Gen($E0); Gen($01);                                       // and eax, 1
+    end;  
+  
   Gen($50);                                                             // push eax
   end;// else
 end;
@@ -603,9 +614,9 @@ if Types[ValType].Kind = REALTYPE then        // Real type
   Gen($D9); Gen($03);                                                   // fld dword ptr [ebx]  ; st(1) = operand2;  st = operand1
   Gen($58);                                                             // pop eax
   Gen($89); Gen($E3);                                                   // mov ebx, esp
-  Gen($DE); Gen($D9);                                                   // fcompp         ;  test st - st(1)
+  Gen($DE); Gen($D9);                                                   // fcompp               ;  test st - st(1)
   Gen($DF); Gen($E0);                                                   // fnstsw ax
-  Gen($68); GenDWord(-1);                                               // push FFFFFFFFh ;  TRUE
+  Gen($68); GenDWord(1);                                                // push 1               ;  TRUE
   Gen($9E);                                                             // sahf
   case rel of
     EQTOK: Gen($74);                                                    // je  ...
@@ -620,7 +631,7 @@ else                                          // Ordinal types
   begin
   Gen($59);                                                             // pop ecx
   Gen($58);                                                             // pop eax
-  Gen($68); GenDWord(-1);                                               // push FFFFFFFFh ;  TRUE
+  Gen($68); GenDWord(1);                                                // push 1               ;  TRUE
   Gen($3B); Gen($C1);                                                   // cmp eax, ecx
   case rel of
     EQTOK: Gen($74);                                                    // je  ...
@@ -634,7 +645,7 @@ else                                          // Ordinal types
 
 Gen($06);                                                               // ... +6
 Gen($59);                                                               // pop ecx
-Gen($68); GenDWord(0);                                                  // push 00000000h ;  FALSE
+Gen($68); GenDWord(0);                                                  // push 0               ;  FALSE
 end;
 
 

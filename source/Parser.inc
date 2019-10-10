@@ -277,7 +277,7 @@ if Tok.Kind in RelationOperators then
       GETOK: Yes := ConstVal.Value >= RightConstVal.Value;
     end;
 
-  if Yes then ConstVal.Value := -1 else ConstVal.Value := 0;
+  if Yes then ConstVal.Value := 1 else ConstVal.Value := 0;
   
   ConstValType := BOOLEANTYPEINDEX;
   end;
@@ -2668,8 +2668,8 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   procedure DeclarePredefinedIdents;
   begin
   // Constants
-  DeclareIdent('TRUE',  CONSTANT, 0, BOOLEANTYPEINDEX, VALPASSING, -1, 0.0, EMPTYPROC);
-  DeclareIdent('FALSE', CONSTANT, 0, BOOLEANTYPEINDEX, VALPASSING,  0, 0.0, EMPTYPROC);
+  DeclareIdent('TRUE',  CONSTANT, 0, BOOLEANTYPEINDEX, VALPASSING, 1, 0.0, EMPTYPROC);
+  DeclareIdent('FALSE', CONSTANT, 0, BOOLEANTYPEINDEX, VALPASSING, 0, 0.0, EMPTYPROC);
 
   // Types
   DeclareIdent('INTEGER',  USERTYPE, 0, INTEGERTYPEINDEX,  VALPASSING, 0, 0.0, EMPTYPROC);
@@ -2811,7 +2811,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     
       procedure CompileTypedConstConstructor(InitializedDataOffset: LongInt; ConstType: Integer);
       const
-        TrueVal: Integer = -1;
+        TrueVal: Boolean = True;
       
       var
         ConstVal, ElementVal, ElementVal2: TConst;
