@@ -371,7 +371,7 @@ var
   InitializedGlobalDataSize, UninitializedGlobalDataSize, ProgramEntryPoint,
   UnitStackTop: Integer;
   
-  IsConsoleProgram: Integer;      // More convenient than Boolean
+  IsConsoleProgram: Boolean;
   
 
 

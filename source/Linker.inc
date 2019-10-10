@@ -223,7 +223,7 @@ with Headers do
     MajorSubsystemVersion         := 4;
     SizeOfImage                   := Align(SizeOf(Headers), SECTALIGN) + Align(CodeSize, SECTALIGN) + Align(InitializedDataSize, SECTALIGN) + Align(UninitializedDataSize, SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN);
     SizeOfHeaders                 := Align(SizeOf(Headers), FILEALIGN);
-    Subsystem                     := 2 + IsConsoleProgram;                                // Win32 GUI/console
+    Subsystem                     := 2 + Ord(IsConsoleProgram);                                // Win32 GUI/console
     SizeOfStackReserve            := $1000000;
     SizeOfStackCommit             := $100000;
     SizeOfHeapReserve             := $1000000;

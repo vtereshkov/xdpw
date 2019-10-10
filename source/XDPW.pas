@@ -70,7 +70,7 @@ WriteLn('Compiling ', ProgramName);
 FillOperatorSets;
 FillTypeSets;
  
-IsConsoleProgram := 1;  // Console program by default  
+IsConsoleProgram := TRUE;  // Console program by default  
 
 ZeroAll;
 FillChar(ImportSection, SizeOf(ImportSection), #0);

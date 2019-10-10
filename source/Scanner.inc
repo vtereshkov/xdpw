@@ -210,9 +210,9 @@ else if Text = '$APPTYPE' then       // Console/GUI application type directive
     end;
     
   if Text = 'CONSOLE' then
-    IsConsoleProgram := 1
+    IsConsoleProgram := TRUE
   else if Text = 'GUI' then
-    IsConsoleProgram := 0
+    IsConsoleProgram := FALSE
   else
     Error('Unknown application type ' + Text);
   end
