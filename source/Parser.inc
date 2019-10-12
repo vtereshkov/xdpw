@@ -1785,7 +1785,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
         if Ident[LabelIndex].Block <> BlockStack[BlockStackTop].Index then
           Error('Label is not declared in current procedure');
         
-        Ident[LabelIndex].Value := CodeSize;        
+        Ident[LabelIndex].Value := GetCodeSize;        
         Ident[LabelIndex].IsUnresolvedForward := FALSE;
         Ident[LabelIndex].ForLoopNesting := ForLoopNesting;
         
@@ -1941,8 +1941,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
     ExpressionType: Integer;
     
   begin
-  Inc(CodePosStackTop);
-  CodePosStack[CodePosStackTop] := CodeSize;      // Save return address used by GenerateWhileEpilog
+  SaveCodePos;      // Save return address used by GenerateWhileEpilog
 
   NextTok;
   CompileExpression(ExpressionType, FALSE);
@@ -2041,9 +2040,8 @@ procedure CompileStatement{(LoopNesting: Integer)};
   GenerateForAssignment(Ident[CounterIndex].DataType);
   
   // Save return address used by GenerateForEpilog
-  Inc(CodePosStackTop);
-  CodePosStack[CodePosStackTop] := CodeSize;
-
+  SaveCodePos;
+  
   // Check the remaining number of iterations
   GenerateForCondition;
 
@@ -3316,7 +3314,7 @@ CompileDeclarations;
 
 if BlockStack[BlockStackTop].Index = 1 then          // Main program
   begin
-  ProgramEntryPoint := CodeSize;
+  ProgramEntryPoint := GetCodeSize;
   GenerateProgramProlog;
   GenerateTempStorageProlog;
   

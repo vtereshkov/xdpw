@@ -376,6 +376,11 @@ var
 
 
 
+function GetCodeSize: LongInt; forward;
+
+
+
+
 procedure ZeroAll;
 begin
 FillChar(Ident, SizeOf(Ident), #0);
@@ -847,7 +852,7 @@ case Kind of
   PROC, FUNC:
     if PredefProc = EMPTYPROC then
       begin
-      Ident[NumIdent].Value := CodeSize;                              // Routine entry point address
+      Ident[NumIdent].Value := GetCodeSize;                              // Routine entry point address
       Ident[NumIdent].PredefProc := EMPTYPROC;
       end
     else

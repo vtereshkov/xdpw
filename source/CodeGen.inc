@@ -5,12 +5,24 @@
 
 
 
+type
+  TRegister = (NOREG, EAX, EBX, ECX, ESI, EDI, EBP);
+  
+  
+  
+const
+  LastPushedReg: TRegister = NOREG;  
+  
+ 
+ 
+  
 procedure Gen(b: Byte);
 begin
 if CodeSize >= MAXCODESIZE then
   Error('Maximum code size exceeded');
 Code[CodeSize] := b;
 Inc(CodeSize);
+LastPushedReg := NOREG;
 end;
 
 
@@ -86,7 +98,7 @@ Inc(NumRelocs);
 if NumRelocs > MAXRELOCS then
   Error('Maximum number of relocations exceeded');  
 Reloc[NumRelocs].RelocType := RelocType;
-Reloc[NumRelocs].Pos := CodeSize;
+Reloc[NumRelocs].Pos := GetCodeSize;
 Reloc[NumRelocs].Value := dw;
 
 GenDWord(dw);
@@ -105,7 +117,7 @@ end;
 
 procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 begin
-Gen($68); GenRelocDWord(Value, RelocType);                        // push Value  ; relocatable
+Gen($68); GenRelocDWord(Value, RelocType);            // push Value  ; relocatable
 end;
 
 
@@ -130,6 +142,45 @@ for i := 1 to NumRelocs do
   
   GenDWordAt(Reloc[i].Pos, Reloc[i].Value + DeltaAddr);
   end;
+end; 
+
+
+
+
+procedure GenPushReg(Reg: TRegister);
+begin
+case Reg of
+  EAX: Gen($50);            // push eax
+  EBX: Gen($53);            // push ebx
+  ECX: Gen($51);            // push ecx
+  ESI: Gen($56);            // push esi
+  EDI: Gen($57);            // push edi
+  EBP: Gen($55)             // push ebp
+else
+  Error('Internal fault: Unknown register');  
+end;
+LastPushedReg := Reg;
+end;  
+
+
+
+
+procedure GenPopReg(Reg: TRegister);
+begin
+if Reg = LastPushedReg then
+  Dec(CodeSize)
+else  
+  case Reg of
+    EAX: Gen($58);            // pop eax
+    EBX: Gen($5B);            // pop ebx
+    ECX: Gen($59);            // pop ecx
+    ESI: Gen($5E);            // pop esi
+    EDI: Gen($5F);            // pop edi
+    EBP: Gen($5D)             // pop ebp
+  else
+    Error('Internal fault: Unknown register');  
+  end;
+LastPushedReg := NOREG;  
 end;  
 
 
@@ -159,7 +210,7 @@ case Scope of
         end;
       Gen($8D); Gen($86); GenDWord(Addr);                       // lea eax, [esi + Addr]
       end;
-    Gen($50);                                                   // push eax
+    GenPushReg(EAX);                                            // push eax
     end;// if
 end;// case
 end;
@@ -169,7 +220,7 @@ end;
 
 procedure DerefPtr(DataType: Integer);
 begin
-Gen($5E);                                                         // pop esi
+GenPopReg(ESI);                                                   // pop esi
 
 case TypeSize(DataType) of
 
@@ -204,7 +255,7 @@ else
   Error('Internal fault: Illegal designator size');
 end;
 
-Gen($50);                                                         // push eax
+GenPushReg(EAX);                                                  // push eax
 end;
 
 
@@ -230,7 +281,7 @@ var
   Log2BaseTypeSize: ShortInt;
 
 begin
-Gen($58);                                                       // pop eax           ; Array index
+GenPopReg(EAX);                                                 // pop eax           ; Array index
 
 IndexLowBound := LowBound(Types[ArrType].IndexType);
 if IndexLowBound = 1 then
@@ -253,9 +304,9 @@ else if Log2BaseTypeSize < 0 then
   Gen($F7); Gen($E1);                                           // mul ecx
   end;
 
-Gen($5B);                                                       // pop ebx            ; Array base offset
+GenPopReg(EBX);                                                 // pop ebx            ; Array base offset
 Gen($03); Gen($D8);                                             // add ebx, eax
-Gen($53);                                                       // push ebx
+GenPushReg(EBX);                                                // push ebx
 end;
 
 
@@ -268,9 +319,9 @@ begin
 Offset := Types[RecType].Field[FieldIndex]^.Offset;
 if Offset > 0 then
   begin
-  Gen($58);                                                       // pop eax
+  GenPopReg(EAX);                                                 // pop eax
   Gen($05); GenDWord(Offset);                                     // add eax, Offset
-  Gen($50);                                                       // push eax
+  GenPushReg(EAX);                                                // push eax
   end;
 end;
 
@@ -279,11 +330,11 @@ end;
 
 procedure GetCharAsTempString;
 begin
-Gen($5E);                                                         // pop esi                  ; Temporary string address
-Gen($58);                                                         // pop eax                  ; Character
+GenPopReg(ESI);                                                   // pop esi                  ; Temporary string address
+GenPopReg(EAX);                                                   // pop eax                  ; Character
 Gen($88); Gen($06);                                               // mov byte ptr [esi], al
 Gen($C6); Gen($46); Gen($01); Gen($00);                           // mov byte ptr [esi + 1], 0
-Gen($56);                                                         // push esi
+GenPushReg(ESI);                                                  // push esi
 end;
 
 
@@ -291,7 +342,7 @@ end;
 
 procedure SaveStackTopToEAX;
 begin
-Gen($58);                                                                               // pop eax
+GenPopReg(EAX);                                                                               // pop eax
 end;
 
 
@@ -299,7 +350,7 @@ end;
 
 procedure RestoreStackTopFromEAX;
 begin
-Gen($50);                                                                               // push eax
+GenPushReg(EAX);                                                                               // push eax
 end;
 
 
@@ -329,9 +380,36 @@ end;
 
 
 
+function GetCodeSize{: LongInt};
+begin
+LastPushedReg := NOREG;
+Result := CodeSize;
+end;
+
+
+
+
+procedure SaveCodePos;
+begin
+Inc(CodePosStackTop);
+CodePosStack[CodePosStackTop] := GetCodeSize;
+end;
+
+
+
+
+function RestoreCodePos: LongInt;
+begin
+Result := CodePosStack[CodePosStackTop];
+Dec(CodePosStackTop);
+end;
+
+
+
+
 procedure GenerateIncDec(proc: TPredefProc; Size: Byte);
 begin
-Gen($5E);                                                             // pop esi
+GenPopReg(ESI);                                                       // pop esi
 
 case Size of
   1: begin
@@ -450,17 +528,17 @@ else                                // Ordinal types
   case func of
     ABSFUNC:
       begin
-      Gen($58);                                                         // pop eax
+      GenPopReg(EAX);                                                   // pop eax
       Gen($83); Gen($F8); Gen($00);                                     // cmp eax, 0
       Gen($7D); Gen($02);                                               // jge +2
       Gen($F7); Gen($D8);                                               // neg eax
-      Gen($50);                                                         // push eax
+      GenPushReg(EAX);                                                  // push eax
       end;
     SQRFUNC:
       begin
-      Gen($58);                                                         // pop eax
+      GenPopReg(EAX);                                                   // pop eax
       Gen($F7); Gen($E8);                                               // imul eax
-      Gen($50);                                                         // push eax
+      GenPushReg(EAX);                                                  // push eax
       end;
   end;// case
 end;// GenerateMathFunction
@@ -483,7 +561,7 @@ if Types[ResultType].Kind = REALTYPE then     // Real type
   end
 else                                              // Ordinal types
   begin
-  Gen($58);                                                             // pop eax
+  GenPopReg(EAX);                                                       // pop eax
   case op of
     MINUSTOK:
       begin
@@ -500,7 +578,7 @@ else                                              // Ordinal types
     Gen($83); Gen($E0); Gen($01);                                       // and eax, 1
     end;
     
-  Gen($50);                                                             // push eax
+  GenPushReg(EAX);                                                      // push eax
   end;// else
   
 end;
@@ -514,7 +592,7 @@ if Types[ResultType].Kind = REALTYPE then     // Real type
   begin
   Gen($89); Gen($E3);                                                   // mov ebx, esp
   Gen($D9); Gen($03);                                                   // fld dword ptr [ebx]  ; st = operand2
-  Gen($58);                                                             // pop eax
+  GenPopReg(EAX);                                                       // pop eax
   Gen($89); Gen($E3);                                                   // mov ebx, esp
   Gen($D9); Gen($03);                                                   // fld dword ptr [ebx]  ; st(1) = operand2;  st = operand1
   Gen($D9); Gen($C9);                                                   // fxch                 ; st = operand2;  st(1) = operand1
@@ -543,8 +621,8 @@ if Types[ResultType].Kind = REALTYPE then     // Real type
   end // if
 else                                          // Ordinal types
   begin
-  Gen($59);                                                             // pop ecx
-  Gen($58);                                                             // pop eax
+  GenPopReg(ECX);                                                       // pop ecx
+  GenPopReg(EAX);                                                       // pop eax
 
   case op of
     PLUSTOK:
@@ -596,7 +674,7 @@ else                                          // Ordinal types
     Gen($83); Gen($E0); Gen($01);                                       // and eax, 1
     end;  
   
-  Gen($50);                                                             // push eax
+  GenPushReg(EAX);                                                      // push eax
   end;// else
 end;
 
@@ -609,10 +687,10 @@ if Types[ValType].Kind = REALTYPE then        // Real type
   begin
   Gen($89); Gen($E3);                                                   // mov ebx, esp
   Gen($D9); Gen($03);                                                   // fld dword ptr [ebx]  ; st = operand2
-  Gen($58);                                                             // pop eax
+  GenPopReg(EAX);                                                       // pop eax
   Gen($89); Gen($E3);                                                   // mov ebx, esp
   Gen($D9); Gen($03);                                                   // fld dword ptr [ebx]  ; st(1) = operand2;  st = operand1
-  Gen($58);                                                             // pop eax
+  GenPopReg(EAX);                                                       // pop eax
   Gen($89); Gen($E3);                                                   // mov ebx, esp
   Gen($DE); Gen($D9);                                                   // fcompp               ;  test st - st(1)
   Gen($DF); Gen($E0);                                                   // fnstsw ax
@@ -629,8 +707,8 @@ if Types[ValType].Kind = REALTYPE then        // Real type
   end
 else                                          // Ordinal types
   begin
-  Gen($59);                                                             // pop ecx
-  Gen($58);                                                             // pop eax
+  GenPopReg(ECX);                                                       // pop ecx
+  GenPopReg(EAX);                                                       // pop eax
   Gen($68); GenDWord(1);                                                // push 1               ;  TRUE
   Gen($3B); Gen($C1);                                                   // cmp eax, ecx
   case rel of
@@ -644,7 +722,7 @@ else                                          // Ordinal types
   end;// else
 
 Gen($06);                                                               // ... +6
-Gen($59);                                                               // pop ecx
+GenPopReg(ECX);                                                         // pop ecx
 Gen($68); GenDWord(0);                                                  // push 0               ;  FALSE
 end;
 
@@ -657,9 +735,9 @@ begin
 // EBX should be preserved
 
 // Source value
-Gen($58);                                                               // pop eax
+GenPopReg(EAX);                                                               // pop eax
 // Destination address
-Gen($5E);                                                               // pop esi
+GenPopReg(ESI);                                                               // pop esi
 
 case TypeSize(DesignatorType) of
   1: begin
@@ -682,9 +760,9 @@ end;
 
 procedure GenerateForAssignment(DesignatorType: Integer);
 begin
-Gen($5B);                                                               // pop ebx  ; save final counter value
+GenPopReg(EBX);                                                               // pop ebx  ; save final counter value
 GenerateAssignment(DesignatorType);
-Gen($53);                                                               // push ebx  ; restore final counter value
+GenPushReg(EBX);                                                              // push ebx  ; restore final counter value
 end;
 
 
@@ -693,9 +771,9 @@ end;
 procedure GenerateStructuredAssignment(DesignatorType: Integer);
 begin
 // Source address
-Gen($5E);                                                               // pop esi
+GenPopReg(ESI);                                                         // pop esi
 // Destination address
-Gen($5F);                                                               // pop edi
+GenPopReg(EDI);                                                         // pop edi
 
 // Copy source to destination
 Gen($B9); GenDWord(TypeSize(DesignatorType));                           // mov ecx, TypeSize(DesignatorType)
@@ -743,7 +821,7 @@ if (CallerNesting < 0) or (CalleeNesting < 1) or (CallerNesting - CalleeNesting 
 if CalleeNesting > 1 then                        // If a nested routine is called, push static link as the last hidden parameter
   if CallerNesting - CalleeNesting = -1 then     // The caller and the callee's enclosing routine are at the same nesting level
     begin
-    Gen($55);                                                             // push ebp
+    GenPushReg(EBP);                                                             // push ebp
     end
   else                                           // The caller is deeper
     begin
@@ -752,11 +830,11 @@ if CalleeNesting > 1 then                        // If a nested routine is calle
       begin
       Gen($8B); Gen($76); Gen(StaticLinkAddr);                            // mov esi, [esi + StaticLinkAddr]
       end;
-    Gen($56);                                                             // push esi
+    GenPushReg(ESI);                                                      // push esi
     end;
 
 // Call the routine  
-CodePos := CodeSize;
+CodePos := GetCodeSize;
 Gen($E8); GenDWord(EntryPoint - (CodePos + 5));                           // call EntryPoint
 end;
 
@@ -766,7 +844,7 @@ end;
 procedure GenerateIndirectCall(NumParam: Integer);
 begin
 Gen($FF); Gen($94); Gen($24); GenDWord(SizeOf(LongInt) * NumParam);       // call dword ptr [esp + 4 * NumParam]
-Gen($59);                                                                 // pop ecx  ; pop and discard call address
+GenPopReg(ECX);                                                           // pop ecx  ; pop and discard call address
 end;
 
 
@@ -798,7 +876,7 @@ end;
 
 procedure GenerateForwardResolution(CodePos: Integer);
 begin
-GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, CodeSize - (CodePos + 5));      // jmp CodeSize
+GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, GetCodeSize - (CodePos + 5));      // jmp GetCodeSize
 end;
 
 
@@ -814,7 +892,7 @@ end;
 
 procedure GenerateIfCondition;
 begin
-Gen($58);                                                   // pop eax
+GenPopReg(EAX);                                             // pop eax
 Gen($83); Gen($F8); Gen($00);                               // cmp eax, 0
 Gen($75); Gen($05);                                         // jne +5
 end;
@@ -824,8 +902,7 @@ end;
 
 procedure GenerateIfProlog;
 begin
-Inc(CodePosStackTop);
-CodePosStack[CodePosStackTop] := CodeSize;
+SaveCodePos;
 
 Gen($90);                                                   // nop   ; jump to the IF block end will be inserted here
 Gen($90);                                                   // nop
@@ -841,10 +918,8 @@ procedure GenerateElseProlog;
 var
   CodePos: Integer;
 begin
-CodePos := CodePosStack[CodePosStackTop];
-Dec(CodePosStackTop);
-
-GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, CodeSize - (CodePos + 5) + 5);  // jmp (IF..THEN block end)
+CodePos := RestoreCodePos;
+GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, GetCodeSize - (CodePos + 5) + 5);  // jmp (IF..THEN block end)
 
 GenerateIfProlog;
 end;
@@ -856,10 +931,8 @@ procedure GenerateIfElseEpilog;
 var
   CodePos: Integer;
 begin
-CodePos := CodePosStack[CodePosStackTop];
-Dec(CodePosStackTop);
-
-GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, CodeSize - (CodePos + 5));      // jmp (IF..THEN block end)
+CodePos := RestoreCodePos;
+GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, GetCodeSize - (CodePos + 5));      // jmp (IF..THEN block end)
 end;
 
 
@@ -867,7 +940,7 @@ end;
 
 procedure GenerateCaseProlog;
 begin
-Gen($59);                                                   // pop ecx           ; CASE switch value
+GenPopReg(ECX);                                             // pop ecx           ; CASE switch value
 Gen($B0); Gen($00);                                         // mov al, 00h       ; initial flag mask
 end;
 
@@ -921,7 +994,7 @@ procedure GenerateCaseStatementEpilog;
 var
   StoredCodeSize: LongInt;
 begin
-StoredCodeSize := CodeSize;
+StoredCodeSize := GetCodeSize;
 
 Gen($90);                                                   // nop   ; jump to the CASE block end will be inserted here
 Gen($90);                                                   // nop
@@ -958,16 +1031,11 @@ procedure GenerateWhileEpilog;
 var
   CodePos, CurPos, ReturnPos: Integer;
 begin
-CodePos := CodePosStack[CodePosStackTop];
-Dec(CodePosStackTop);
+CodePos := RestoreCodePos;
+GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, GetCodeSize - (CodePos + 5) + 5);  // jmp (WHILE..DO block end)
 
-GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, CodeSize - (CodePos + 5) + 5);  // jmp (WHILE..DO block end)
-
-ReturnPos := CodePosStack[CodePosStackTop];
-Dec(CodePosStackTop);
-
-CurPos := CodeSize;
-
+ReturnPos := RestoreCodePos;
+CurPos := GetCodeSize;
 Gen($E9); GenDWord(ReturnPos - (CurPos + 5));                                // jmp ReturnPos
 end;
 
@@ -984,8 +1052,7 @@ end;
 
 procedure GenerateRepeatProlog;
 begin
-Inc(CodePosStackTop);
-CodePosStack[CodePosStackTop] := CodeSize;
+SaveCodePos;
 end;
 
 
@@ -995,11 +1062,8 @@ procedure GenerateRepeatEpilog;
 var
   CurPos, ReturnPos: Integer;
 begin
-ReturnPos := CodePosStack[CodePosStackTop];
-Dec(CodePosStackTop);
-
-CurPos := CodeSize;
-
+ReturnPos := RestoreCodePos;
+CurPos := GetCodeSize;
 Gen($E9); GenDWord(ReturnPos - (CurPos + 5));               // jmp ReturnPos
 end;
 
@@ -1010,18 +1074,18 @@ procedure GenerateForNumberOfIterations(Down: Boolean);
 begin
 if Down then
   begin
-  Gen($59);                                                 // pop ecx       ; final value
-  Gen($58);                                                 // pop eax       ; initial value  
+  GenPopReg(ECX);                                                 // pop ecx       ; final value
+  GenPopReg(EAX);                                                 // pop eax       ; initial value  
   end
 else
   begin  
-  Gen($58);                                                 // pop eax       ; final value
-  Gen($59);                                                 // pop ecx       ; initial value
+  GenPopReg(EAX);                                                 // pop eax       ; final value
+  GenPopReg(ECX);                                                 // pop ecx       ; initial value
   end;    
   
-Gen($2B); Gen($C1);                                         // sub eax, ecx
-Gen($40);                                                   // inc eax
-Gen($50);                                                   // push eax  
+Gen($2B); Gen($C1);                                               // sub eax, ecx
+Gen($40);                                                         // inc eax
+GenPushReg(EAX);                                                  // push eax  
 end;
 
 
@@ -1029,10 +1093,10 @@ end;
 
 procedure GenerateForCondition;
 begin
-Gen($58);                                                   // pop eax       ; remaining number of iterations
-Gen($50);                                                   // push eax
-Gen($83); Gen($F8); Gen($00);                               // cmp eax, 0
-Gen($7F); Gen($05);                                         // jg +5
+GenPopReg(EAX);                                                   // pop eax       ; remaining number of iterations
+GenPushReg(EAX);                                                  // push eax
+Gen($83); Gen($F8); Gen($00);                                     // cmp eax, 0
+Gen($7F); Gen($05);                                               // jg +5
 end;
 
 
@@ -1056,9 +1120,9 @@ else
   GenerateIncDec(INCPROC, TypeSize(CounterType));
   
 // Decrement remaining number of iterations
-Gen($58);                                                   // pop eax
-Gen($48);                                                   // dec eax
-Gen($50);                                                   // push eax
+GenPopReg(EAX);                                                   // pop eax
+Gen($48);                                                         // dec eax
+GenPushReg(EAX);                                                  // push eax
   
 GenerateWhileEpilog;
 
@@ -1079,7 +1143,7 @@ end;
 procedure GenerateGoto(LabelIndex: Integer);
 begin
 Inc(NumGotos);
-Gotos[NumGotos].Pos := CodeSize;
+Gotos[NumGotos].Pos := GetCodeSize;
 Gotos[NumGotos].LabelIndex := LabelIndex;
 Gotos[NumGotos].ForLoopNesting := ForLoopNesting;
 
@@ -1143,7 +1207,7 @@ end;
 
 procedure GenerateStackFrameProlog(TotalLocalVarsSize: Integer);
 begin
-Gen($55);                                                     // push ebp
+GenPushReg(EBP);                                              // push ebp
 Gen($8B); Gen($EC);                                           // mov ebp, esp
 Gen($81); Gen($EC); GenDWord(TotalLocalVarsSize);             // sub esp, TotalLocalVarsSize
 end;
@@ -1151,11 +1215,10 @@ end;
 
 
 
-
 procedure GenerateStackFrameEpilog;
 begin
 Gen($8B); Gen($E5);                                           // mov esp, ebp
-Gen($5D);                                                     // pop ebp
+GenPopReg(EBP);                                               // pop ebp
 end;
 
 
@@ -1163,8 +1226,7 @@ end;
 
 procedure GenerateTempStorageProlog;
 begin
-Inc(CodePosStackTop);
-CodePosStack[CodePosStackTop] := CodeSize;
+SaveCodePos;
 
 Gen($90);                                                     // nop   ; actual stack storage size will be inserted here 
 Gen($90);                                                     // nop
@@ -1181,9 +1243,7 @@ procedure GenerateTempStorageEpilog(TotalTempStorageSize: Integer);
 var
   CodePos: Integer;
 begin
-CodePos := CodePosStack[CodePosStackTop];
-Dec(CodePosStackTop);
-
+CodePos := RestoreCodePos;
 GenAt(CodePos, $81); GenAt(CodePos + 1, $EC); GenDWordAt(CodePos + 2, TotalTempStorageSize);      // sub esp, TotalTempStorageSize
 end;
 
@@ -1201,7 +1261,7 @@ end;
 procedure GenerateBreakCall(LoopNesting: Integer);
 begin
 Inc(BreakCall[LoopNesting].NumCalls);
-BreakCall[LoopNesting].Pos[BreakCall[LoopNesting].NumCalls] := CodeSize;
+BreakCall[LoopNesting].Pos[BreakCall[LoopNesting].NumCalls] := GetCodeSize;
 
 GenerateForwardReference;
 end;
@@ -1231,7 +1291,7 @@ end;
 procedure GenerateContinueCall(LoopNesting: Integer);
 begin
 Inc(ContinueCall[LoopNesting].NumCalls);
-ContinueCall[LoopNesting].Pos[ContinueCall[LoopNesting].NumCalls] := CodeSize;
+ContinueCall[LoopNesting].Pos[ContinueCall[LoopNesting].NumCalls] := GetCodeSize;
 
 GenerateForwardReference;
 end;
@@ -1263,7 +1323,7 @@ begin
 DiscardStackTop(ForLoopNesting);      // Remove the remaining numbers of iterations of all nested FOR loops
 
 Inc(ExitCall.NumCalls);
-ExitCall.Pos[ExitCall.NumCalls] := CodeSize;
+ExitCall.Pos[ExitCall.NumCalls] := GetCodeSize;
 
 GenerateForwardReference;
 end;
