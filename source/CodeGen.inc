@@ -6,12 +6,14 @@
 
 
 type
-  TRegister = (NOREG, EAX, EBX, ECX, ESI, EDI, EBP);
+  TRegister = (NOREG, EAX, ECX, ESI, EDI, EBP);
   
   
   
 const
   LastPushedReg: TRegister = NOREG;  
+  LastPushedConst: LongInt = 0;
+  LastPushedConstValid: Boolean = FALSE;
   
  
  
@@ -22,7 +24,9 @@ if CodeSize >= MAXCODESIZE then
   Error('Maximum code size exceeded');
 Code[CodeSize] := b;
 Inc(CodeSize);
+
 LastPushedReg := NOREG;
+LastPushedConstValid := FALSE;
 end;
 
 
@@ -110,6 +114,9 @@ end;
 procedure PushConst(Value: LongInt);
 begin
 Gen($68); GenDWord(Value);                            // push Value
+
+LastPushedConst := Value;
+LastPushedConstValid := TRUE;
 end;
 
 
@@ -151,13 +158,12 @@ procedure GenPushReg(Reg: TRegister);
 begin
 case Reg of
   EAX: Gen($50);            // push eax
-  EBX: Gen($53);            // push ebx
   ECX: Gen($51);            // push ecx
   ESI: Gen($56);            // push esi
   EDI: Gen($57);            // push edi
   EBP: Gen($55)             // push ebp
 else
-  Error('Internal fault: Unknown register');  
+  Error('Internal fault: Illegal register');  
 end;
 LastPushedReg := Reg;
 end;  
@@ -167,12 +173,36 @@ end;
 
 procedure GenPopReg(Reg: TRegister);
 begin
-if Reg = LastPushedReg then
+if Reg = LastPushedReg then                           // Meaningless 'push Reg / pop Reg' - remove 'push Reg' from the stack  
   Dec(CodeSize)
-else  
+                                       
+else if (Reg = ECX) and (LastPushedReg = EAX) then    // Special case - replace push eax / pop ecx
+  begin
+  Dec(CodeSize);                                       
+  Gen($89); Gen($C1);                                 // mov ecx, eax
+  end
+  
+else if (Reg = ESI) and (LastPushedReg = EAX) then    // Special case - replace push eax / pop esi
+  begin
+  Dec(CodeSize);                                       
+  Gen($89); Gen($C6);                                 // mov esi, eax
+  end
+  
+else if (Reg = EAX) and LastPushedConstValid then     // Special case - replace push Value / pop eax
+  begin
+  CodeSize := CodeSize - 5;                                       
+  Gen($B8); GenDWord(LastPushedConst);                // mov eax, Value
+  end
+  
+else if (Reg = ECX) and LastPushedConstValid then     // Special case - replace push Value / pop ecx
+  begin
+  CodeSize := CodeSize - 5;                                       
+  Gen($B9); GenDWord(LastPushedConst);                // mov ecx, Value
+  end
+ 
+else                                                  // General rule
   case Reg of
     EAX: Gen($58);            // pop eax
-    EBX: Gen($5B);            // pop ebx
     ECX: Gen($59);            // pop ecx
     ESI: Gen($5E);            // pop esi
     EDI: Gen($5F);            // pop edi
@@ -180,7 +210,9 @@ else
   else
     Error('Internal fault: Unknown register');  
   end;
-LastPushedReg := NOREG;  
+  
+LastPushedReg := NOREG;
+LastPushedConstValid := FALSE;  
 end;  
 
 
@@ -199,7 +231,7 @@ case Scope of
     begin
     if DeltaNesting = 0 then                  // Strictly local variable
       begin
-      Gen($8D); Gen($85); GenDWord(Addr);                       // lea eax, [ebp + Addr]
+      Gen($8D); Gen($B5); GenDWord(Addr);                       // lea esi, [ebp + Addr]
       end
     else                                      // Intermediate level variable
       begin
@@ -208,9 +240,9 @@ case Scope of
         begin
         Gen($8B); Gen($76); Gen(StaticLinkAddr);                // mov esi, [esi + StaticLinkAddr]
         end;
-      Gen($8D); Gen($86); GenDWord(Addr);                       // lea eax, [esi + Addr]
+      Gen($8D); Gen($B6); GenDWord(Addr);                       // lea esi, [esi + Addr]
       end;
-    GenPushReg(EAX);                                            // push eax
+    GenPushReg(ESI);                                            // push esi
     end;// if
 end;// case
 end;
@@ -300,13 +332,12 @@ if Log2BaseTypeSize > 0 then
   end
 else if Log2BaseTypeSize < 0 then
   begin
-  Gen($B9); GenDWord(BaseTypeSize);                             // mov ecx, BaseTypeSize
-  Gen($F7); Gen($E1);                                           // mul ecx
+  Gen($69); Gen($C0); GenDWord(BaseTypeSize);                   // imul eax, BaseTypeSize
   end;
 
-GenPopReg(EBX);                                                 // pop ebx            ; Array base offset
-Gen($03); Gen($D8);                                             // add ebx, eax
-GenPushReg(EBX);                                                // push ebx
+GenPopReg(ESI);                                                 // pop esi            ; Array base offset
+Gen($01); Gen($C6);                                             // add esi, eax
+GenPushReg(ESI);                                                // push esi
 end;
 
 
@@ -319,9 +350,9 @@ begin
 Offset := Types[RecType].Field[FieldIndex]^.Offset;
 if Offset > 0 then
   begin
-  GenPopReg(EAX);                                                 // pop eax
-  Gen($05); GenDWord(Offset);                                     // add eax, Offset
-  GenPushReg(EAX);                                                // push eax
+  GenPopReg(ESI);                                                 // pop esi
+  Gen($81); Gen($C6); GenDWord(Offset);                           // add esi, Offset
+  GenPushReg(ESI);                                                // push esi
   end;
 end;
 
@@ -342,7 +373,7 @@ end;
 
 procedure SaveStackTopToEAX;
 begin
-GenPopReg(EAX);                                                                               // pop eax
+GenPopReg(EAX);                                                    // pop eax
 end;
 
 
@@ -350,7 +381,7 @@ end;
 
 procedure RestoreStackTopFromEAX;
 begin
-GenPushReg(EAX);                                                                               // push eax
+GenPushReg(EAX);                                                   // push eax
 end;
 
 
@@ -383,6 +414,8 @@ end;
 function GetCodeSize{: LongInt};
 begin
 LastPushedReg := NOREG;
+LastPushedConstValid := FALSE;
+
 Result := CodeSize;
 end;
 
@@ -732,12 +765,12 @@ end;
 
 procedure GenerateAssignment(DesignatorType: Integer);
 begin
-// EBX should be preserved
+// ECX should be preserved
 
 // Source value
-GenPopReg(EAX);                                                               // pop eax
+GenPopReg(EAX);                                                         // pop eax
 // Destination address
-GenPopReg(ESI);                                                               // pop esi
+GenPopReg(ESI);                                                         // pop esi
 
 case TypeSize(DesignatorType) of
   1: begin
@@ -760,9 +793,9 @@ end;
 
 procedure GenerateForAssignment(DesignatorType: Integer);
 begin
-GenPopReg(EBX);                                                               // pop ebx  ; save final counter value
+GenPopReg(ECX);                                                         // pop ecx  ; save final counter value
 GenerateAssignment(DesignatorType);
-GenPushReg(EBX);                                                              // push ebx  ; restore final counter value
+GenPushReg(ECX);                                                        // push ecx  ; restore final counter value
 end;
 
 
@@ -821,7 +854,7 @@ if (CallerNesting < 0) or (CalleeNesting < 1) or (CallerNesting - CalleeNesting 
 if CalleeNesting > 1 then                        // If a nested routine is called, push static link as the last hidden parameter
   if CallerNesting - CalleeNesting = -1 then     // The caller and the callee's enclosing routine are at the same nesting level
     begin
-    GenPushReg(EBP);                                                             // push ebp
+    GenPushReg(EBP);                                                      // push ebp
     end
   else                                           // The caller is deeper
     begin
@@ -884,7 +917,7 @@ end;
 
 procedure GenerateForwardResolutionToDestination(CodePos, DestPos: Integer);
 begin
-GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, DestPos - (CodePos + 5));       // jmp DestPos
+GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, DestPos - (CodePos + 5));          // jmp DestPos
 end;
 
 
@@ -1036,7 +1069,7 @@ GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, GetCodeSize - (CodePos + 5) + 5);  
 
 ReturnPos := RestoreCodePos;
 CurPos := GetCodeSize;
-Gen($E9); GenDWord(ReturnPos - (CurPos + 5));                                // jmp ReturnPos
+Gen($E9); GenDWord(ReturnPos - (CurPos + 5));                                   // jmp ReturnPos
 end;
 
 
