@@ -1160,5 +1160,28 @@ for i := 0 to SizeOf(SetStorage1) - 1 do
     Result := 1;
     Exit;
     end;
-end;  
+end; 
+
+
+
+
+function TestSubset(const SetStorage1, SetStorage2: TSetStorage): Integer;
+var
+  IntersectionStorage: TSetStorage;
+begin
+SetIntersection(SetStorage1, SetStorage2, IntersectionStorage);
+if CompareSets(SetStorage1, IntersectionStorage) = 0 then Result := -1 else Result := 1;
+end;
+
+
+
+
+function TestSuperset(const SetStorage1, SetStorage2: TSetStorage): Integer;
+var
+  IntersectionStorage: TSetStorage;
+begin
+SetIntersection(SetStorage1, SetStorage2, IntersectionStorage);
+if CompareSets(SetStorage2, IntersectionStorage) = 0 then Result := 1 else Result := -1;
+end; 
+ 
  

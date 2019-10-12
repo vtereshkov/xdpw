@@ -1697,17 +1697,21 @@ if Tok.Kind in RelationOperators then
     end;
 
   // Special case: set comparison
-  if (OpTok.Kind in [EQTOK, NETOK]) and (Types[ValType].Kind = SETTYPE) then
+  if (OpTok.Kind in [EQTOK, NETOK, GETOK, LETOK]) and (Types[ValType].Kind = SETTYPE) then
     begin
-    ValType := GetCompatibleType(ValType, RightValType); 
+    GetCompatibleType(ValType, RightValType); 
     
-    LibProcIdentIndex := GetIdent('COMPARESETS');
+    case OpTok.Kind of
+      GETOK: LibProcIdentIndex := GetIdent('TESTSUPERSET');    // Returns  1 if Val >= RightVal, -1 otherwise 
+      LETOK: LibProcIdentIndex := GetIdent('TESTSUBSET')       // Returns -1 if Val <= RightVal,  1 otherwise 
+      else   LibProcIdentIndex := GetIdent('COMPARESETS');     // Returns  0 if Val  = RightVal,  1 otherwise  
+    end; 
     
     GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
     RestoreStackTopFromEAX;
     ValType := Ident[LibProcIdentIndex].DataType;
     
-    PushConst(0);
+    PushConst(0);  
     RightValType := INTEGERTYPEINDEX;
     end;  
 
