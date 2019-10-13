@@ -6,17 +6,24 @@
 
 
 type
-  TRegister = (NOREG, EAX, ECX, ESI, EDI, EBP);
+  TRegister = (EMPTYREG, EAX, ECX, ESI, EDI, EBP);
+   
+  TInstructionKind = (EMPTYOP, PUSHREGOP, PUSHCONSTOP);
+  
+  TInstruction = record
+    Kind: TInstructionKind;
+    Reg: TRegister;
+    Value: LongInt;
+  end;
+  
   
   
   
 const
-  LastPushedReg: TRegister = NOREG;  
-  LastPushedConst: LongInt = 0;
-  LastPushedConstValid: Boolean = FALSE;
+  OptimizedInstruction: TInstruction = (Kind: EMPTYOP; Reg: EMPTYREG; Value: 0);
   
- 
- 
+
+
   
 procedure Gen(b: Byte);
 begin
@@ -25,8 +32,8 @@ if CodeSize >= MAXCODESIZE then
 Code[CodeSize] := b;
 Inc(CodeSize);
 
-LastPushedReg := NOREG;
-LastPushedConstValid := FALSE;
+// If an instruction has not been optimized immediately, it will not be optimized at all
+OptimizedInstruction.Kind := EMPTYOP;
 end;
 
 
@@ -115,8 +122,8 @@ procedure PushConst(Value: LongInt);
 begin
 Gen($68); GenDWord(Value);                            // push Value
 
-LastPushedConst := Value;
-LastPushedConstValid := TRUE;
+OptimizedInstruction.Kind := PUSHCONSTOP;
+OptimizedInstruction.Value := Value;
 end;
 
 
@@ -149,7 +156,56 @@ for i := 1 to NumRelocs do
   
   GenDWordAt(Reloc[i].Pos, Reloc[i].Value + DeltaAddr);
   end;
-end; 
+end;
+
+
+
+
+function OptimizePop(Reg: TRegister): Boolean;
+begin
+Result := FALSE;
+
+if OptimizedInstruction.Kind = PUSHREGOP then
+  begin
+  if Reg = OptimizedInstruction.Reg then                            // Meaningless 'push Reg / pop Reg' - remove 'push Reg' from the stack  
+    begin
+    Dec(CodeSize);
+    Result := TRUE;
+    end
+                                         
+  else if (Reg = ECX) and (OptimizedInstruction.Reg = EAX) then     // Special case - replace push eax / pop ecx
+    begin
+    Dec(CodeSize);                                       
+    Gen($89); Gen($C1);                                             // mov ecx, eax
+    Result := TRUE;
+    end
+    
+  else if (Reg = ESI) and (OptimizedInstruction.Reg = EAX) then     // Special case - replace push eax / pop esi
+    begin
+    Dec(CodeSize);                                       
+    Gen($89); Gen($C6);                                             // mov esi, eax
+    Result := TRUE;
+    end
+  end  
+
+else if OptimizedInstruction.Kind = PUSHCONSTOP then
+  begin  
+  if Reg = EAX then                                                 // Special case - replace push Value / pop eax
+    begin
+    CodeSize := CodeSize - 5;                                       
+    Gen($B8); GenDWord(OptimizedInstruction.Value);                 // mov eax, Value
+    Result := TRUE;
+    end
+    
+  else if Reg = ECX then                                            // Special case - replace push Value / pop ecx
+    begin
+    CodeSize := CodeSize - 5;                                       
+    Gen($B9); GenDWord(OptimizedInstruction.Value);                 // mov ecx, Value
+    Result := TRUE;
+    end
+  end
+  
+end;
 
 
 
@@ -165,7 +221,9 @@ case Reg of
 else
   Error('Internal fault: Illegal register');  
 end;
-LastPushedReg := Reg;
+
+OptimizedInstruction.Kind := PUSHREGOP;
+OptimizedInstruction.Reg := Reg;
 end;  
 
 
@@ -173,34 +231,7 @@ end;
 
 procedure GenPopReg(Reg: TRegister);
 begin
-if Reg = LastPushedReg then                           // Meaningless 'push Reg / pop Reg' - remove 'push Reg' from the stack  
-  Dec(CodeSize)
-                                       
-else if (Reg = ECX) and (LastPushedReg = EAX) then    // Special case - replace push eax / pop ecx
-  begin
-  Dec(CodeSize);                                       
-  Gen($89); Gen($C1);                                 // mov ecx, eax
-  end
-  
-else if (Reg = ESI) and (LastPushedReg = EAX) then    // Special case - replace push eax / pop esi
-  begin
-  Dec(CodeSize);                                       
-  Gen($89); Gen($C6);                                 // mov esi, eax
-  end
-  
-else if (Reg = EAX) and LastPushedConstValid then     // Special case - replace push Value / pop eax
-  begin
-  CodeSize := CodeSize - 5;                                       
-  Gen($B8); GenDWord(LastPushedConst);                // mov eax, Value
-  end
-  
-else if (Reg = ECX) and LastPushedConstValid then     // Special case - replace push Value / pop ecx
-  begin
-  CodeSize := CodeSize - 5;                                       
-  Gen($B9); GenDWord(LastPushedConst);                // mov ecx, Value
-  end
- 
-else                                                  // General rule
+if not OptimizePop(Reg) then
   case Reg of
     EAX: Gen($58);            // pop eax
     ECX: Gen($59);            // pop ecx
@@ -208,11 +239,10 @@ else                                                  // General rule
     EDI: Gen($5F);            // pop edi
     EBP: Gen($5D)             // pop ebp
   else
-    Error('Internal fault: Unknown register');  
+    Error('Internal fault: Illegal register');  
   end;
   
-LastPushedReg := NOREG;
-LastPushedConstValid := FALSE;  
+OptimizedInstruction.Kind := EMPTYOP;  
 end;  
 
 
@@ -413,10 +443,10 @@ end;
 
 function GetCodeSize{: LongInt};
 begin
-LastPushedReg := NOREG;
-LastPushedConstValid := FALSE;
-
 Result := CodeSize;
+
+// If code size is requested, disable the last instruction optimization
+OptimizedInstruction.Kind := EMPTYOP;
 end;
 
 
