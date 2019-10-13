@@ -8,7 +8,7 @@
 type
   TRegister = (EMPTYREG, EAX, ECX, ESI, EDI, EBP);
    
-  TInstructionKind = (EMPTYOP, PUSHREGOP, PUSHCONSTOP, PUSHRELOCCONSTOP);
+  TInstructionKind = (EMPTYOP, PUSHREGOP, PUSHCONSTOP, PUSHRELOCCONSTOP, PUSHLOCALADDROP, LEAOP_PUSHREGOP);
   
   TInstruction = record
     Kind: TInstructionKind;
@@ -20,11 +20,24 @@ type
   
   
 const
-  OptimizedInstruction: TInstruction = (Kind: EMPTYOP; Reg: EMPTYREG; Value: 0);
-  
+  OptimizePopRegTrigger: TInstruction = (Kind: EMPTYOP; Reg: EMPTYREG; Value: 0);
+  OptimizeDerefPtrTrigger: TInstruction = (Kind: EMPTYOP; Reg: EMPTYREG; Value: 0);
 
 
-  
+
+
+function GetCodeSize{: LongInt};
+begin
+Result := CodeSize;
+
+// If code size is requested, disable the last instruction optimization
+OptimizePopRegTrigger.Kind := EMPTYOP;
+OptimizeDerefPtrTrigger.Kind := EMPTYOP;
+end;
+ 
+
+
+ 
 procedure Gen(b: Byte);
 begin
 if CodeSize >= MAXCODESIZE then
@@ -33,7 +46,8 @@ Code[CodeSize] := b;
 Inc(CodeSize);
 
 // If an instruction has not been optimized immediately, it will not be optimized at all
-OptimizedInstruction.Kind := EMPTYOP;
+OptimizePopRegTrigger.Kind := EMPTYOP;
+OptimizeDerefPtrTrigger.Kind := EMPTYOP;
 end;
 
 
@@ -122,8 +136,8 @@ procedure PushConst(Value: LongInt);
 begin
 Gen($68); GenDWord(Value);                            // push Value
 
-OptimizedInstruction.Kind := PUSHCONSTOP;
-OptimizedInstruction.Value := Value;
+OptimizePopRegTrigger.Kind := PUSHCONSTOP;
+OptimizePopRegTrigger.Value := Value;
 end;
 
 
@@ -133,8 +147,8 @@ procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 begin
 Gen($68); GenRelocDWord(Value, RelocType);            // push Value  ; relocatable
 
-OptimizedInstruction.Kind := PUSHRELOCCONSTOP;
-OptimizedInstruction.Value := Value;
+OptimizePopRegTrigger.Kind := PUSHRELOCCONSTOP;
+OptimizePopRegTrigger.Value := Value;
 end;
 
 
@@ -164,30 +178,30 @@ end;
 
 
 
-function OptimizePop(Reg: TRegister): Boolean;
+function OptimizePopReg(PopReg: TRegister): Boolean;
 begin
 Result := FALSE;
 
-case OptimizedInstruction.Kind of
+case OptimizePopRegTrigger.Kind of
   PUSHREGOP:
     begin
-    if Reg = OptimizedInstruction.Reg then                            // Meaningless 'push Reg / pop Reg' - remove 'push Reg' from the stack  
+    if PopReg = OptimizePopRegTrigger.Reg then
       begin
-      Dec(CodeSize);
+      Dec(CodeSize);                                                         // Remove: push PopReg
       Result := TRUE;
       end
                                            
-    else if (Reg = ECX) and (OptimizedInstruction.Reg = EAX) then     // Special case - replace push eax / pop ecx
+    else if (PopReg = ECX) and (OptimizePopRegTrigger.Reg = EAX) then
       begin
-      Dec(CodeSize);                                       
-      Gen($89); Gen($C1);                                             // mov ecx, eax
+      Dec(CodeSize);                                                         // Remove: push PopReg
+      Gen($89); Gen($C1);                                                    // mov ecx, eax
       Result := TRUE;
       end
       
-    else if (Reg = ESI) and (OptimizedInstruction.Reg = EAX) then     // Special case - replace push eax / pop esi
+    else if (PopReg = ESI) and (OptimizePopRegTrigger.Reg = EAX) then 
       begin
-      Dec(CodeSize);                                       
-      Gen($89); Gen($C6);                                             // mov esi, eax
+      Dec(CodeSize);                                                         // Remove: push PopReg                                       
+      Gen($89); Gen($C6);                                                    // mov esi, eax
       Result := TRUE;
       end
     end;
@@ -195,17 +209,17 @@ case OptimizedInstruction.Kind of
 
   PUSHCONSTOP:
     begin  
-    if Reg = EAX then                                                 // Special case - replace push Value / pop eax
+    if PopReg = EAX then
       begin
-      CodeSize := CodeSize - 5;                                       
-      Gen($B8); GenDWord(OptimizedInstruction.Value);                 // mov eax, Value
+      CodeSize := CodeSize - 5;                                              // Remove: push Value                                       
+      Gen($B8); GenDWord(OptimizePopRegTrigger.Value);                       // mov eax, Value
       Result := TRUE;
       end
       
-    else if Reg = ECX then                                            // Special case - replace push Value / pop ecx
+    else if PopReg = ECX then                                                
       begin
-      CodeSize := CodeSize - 5;                                       
-      Gen($B9); GenDWord(OptimizedInstruction.Value);                 // mov ecx, Value
+      CodeSize := CodeSize - 5;                                              // Remove: push Value
+      Gen($B9); GenDWord(OptimizePopRegTrigger.Value);                       // mov ecx, Value
       Result := TRUE;
       end
     end;
@@ -213,16 +227,73 @@ case OptimizedInstruction.Kind of
 
   PUSHRELOCCONSTOP:
     begin  
-    if Reg = ESI then                                                 // Special case - replace push Value / pop esi
+    if PopReg = ESI then
       begin
-      CodeSize := CodeSize - 5;                                       
-      Gen($BE); GenDWord(OptimizedInstruction.Value);                 // mov esi, Value
+      CodeSize := CodeSize - 5;                                              // Remove: push Value                                       
+      Gen($BE); GenDWord(OptimizePopRegTrigger.Value);                       // mov esi, Value
       Result := TRUE;
       end;
-    end
+    end;
+
+
+  PUSHLOCALADDROP:
+    begin
+    if (PopReg = EAX) and (OptimizePopRegTrigger.Reg = EBP) then
+      begin
+      CodeSize := CodeSize - 6;                                              // Remove: push dword ptr [ebp + Value]                                       
+      Gen($8B); Gen($85); GenDWord(OptimizePopRegTrigger.Value);             // mov eax, dword ptr [ebp + Value]
+      Result := TRUE;
+      end
+
+    else if (PopReg = ESI) and (OptimizePopRegTrigger.Reg = EBP) then
+      begin
+      CodeSize := CodeSize - 6;                                              // Remove: push dword ptr [ebp + Value]                                       
+      Gen($8B); Gen($B5); GenDWord(OptimizePopRegTrigger.Value);             // mov esi, dword ptr [ebp + Value]
+      Result := TRUE;
+      end
+  
+    else if (PopReg = EAX) and (OptimizePopRegTrigger.Reg = ESI)then
+      begin
+      CodeSize := CodeSize - 2;                                              // Remove: push dword ptr [esi]                                       
+      Gen($8B); Gen($06);                                                    // mov eax, dword ptr [esi]
+      Result := TRUE;
+      end
+      
+    else if (PopReg = ECX) and (OptimizePopRegTrigger.Reg = ESI)then
+      begin
+      CodeSize := CodeSize - 2;                                              // Remove: push dword ptr [esi]                                       
+      Gen($8B); Gen($0E);                                                    // mov ecx, dword ptr [esi]
+      Result := TRUE;
+      end;      
+    end;
   
   end; // case
   
+end;
+
+
+
+
+function OptimizeDerefPtr: Boolean;
+begin
+Result := FALSE;
+
+case OptimizeDerefPtrTrigger.Kind of
+  LEAOP_PUSHREGOP:
+    begin
+    CodeSize := CodeSize - 7;                                           // Remove: lea esi, [ebp + Addr], push esi
+    Gen($FF); Gen($B5); GenDWord(OptimizeDerefPtrTrigger.Value);        // push dword ptr [ebp + Addr]
+    
+    OptimizePopRegTrigger.Kind := PUSHLOCALADDROP;
+    OptimizePopRegTrigger.Reg := EBP;
+    OptimizePopRegTrigger.Value := OptimizeDerefPtrTrigger.Value;    
+    
+    Result := TRUE;
+    end;
+    
+  end; // case
+  
+OptimizeDerefPtrTrigger.Kind := EMPTYOP;  
 end;
 
 
@@ -240,8 +311,8 @@ else
   Error('Internal fault: Illegal register');  
 end;
 
-OptimizedInstruction.Kind := PUSHREGOP;
-OptimizedInstruction.Reg := Reg;
+OptimizePopRegTrigger.Kind := PUSHREGOP;
+OptimizePopRegTrigger.Reg := Reg;
 end;  
 
 
@@ -249,7 +320,7 @@ end;
 
 procedure GenPopReg(Reg: TRegister);
 begin
-if not OptimizePop(Reg) then
+if not OptimizePopReg(Reg) then
   case Reg of
     EAX: Gen($58);            // pop eax
     ECX: Gen($59);            // pop ecx
@@ -260,8 +331,8 @@ if not OptimizePop(Reg) then
     Error('Internal fault: Illegal register');  
   end;
   
-OptimizedInstruction.Kind := EMPTYOP;  
-end;  
+OptimizePopRegTrigger.Kind := EMPTYOP;  
+end; 
 
 
 
@@ -280,6 +351,10 @@ case Scope of
     if DeltaNesting = 0 then                  // Strictly local variable
       begin
       Gen($8D); Gen($B5); GenDWord(Addr);                       // lea esi, [ebp + Addr]
+      GenPushReg(ESI);                                          // push esi
+
+      OptimizeDerefPtrTrigger.Kind := LEAOP_PUSHREGOP;
+      OptimizeDerefPtrTrigger.Value := Addr;      
       end
     else                                      // Intermediate level variable
       begin
@@ -289,8 +364,9 @@ case Scope of
         Gen($8B); Gen($76); Gen(StaticLinkAddr);                // mov esi, [esi + StaticLinkAddr]
         end;
       Gen($8D); Gen($B6); GenDWord(Addr);                       // lea esi, [esi + Addr]
+      GenPushReg(ESI);                                          // push esi
       end;
-    GenPushReg(ESI);                                            // push esi
+    
     end;// if
 end;// case
 end;
@@ -300,11 +376,11 @@ end;
 
 procedure DerefPtr(DataType: Integer);
 begin
-GenPopReg(ESI);                                                   // pop esi
-
 case TypeSize(DataType) of
 
-  1: if Types[DataType].Kind in UnsignedTypes then
+  1: begin
+     GenPopReg(ESI);                                              // pop esi
+     if Types[DataType].Kind in UnsignedTypes then
        begin
        Gen($31); Gen($C0);                                        // xor eax, eax
        Gen($8A); Gen($06);                                        // mov al, [esi]
@@ -315,8 +391,12 @@ case TypeSize(DataType) of
        Gen($66); Gen($98);                                        // cbw
        Gen($98);                                                  // cwde
        end;
+     GenPushReg(EAX);                                             // push eax
+     end;  
        
-  2: if Types[DataType].Kind in UnsignedTypes then
+  2: begin
+     GenPopReg(ESI);                                              // pop esi
+     if Types[DataType].Kind in UnsignedTypes then
        begin
        Gen($31); Gen($C0);                                        // xor eax, eax
        Gen($66); Gen($8B); Gen($06);                              // mov ax, [esi]
@@ -326,16 +406,23 @@ case TypeSize(DataType) of
        Gen($66); Gen($8B); Gen($06);                              // mov ax, [esi]
        Gen($98);                                                  // cwde
        end;
+     GenPushReg(EAX);                                             // push eax
+     end;  
      
   4: begin
-     Gen($8B); Gen($06);                                          // mov eax, [esi]
+     if not OptimizeDerefPtr then           // If DerefPtr immediately follows PushVarPtr, try to optimize it
+       begin
+       GenPopReg(ESI);                                            // pop esi
+       Gen($FF); Gen($36);                                        // push dword ptr [esi]
+       
+       OptimizePopRegTrigger.Kind := PUSHLOCALADDROP;
+       OptimizePopRegTrigger.Reg := ESI;     
+       end
      end
-     
 else
   Error('Internal fault: Illegal designator size');
 end;
 
-GenPushReg(EAX);                                                  // push eax
 end;
 
 
@@ -454,17 +541,6 @@ end;
 procedure DuplicateStackTop;
 begin
 Gen($FF); Gen($34); Gen($24);                                                           // push dword ptr [esp]
-end;
-
-
-
-
-function GetCodeSize{: LongInt};
-begin
-Result := CodeSize;
-
-// If code size is requested, disable the last instruction optimization
-OptimizedInstruction.Kind := EMPTYOP;
 end;
 
 
