@@ -8,7 +8,7 @@
 type
   TRegister = (EMPTYREG, EAX, ECX, ESI, EDI, EBP);
    
-  TInstructionKind = (EMPTYOP, PUSHREGOP, PUSHCONSTOP);
+  TInstructionKind = (EMPTYOP, PUSHREGOP, PUSHCONSTOP, PUSHRELOCCONSTOP);
   
   TInstruction = record
     Kind: TInstructionKind;
@@ -132,6 +132,9 @@ end;
 procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 begin
 Gen($68); GenRelocDWord(Value, RelocType);            // push Value  ; relocatable
+
+OptimizedInstruction.Kind := PUSHRELOCCONSTOP;
+OptimizedInstruction.Value := Value;
 end;
 
 
@@ -165,45 +168,60 @@ function OptimizePop(Reg: TRegister): Boolean;
 begin
 Result := FALSE;
 
-if OptimizedInstruction.Kind = PUSHREGOP then
-  begin
-  if Reg = OptimizedInstruction.Reg then                            // Meaningless 'push Reg / pop Reg' - remove 'push Reg' from the stack  
+case OptimizedInstruction.Kind of
+  PUSHREGOP:
     begin
-    Dec(CodeSize);
-    Result := TRUE;
-    end
-                                         
-  else if (Reg = ECX) and (OptimizedInstruction.Reg = EAX) then     // Special case - replace push eax / pop ecx
-    begin
-    Dec(CodeSize);                                       
-    Gen($89); Gen($C1);                                             // mov ecx, eax
-    Result := TRUE;
-    end
-    
-  else if (Reg = ESI) and (OptimizedInstruction.Reg = EAX) then     // Special case - replace push eax / pop esi
-    begin
-    Dec(CodeSize);                                       
-    Gen($89); Gen($C6);                                             // mov esi, eax
-    Result := TRUE;
-    end
-  end  
+    if Reg = OptimizedInstruction.Reg then                            // Meaningless 'push Reg / pop Reg' - remove 'push Reg' from the stack  
+      begin
+      Dec(CodeSize);
+      Result := TRUE;
+      end
+                                           
+    else if (Reg = ECX) and (OptimizedInstruction.Reg = EAX) then     // Special case - replace push eax / pop ecx
+      begin
+      Dec(CodeSize);                                       
+      Gen($89); Gen($C1);                                             // mov ecx, eax
+      Result := TRUE;
+      end
+      
+    else if (Reg = ESI) and (OptimizedInstruction.Reg = EAX) then     // Special case - replace push eax / pop esi
+      begin
+      Dec(CodeSize);                                       
+      Gen($89); Gen($C6);                                             // mov esi, eax
+      Result := TRUE;
+      end
+    end;
+  
 
-else if OptimizedInstruction.Kind = PUSHCONSTOP then
-  begin  
-  if Reg = EAX then                                                 // Special case - replace push Value / pop eax
-    begin
-    CodeSize := CodeSize - 5;                                       
-    Gen($B8); GenDWord(OptimizedInstruction.Value);                 // mov eax, Value
-    Result := TRUE;
+  PUSHCONSTOP:
+    begin  
+    if Reg = EAX then                                                 // Special case - replace push Value / pop eax
+      begin
+      CodeSize := CodeSize - 5;                                       
+      Gen($B8); GenDWord(OptimizedInstruction.Value);                 // mov eax, Value
+      Result := TRUE;
+      end
+      
+    else if Reg = ECX then                                            // Special case - replace push Value / pop ecx
+      begin
+      CodeSize := CodeSize - 5;                                       
+      Gen($B9); GenDWord(OptimizedInstruction.Value);                 // mov ecx, Value
+      Result := TRUE;
+      end
+    end;
+
+
+  PUSHRELOCCONSTOP:
+    begin  
+    if Reg = ESI then                                                 // Special case - replace push Value / pop esi
+      begin
+      CodeSize := CodeSize - 5;                                       
+      Gen($BE); GenDWord(OptimizedInstruction.Value);                 // mov esi, Value
+      Result := TRUE;
+      end;
     end
-    
-  else if Reg = ECX then                                            // Special case - replace push Value / pop ecx
-    begin
-    CodeSize := CodeSize - 5;                                       
-    Gen($B9); GenDWord(OptimizedInstruction.Value);                 // mov ecx, Value
-    Result := TRUE;
-    end
-  end
+  
+  end; // case
   
 end;
 
