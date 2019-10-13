@@ -190,6 +190,11 @@ The compiler directly builds a Windows PE executable without using any external 
 * `$I` - Include source file. Examples: `{$I windows.inc}`, `{$I samples\gauss.inc}`
 * `$APPTYPE` - Set application type. Examples: `{$APPTYPE GUI}`, `{$APPTYPE CONSOLE}`
 
+#### Optimizations
+Only two simplest kinds of peephole optimizations are performed:
+* Push/pop pair optimizations 
+* Local variable loading optimizations (32-bit variables only)  
+
 #### Inlined procedures and functions
 The following identifiers are implemented as part of the compiler. Their names are not reserved words and can be locally redefined by the user.
 ```pascal
