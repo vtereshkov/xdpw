@@ -17,6 +17,10 @@ type
   end;
   
   
+
+// Each optimization involves two instructions: a 'trigger' instruction (Op1) and an instruction to be optimized (Op2)
+// If Op2 immediately follows Op1 and CodeSize is not requested, then Op1 is removed, and Op2 is replaced with an optimized version, Op2'
+  
   
   
 const
@@ -178,127 +182,6 @@ end;
 
 
 
-function OptimizePopReg(PopReg: TRegister): Boolean;
-begin
-Result := FALSE;
-
-case OptimizePopRegTrigger.Kind of
-  PUSHREGOP:
-    begin
-    if PopReg = OptimizePopRegTrigger.Reg then
-      begin
-      Dec(CodeSize);                                                         // Remove: push PopReg
-      Result := TRUE;
-      end
-                                           
-    else if (PopReg = ECX) and (OptimizePopRegTrigger.Reg = EAX) then
-      begin
-      Dec(CodeSize);                                                         // Remove: push PopReg
-      Gen($89); Gen($C1);                                                    // mov ecx, eax
-      Result := TRUE;
-      end
-      
-    else if (PopReg = ESI) and (OptimizePopRegTrigger.Reg = EAX) then 
-      begin
-      Dec(CodeSize);                                                         // Remove: push PopReg                                       
-      Gen($89); Gen($C6);                                                    // mov esi, eax
-      Result := TRUE;
-      end
-    end;
-  
-
-  PUSHCONSTOP:
-    begin  
-    if PopReg = EAX then
-      begin
-      CodeSize := CodeSize - 5;                                              // Remove: push Value                                       
-      Gen($B8); GenDWord(OptimizePopRegTrigger.Value);                       // mov eax, Value
-      Result := TRUE;
-      end
-      
-    else if PopReg = ECX then                                                
-      begin
-      CodeSize := CodeSize - 5;                                              // Remove: push Value
-      Gen($B9); GenDWord(OptimizePopRegTrigger.Value);                       // mov ecx, Value
-      Result := TRUE;
-      end
-    end;
-
-
-  PUSHRELOCCONSTOP:
-    begin  
-    if PopReg = ESI then
-      begin
-      CodeSize := CodeSize - 5;                                              // Remove: push Value                                       
-      Gen($BE); GenDWord(OptimizePopRegTrigger.Value);                       // mov esi, Value
-      Result := TRUE;
-      end;
-    end;
-
-
-  PUSHLOCALADDROP:
-    begin
-    if (PopReg = EAX) and (OptimizePopRegTrigger.Reg = EBP) then
-      begin
-      CodeSize := CodeSize - 6;                                              // Remove: push dword ptr [ebp + Value]                                       
-      Gen($8B); Gen($85); GenDWord(OptimizePopRegTrigger.Value);             // mov eax, dword ptr [ebp + Value]
-      Result := TRUE;
-      end
-
-    else if (PopReg = ESI) and (OptimizePopRegTrigger.Reg = EBP) then
-      begin
-      CodeSize := CodeSize - 6;                                              // Remove: push dword ptr [ebp + Value]                                       
-      Gen($8B); Gen($B5); GenDWord(OptimizePopRegTrigger.Value);             // mov esi, dword ptr [ebp + Value]
-      Result := TRUE;
-      end
-  
-    else if (PopReg = EAX) and (OptimizePopRegTrigger.Reg = ESI)then
-      begin
-      CodeSize := CodeSize - 2;                                              // Remove: push dword ptr [esi]                                       
-      Gen($8B); Gen($06);                                                    // mov eax, dword ptr [esi]
-      Result := TRUE;
-      end
-      
-    else if (PopReg = ECX) and (OptimizePopRegTrigger.Reg = ESI)then
-      begin
-      CodeSize := CodeSize - 2;                                              // Remove: push dword ptr [esi]                                       
-      Gen($8B); Gen($0E);                                                    // mov ecx, dword ptr [esi]
-      Result := TRUE;
-      end;      
-    end;
-  
-  end; // case
-  
-end;
-
-
-
-
-function OptimizeDerefPtr: Boolean;
-begin
-Result := FALSE;
-
-case OptimizeDerefPtrTrigger.Kind of
-  LEAOP_PUSHREGOP:
-    begin
-    CodeSize := CodeSize - 7;                                           // Remove: lea esi, [ebp + Addr], push esi
-    Gen($FF); Gen($B5); GenDWord(OptimizeDerefPtrTrigger.Value);        // push dword ptr [ebp + Addr]
-    
-    OptimizePopRegTrigger.Kind := PUSHLOCALADDROP;
-    OptimizePopRegTrigger.Reg := EBP;
-    OptimizePopRegTrigger.Value := OptimizeDerefPtrTrigger.Value;    
-    
-    Result := TRUE;
-    end;
-    
-  end; // case
-  
-OptimizeDerefPtrTrigger.Kind := EMPTYOP;  
-end;
-
-
-
-
 procedure GenPushReg(Reg: TRegister);
 begin
 case Reg of
@@ -319,7 +202,100 @@ end;
 
 
 procedure GenPopReg(Reg: TRegister);
-begin
+
+
+  function OptimizePopReg(PopReg: TRegister): Boolean;
+  begin
+  Result := FALSE;
+
+  case OptimizePopRegTrigger.Kind of
+    PUSHREGOP:
+      begin
+      if PopReg = OptimizePopRegTrigger.Reg then
+        begin
+        Dec(CodeSize);                                                         // Remove: push PopReg
+        Result := TRUE;
+        end
+                                             
+      else if (PopReg = ECX) and (OptimizePopRegTrigger.Reg = EAX) then
+        begin
+        Dec(CodeSize);                                                         // Remove: push PopReg
+        Gen($89); Gen($C1);                                                    // mov ecx, eax
+        Result := TRUE;
+        end
+        
+      else if (PopReg = ESI) and (OptimizePopRegTrigger.Reg = EAX) then 
+        begin
+        Dec(CodeSize);                                                         // Remove: push PopReg                                       
+        Gen($89); Gen($C6);                                                    // mov esi, eax
+        Result := TRUE;
+        end
+      end;    
+
+    PUSHCONSTOP:
+      begin  
+      if PopReg = EAX then
+        begin
+        CodeSize := CodeSize - 5;                                              // Remove: push Value                                       
+        Gen($B8); GenDWord(OptimizePopRegTrigger.Value);                       // mov eax, Value
+        Result := TRUE;
+        end
+        
+      else if PopReg = ECX then                                                
+        begin
+        CodeSize := CodeSize - 5;                                              // Remove: push Value
+        Gen($B9); GenDWord(OptimizePopRegTrigger.Value);                       // mov ecx, Value
+        Result := TRUE;
+        end
+      end;
+
+    PUSHRELOCCONSTOP:
+      begin  
+      if PopReg = ESI then
+        begin
+        CodeSize := CodeSize - 5;                                              // Remove: push Value                                       
+        Gen($BE); GenDWord(OptimizePopRegTrigger.Value);                       // mov esi, Value
+        Result := TRUE;
+        end;
+      end;
+
+    PUSHLOCALADDROP:
+      begin
+      if (PopReg = EAX) and (OptimizePopRegTrigger.Reg = EBP) then
+        begin
+        CodeSize := CodeSize - 6;                                              // Remove: push dword ptr [ebp + Value]                                       
+        Gen($8B); Gen($85); GenDWord(OptimizePopRegTrigger.Value);             // mov eax, dword ptr [ebp + Value]
+        Result := TRUE;
+        end
+
+      else if (PopReg = ESI) and (OptimizePopRegTrigger.Reg = EBP) then
+        begin
+        CodeSize := CodeSize - 6;                                              // Remove: push dword ptr [ebp + Value]                                       
+        Gen($8B); Gen($B5); GenDWord(OptimizePopRegTrigger.Value);             // mov esi, dword ptr [ebp + Value]
+        Result := TRUE;
+        end
+    
+      else if (PopReg = EAX) and (OptimizePopRegTrigger.Reg = ESI)then
+        begin
+        CodeSize := CodeSize - 2;                                              // Remove: push dword ptr [esi]                                       
+        Gen($8B); Gen($06);                                                    // mov eax, dword ptr [esi]
+        Result := TRUE;
+        end
+        
+      else if (PopReg = ECX) and (OptimizePopRegTrigger.Reg = ESI)then
+        begin
+        CodeSize := CodeSize - 2;                                              // Remove: push dword ptr [esi]                                       
+        Gen($8B); Gen($0E);                                                    // mov ecx, dword ptr [esi]
+        Result := TRUE;
+        end;      
+      end;
+    
+    end; // case
+    
+  end;
+
+
+begin // GenPopReg
 if not OptimizePopReg(Reg) then
   case Reg of
     EAX: Gen($58);            // pop eax
@@ -375,7 +351,32 @@ end;
 
 
 procedure DerefPtr(DataType: Integer);
-begin
+
+
+  function OptimizeDerefPtr: Boolean;
+  begin
+  Result := FALSE;
+
+  case OptimizeDerefPtrTrigger.Kind of
+    LEAOP_PUSHREGOP:
+      begin
+      CodeSize := CodeSize - 7;                                           // Remove: lea esi, [ebp + Addr], push esi
+      Gen($FF); Gen($B5); GenDWord(OptimizeDerefPtrTrigger.Value);        // push dword ptr [ebp + Addr]
+      
+      OptimizePopRegTrigger.Kind := PUSHLOCALADDROP;
+      OptimizePopRegTrigger.Reg := EBP;
+      OptimizePopRegTrigger.Value := OptimizeDerefPtrTrigger.Value;    
+      
+      Result := TRUE;
+      end;
+      
+    end; // case
+    
+  OptimizeDerefPtrTrigger.Kind := EMPTYOP;  
+  end;
+
+
+begin // DerefPtr
 case TypeSize(DataType) of
 
   1: begin
