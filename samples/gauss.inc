@@ -18,7 +18,7 @@ procedure Error(const E: string); forward;     // To be defined in the main modu
 
 procedure SolveLinearSystem(var T: TMatrix; var x: TVector; m: Integer);
 var
-  i, j, k: Integer;
+  i, j: Integer;
   s: Real;
 
   procedure TriangularizeMatrix(var T: TMatrix; m: Integer);

@@ -1,2 +1,2 @@
-for %%f in (samples\*.pas) do xdpw %%f %1
+for %%f in (samples\*.pas) do xdpw %%f
 pause

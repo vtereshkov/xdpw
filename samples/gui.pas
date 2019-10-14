@@ -1,13 +1,12 @@
 // GUI demo
 
 {$APPTYPE GUI}
+{$H-}
 
 program GUI;
 
 
-
 {$I windows.inc}
-
 
 
 const
@@ -42,8 +41,7 @@ end;
 
  
 
-// Callback function: parameters reversed for compatibiity with 'stdcall'
-function WindowProc(lParam, wParam, uMsg, hWnd: LongInt): Integer;  
+function WindowProc(hWnd, uMsg, wParam, lParam: LongInt): Integer stdcall; 
 begin
 case uMsg of
   WM_PAINT:
@@ -86,7 +84,7 @@ var
   wc: WNDCLASSA;
   hInst, hWnd: LongInt;
   message: MSG;
-  ClassName: string; 
+  ClassName, WindowText: array [0..255] of Char; 
 
  
 
@@ -95,7 +93,9 @@ begin
 NumPoints := 0;
 
 hInst := GetModuleHandleA(nil);
-ClassName := 'Main Window Class';
+
+StrToChars('GUI Demo Window Class', ClassName);
+StrToChars('GUI Demo', WindowText);
 
 with wc do
   begin
@@ -114,8 +114,8 @@ with wc do
 RegisterClassA(wc);
 
 hWnd := CreateWindowExA(0,                      // optional styles
-                        ClassName,              // class
-                        'GUI Demo',             // text
+                        @ClassName,             // class
+                        @WindowText,            // text
                         WS_OVERLAPPEDWINDOW,    // style
                         100,                    // position X
                         100,                    // position Y

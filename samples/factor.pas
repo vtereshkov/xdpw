@@ -1,5 +1,6 @@
 // Factorization demo
 
+{$APPTYPE CONSOLE}
 
 program Factor;
 
@@ -8,6 +9,7 @@ program Factor;
 var
   LowBound, HighBound, Number, Dividend, Divisor: Integer;
   DivisorFound: Boolean;
+
 
 
 begin

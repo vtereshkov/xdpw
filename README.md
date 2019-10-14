@@ -31,6 +31,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * The compiler is self-hosting
 * Functions can return arrays, records or sets (Delphi style)
 * Functions can be called as procedures (Delphi style)
+* Parameters can have default values (Delphi style)
 * The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
 * Single-line comments (`//`) are supported (Delphi style)
 
@@ -38,16 +39,14 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Strings are null-terminated arrays of characters (C style), but indexed from 1 for Pascal compatibility
 * The `Text` type is equivalent to `file`. It can be used for both text and untyped files
 * Calls via procedural variables require parentheses even for empty parameter lists
-* The `external` directive implies the `stdcall` calling convention
 
 #### Limitations
 * No object-oriented programming
 * No `uses` clause. The `$I` directive should be used instead (Turbo Pascal 3 style)
-* No double-precision floating-point numbers, variant records, typed files 
+* No `Double` and `Extended` types 
 * Arrays, records and sets cannot be passed to subroutines without `const` or `var`
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical
-* `Reset` and `Rewrite` always require the block size 1 as the second parameter
 
 #### Formal grammar
 ```
@@ -80,8 +79,8 @@ TypeDeclarations = "type" Ident "=" Type ";" {Ident "=" Type ";"} .
 
 VarDeclarations = "var" IdentList ":" Type ";" {IdentList ":" Type ";"} .
 
-ProcFuncDeclarations = ("procedure" | "function") Ident [FormalParams] [":" TypeIdent] ";" 
-                       (Directive | Block) .
+ProcFuncDeclarations = ("procedure" | "function") Ident [FormalParams] [":" TypeIdent] 
+                       ["stdcall"] ";" (Directive | Block) .
 
 Directive = ("forward" | ("external" StringLiteral "name" StringLiteral)) ";" .         
 
@@ -90,18 +89,25 @@ ActualParams = "(" [ (Expression | Designator) |
 
 FormalParams = "(" FormalParamList {";" FormalParamList} ")" .
               
-FormalParamList = ["const" | "var"] IdentList [":" ["array" "of"] TypeIdent] .             
+FormalParamList = ["const" | "var"] IdentList [":" ["array" "of"] TypeIdent] 
+                                              ["=" ConstExpression] .             
 
 IdentList = Ident {"," Ident} .
 
 Type = "(" Ident {"," Ident} ")" |
        "^" TypeIdent |
        ["packed"] "array" "[" Type {"," Type} "]" "of" Type |
-       ["packed"] "record" IdentList ":" Type {";" IdentList ":" Type} [";"] "end" |
+       ["packed"] "record" Fields 
+          ["case" Ident ":" Type "of" 
+               ConstExpression {"," ConstExpression} ":" "(" Fields ")"
+          {";" ConstExpression {"," ConstExpression} ":" "(" Fields ")"} [";"] "end" |
        ["packed"] "set" "of" Type |
+       ["packed"] "file" ["of" Type] |
        ConstExpression ".." ConstExpression |
-       ("procedure" | "function") [FormalParams] [":" TypeIdent] |
+       ("procedure" | "function") [FormalParams] [":" TypeIdent] ["stdcall"] |
        Ident .
+       
+Fields = IdentList ":" Type {";" IdentList ":" Type} .       
        
 TypeIdent = "string" | "file" | Ident .       
 
@@ -184,15 +190,20 @@ The compiler directly builds a Windows PE executable without using any external 
 * `$I` - Include source file. Examples: `{$I windows.inc}`, `{$I samples\gauss.inc}`
 * `$APPTYPE` - Set application type. Examples: `{$APPTYPE GUI}`, `{$APPTYPE CONSOLE}`
 
+#### Optimizations
+Only two simplest kinds of peephole optimizations are performed:
+* Push/pop pair optimizations 
+* Local variable loading optimizations (32-bit variables only)  
+
 #### Inlined procedures and functions
 The following identifiers are implemented as part of the compiler. Their names are not reserved words and can be locally redefined by the user.
 ```pascal
 procedure Inc(var x: Integer);
 procedure Dec(var x: Integer);
 procedure Read([var F: file;] var x1 {; var xi});
-procedure Write([var F: file;] x1 {; xi});
+procedure Write([var F: file;] x1[:w[:d]] {; xi[:w[:d]]});
 procedure ReadLn([var F: file;] var x1 {; var xi});
-procedure WriteLn([var F: file;] x1 {; xi});
+procedure WriteLn([var F: file;] x1[:w[:d]] {; xi[:w[:d]]});
 procedure New(var P: Pointer);
 procedure Dispose(var P: Pointer);
 procedure Break;
@@ -220,13 +231,9 @@ function SqRt(x: Real): Real;
 function Timer: Integer;
 procedure Randomize;
 function Random: Real;
-function Min(x, y: Real): Real;
-function IMin(x, y: Integer): Integer;
-function Max(x, y: Real): Real;
-function IMax(x, y: Integer): Integer;
 procedure Assign(var F: file; const Name: string);
-procedure Rewrite(var F: file; BlockSize: Integer);
-procedure Reset(var F: file; BlockSize: Integer);
+procedure Rewrite(var F: file[; BlockSize: Integer]);
+procedure Reset(var F: file[; BlockSize: Integer]);
 procedure Close(var F: file);
 procedure BlockRead(var F: file; var Buf; Len: Integer; var LenRead: Integer);
 procedure BlockWrite(var F: file; var Buf; Len: Integer);
@@ -243,7 +250,7 @@ procedure FillChar(var Data; Count: Integer; Value: Char);
 function ParamCount: Integer;
 function ParamStr(Index: Integer): string;
 procedure Val(const s: string; var Number: Real; var Code: Integer);
-procedure Str(Number: Real; var s: string);
+procedure Str(Number: Real; var s: string[; DecPlaces: Integer]);
 procedure IVal(const s: string; var Number: Integer; var Code: Integer);
 procedure IStr(Number: Integer; var s: string);
 function UpCase(ch: Char): Char;

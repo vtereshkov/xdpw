@@ -1,5 +1,6 @@
 // Linked list operations demo
 
+{$APPTYPE CONSOLE}
 
 program List;
 

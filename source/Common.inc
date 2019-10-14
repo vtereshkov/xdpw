@@ -120,12 +120,42 @@ type
     );
     
   TToken = record
-    Kind: TTokenKind;
     Name: TString;
-    Value: LongInt;
-    FracValue: Single;
-    StrAddress: Integer;
-    StrLength: Integer;
+  case Kind: TTokenKind of  
+    INTNUMBERTOK:     (Value: LongInt);       // For all ordinal types
+    FRACNUMBERTOK:    (FracValue: Single);
+    STRINGLITERALTOK: (StrAddress: Integer;
+                       StrLength: Integer);
+  end;
+  
+  TTypeKind = (EMPTYTYPE, ANYTYPE, INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE, CHARTYPE, BOOLEANTYPE, REALTYPE,
+               POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, PROCEDURALTYPE, FORWARDTYPE);  
+
+
+
+
+const
+  // Predefined type indices
+  ANYTYPEINDEX          = 1;      // Untyped parameter, or base type for untyped pointers and files
+  INTEGERTYPEINDEX      = 2;
+  SMALLINTTYPEINDEX     = 3;
+  SHORTINTTYPEINDEX     = 4;
+  WORDTYPEINDEX         = 5;
+  BYTETYPEINDEX         = 6;  
+  CHARTYPEINDEX         = 7;
+  BOOLEANTYPEINDEX      = 8;
+  REALTYPEINDEX         = 9;
+  POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other
+  FILETYPEINDEX         = 11;     // Untyped file, compatible with text files
+  STRINGTYPEINDEX       = 12;
+
+
+
+type
+  TConst = record
+  case Kind: TTypeKind of
+    INTEGERTYPE: (Value: LongInt);            // For all ordinal types 
+    REALTYPE:    (FracValue: Single);    
   end;   
   
   TPassMethod = (EMPTYPASSING, VALPASSING, CONSTPASSING, VARPASSING); 
@@ -134,6 +164,7 @@ type
     Name: TString;
     DataType: Integer;
     PassMethod: TPassMethod;
+    Default: TConst;
   end;
 
   PParam = ^TParam;
@@ -144,7 +175,7 @@ type
   
   TScope = (EMPTYSCOPE, GLOBAL, LOCAL);
   
-  TRelocType = (EMPTYRELOC, CODERELOC, INITDATARELOC, UNINITDATARELOC);
+  TRelocType = (EMPTYRELOC, CODERELOC, INITDATARELOC, UNINITDATARELOC, IMPORTRELOC);
   
   TPredefProc = 
     (
@@ -185,22 +216,23 @@ type
   TIdentifier = record
     Kind: TIdentKind;
     Name: TString;
-    Value: LongInt;                    // Value for a constant, address for a label, variable, procedure or function
-    FracValue: Single;
-    Block: Integer;                    // Index of a block in which the identifier is defined
-    NestingLevel: Byte;
-    DataType: Integer;
-    RecType: Integer;                  // Parent record type code for a field
+    Block: Integer;                       // Index of a block in which the identifier is defined
+    NestingLevel: Byte;    
+    RecType: Integer;                     // Parent record type code for a field
     Scope: TScope;
     RelocType: TRelocType;
-    PassMethod: TPassMethod;           // Value, CONST or VAR parameter status
+    PassMethod: TPassMethod;              // Value, CONST or VAR parameter status
     NumParams: Integer;
+    NumDefaultParams: Integer;
     Param: PParams;
     ProcAsBlock: Integer;
     PredefProc: TPredefProc;
     IsUnresolvedForward: Boolean;
-    IsExternal: Boolean;
-    ForLoopNesting: Integer;           // Number of nested FOR loops where the label is defined
+    IsStdCall: Boolean;
+    ForLoopNesting: Integer;              // Number of nested FOR loops where the label is defined
+  case DataType: Integer of
+    INTEGERTYPEINDEX: (Value: LongInt);   // Value for an ordinal constant, address for a label, variable, procedure or function
+    REALTYPEINDEX:    (FracValue: Single);// Value for a real constant
   end;
 
   TField = record
@@ -209,39 +241,38 @@ type
     Offset: Integer;
   end;    
 
-  TTypeKind = (EMPTYTYPE, ANYTYPE, INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE, CHARTYPE, BOOLEANTYPE, REALTYPE,
-               POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, PROCEDURALTYPE, FORWARDTYPE);
-
-  TType = record
-    Kind: TTypeKind;
+  TType = record    
     Block: Integer;
+    BaseType: Integer;
     
-    // For subranges
-    HostType: Integer;
-    Low, High: Integer;    
-    
-    // For pointers, arrays and sets 
-    BaseType, IndexType: Integer;
-    IsOpenArray: Boolean;
-      
-    // For records  
-    NumFields: Integer;
-    Field: array [1..MAXFIELDS] of ^TField;
-    
-    // For procedural types
-    NumParams: Integer;
-    Param: PParams;
-    ResultType: Integer;
-    
-    // For forward types
-    TypeIdentName: TString;   
+  case Kind: TTypeKind of     
+    SUBRANGETYPE:    (Low, High: Integer);
+  
+    ARRAYTYPE:       (IndexType: Integer;
+                      IsOpenArray: Boolean);
+                      
+    RECORDTYPE:      (NumFields: Integer;
+                      Field: array [1..MAXFIELDS] of ^TField);
+                      
+    PROCEDURALTYPE:  (NumParams: Integer;
+                      NumDefaultParams: Integer;
+                      Param: PParams;
+                      ResultType: Integer;
+                      IsStdCall: Boolean);
+  
+    FORWARDTYPE:     (TypeIdentName: TString);   
   end;
   
   TRelocatable = record
     RelocType: TRelocType;
     Pos: LongInt;
     Value: LongInt;
-  end;       
+  end;
+
+  TBlock = record
+    Index: Integer;
+    LocalDataSize, ParamDataSize, TempDataSize: LongInt;
+  end;  
     
   TUnit = record
     FileName: TString;
@@ -249,11 +280,6 @@ type
     Size, Pos, Line: Integer;
   end;  
   
-  TConst = record
-    Value: LongInt;       // For integer numbers 
-    FracValue: Single;    // For floating-point numbers
-  end;
-
   TGoto = record
     Pos: LongInt;
     LabelIndex: Integer;
@@ -272,23 +298,7 @@ type
   
   
 
-  
-const    
-  // Predefined type indices
-  ANYTYPEINDEX          = 1;      // Untyped parameter, or base type for untyped pointers
-  INTEGERTYPEINDEX      = 2;
-  SMALLINTTYPEINDEX     = 3;
-  SHORTINTTYPEINDEX     = 4;
-  WORDTYPEINDEX         = 5;
-  BYTETYPEINDEX         = 6;  
-  CHARTYPEINDEX         = 7;
-  BOOLEANTYPEINDEX      = 8;
-  REALTYPEINDEX         = 9;
-  POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other
-  FILETYPEINDEX         = 11;     // Universal file type
-  STRINGTYPEINDEX       = 12;
-
-  // Keywords
+const
   Keyword: array [1..NUMKEYWORDS] of TKeyName = 
     (
     'AND',
@@ -342,7 +352,7 @@ var
   Code: array [0..MAXCODESIZE - 1] of Byte;
   InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of Char;
   CodePosStack: array [0..1023] of Integer;
-  BlockStack: array [1..MAXBLOCKNESTING] of Integer;
+  BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
   Reloc: array [1..MAXRELOCS] of TRelocatable;
   Gotos: array [1..MAXGOTOS] of TGoto;
   BreakCall, ContinueCall: array [1..MAXLOOPNESTING] of TBreakContinueExitCallList;
@@ -356,14 +366,18 @@ var
   
   IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of TTypeKind;
 
-  NumIdent, NumTypes, NumImports, NumBlocks, BlockStackTop, NumRelocs, NumGotos, ForLoopNesting, WithNesting,
+  NumIdent, NumTypes, NumBlocks, BlockStackTop, NumRelocs, NumGotos, ForLoopNesting, WithNesting,
   CodeSize, CodePosStackTop, 
-  InitializedGlobalDataSize, UninitializedGlobalDataSize, LocalDataSize, ParamDataSize, TempDataSize,
-  ProgramEntryPoint,
+  InitializedGlobalDataSize, UninitializedGlobalDataSize, ProgramEntryPoint,
   UnitStackTop: Integer;
   
-  IsConsoleProgram: Integer;      // More convenient than Boolean
+  IsConsoleProgram: Boolean;
   
+
+
+
+function GetCodeSize: LongInt; forward;
+
 
 
 
@@ -376,7 +390,6 @@ FillChar(InitializedGlobalData, SizeOf(InitializedGlobalData), #0);
 
 NumIdent                    := 0; 
 NumTypes                    := 0; 
-NumImports                  := 0; 
 NumBlocks                   := 0; 
 BlockStackTop               := 0; 
 NumRelocs                   := 0;
@@ -387,9 +400,6 @@ CodeSize                    := 0;
 CodePosStackTop             := 0;
 InitializedGlobalDataSize   := 0;
 UninitializedGlobalDataSize := 0;
-LocalDataSize               := 0;
-ParamDataSize               := 0;
-TempDataSize                := 0;
 ProgramEntryPoint           := 0;
 end;
 
@@ -546,7 +556,7 @@ case Types[DataType].Kind of
   WORDTYPE:       Result :=  0;
   BYTETYPE:       Result :=  0;
   CHARTYPE:       Result :=  0;
-  BOOLEANTYPE:    Result := -1;
+  BOOLEANTYPE:    Result :=  0;
   SUBRANGETYPE:   Result :=  Types[DataType].Low;
   ENUMERATEDTYPE: Result :=  Types[DataType].Low
 else
@@ -567,7 +577,7 @@ case Types[DataType].Kind of
   WORDTYPE:       Result := 65535;
   BYTETYPE:       Result := 255;  
   CHARTYPE:       Result := 255;
-  BOOLEANTYPE:    Result := 0;
+  BOOLEANTYPE:    Result := 1;
   SUBRANGETYPE:   Result := Types[DataType].High;
   ENUMERATEDTYPE: Result := Types[DataType].High
 else
@@ -580,6 +590,7 @@ end;
 
 function TypeSize(DataType: Integer): Integer;
 var
+  CurSize: Integer;
   i: Integer;
 begin
 Result := 0;
@@ -599,11 +610,11 @@ case Types[DataType].Kind of
                     Error('Illegal type')
                   else  
                     Result := (HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1) * TypeSize(Types[DataType].BaseType);
-  RECORDTYPE:     begin
-                  Result := 0;
-                  for i := 1 to Types[DataType].NumFields do
-                    Result := Result + TypeSize(Types[DataType].Field[i]^.DataType);
-                  end;
+  RECORDTYPE:     for i := 1 to Types[DataType].NumFields do
+                    begin
+                    CurSize := Types[DataType].Field[i]^.Offset + TypeSize(Types[DataType].Field[i]^.DataType);
+                    if CurSize > Result then Result := CurSize;
+                    end;  
   SETTYPE:        Result := MAXSETELEMENTS;
   ENUMERATEDTYPE: Result := SizeOf(Byte);                
   PROCEDURALTYPE: Result := SizeOf(Pointer)               
@@ -649,9 +660,9 @@ else                                         // Special cases
 
   // Subranges are compatible with their host types
   if Types[LeftType].Kind = SUBRANGETYPE then
-    Result := GetCompatibleType(Types[LeftType].HostType, RightType);
+    Result := GetCompatibleType(Types[LeftType].BaseType, RightType);
   if Types[RightType].Kind = SUBRANGETYPE then
-    Result := GetCompatibleType(LeftType, Types[RightType].HostType);
+    Result := GetCompatibleType(LeftType, Types[RightType].BaseType);
 
   // Integers
   if (Types[LeftType].Kind in IntegerTypes) and (Types[RightType].Kind in IntegerTypes) then
@@ -696,6 +707,12 @@ else                                         // Special cases
   then  
     Result := RightType;
     
+  // Untyped files are compatible with any other files 
+  if (Types[LeftType].Kind = FILETYPE) and (Types[RightType].Kind = FILETYPE) and
+     (Types[LeftType].BaseType = ANYTYPEINDEX) 
+  then  
+    Result := RightType;    
+    
   // Untyped parameters are compatible with any type
   if Types[LeftType].Kind = ANYTYPE then
     Result := RightType;
@@ -713,7 +730,7 @@ begin
 // Implicit type conversion is possible if DestType is real and SrcType is integer or a subrange of integer
 Result := (Types[DestType].Kind = REALTYPE) and
           ((Types[SrcType].Kind in IntegerTypes) or
-           ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].HostType].Kind in IntegerTypes)));
+           ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind in IntegerTypes)));
 end;
 
 
@@ -722,7 +739,7 @@ end;
 procedure CheckOperator(const Tok: TToken; DataType: Integer); 
 begin
 if Types[DataType].Kind = SUBRANGETYPE then
-  CheckOperator(Tok, Types[DataType].HostType)
+  CheckOperator(Tok, Types[DataType].BaseType)
 else 
   begin
   if not (Types[DataType].Kind in OrdinalTypes) and 
@@ -780,7 +797,7 @@ var
 begin
 for BlockStackIndex := BlockStackTop downto 1 do
   for IdentIndex := NumIdent downto 1 do
-    if (Ident[IdentIndex].Name = Name) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex]) then 
+    if (Ident[IdentIndex].Name = Name) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex].Index) then 
       begin
       Result := IdentIndex;
       Exit;
@@ -807,11 +824,11 @@ var
   i, AdditionalStackItems: Integer;
   Scope: TScope;
 begin
-if BlockStack[BlockStackTop] = 1 then Scope := GLOBAL else Scope := LOCAL;
+if BlockStack[BlockStackTop].Index = 1 then Scope := GLOBAL else Scope := LOCAL;
 
 i := GetIdentUnsafe(Name);
 
-if (i > 0) and (Ident[i].Block = BlockStack[BlockStackTop]) then
+if (i > 0) and (Ident[i].Block = BlockStack[BlockStackTop].Index) then
   Error('Duplicate identifier ' + Name);
 
 Inc(NumIdent);
@@ -823,19 +840,19 @@ Ident[NumIdent].Kind := Kind;
 Ident[NumIdent].Scope := Scope;
 Ident[NumIdent].RelocType := UNINITDATARELOC;
 Ident[NumIdent].DataType := DataType;
-Ident[NumIdent].Block := BlockStack[BlockStackTop];
+Ident[NumIdent].Block := BlockStack[BlockStackTop].Index;
 Ident[NumIdent].NestingLevel := BlockStackTop;
 Ident[NumIdent].NumParams := 0;
 Ident[NumIdent].PassMethod := PassMethod;
 Ident[NumIdent].IsUnresolvedForward := FALSE;
-Ident[NumIdent].IsExternal := FALSE;
+Ident[NumIdent].IsStdCall := FALSE;
 Ident[NumIdent].ForLoopNesting := 0;
 
 case Kind of
   PROC, FUNC:
     if PredefProc = EMPTYPROC then
       begin
-      Ident[NumIdent].Value := CodeSize;                              // Routine entry point address
+      Ident[NumIdent].Value := GetCodeSize;                              // Routine entry point address
       Ident[NumIdent].PredefProc := EMPTYPROC;
       end
     else
@@ -860,14 +877,18 @@ case Kind of
          else                                                                                // Inside a nested routine
            AdditionalStackItems := 2;                                                        // Return address, static link (hidden parameter)  
 
-         Ident[NumIdent].Value := (AdditionalStackItems + TotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from EBP (>0)
-         ParamDataSize := ParamDataSize + SizeOf(LongInt);                                   // Parameters always occupy 4 bytes each
+         with BlockStack[BlockStackTop] do
+           begin
+           Ident[NumIdent].Value := (AdditionalStackItems + TotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from EBP (>0)
+           ParamDataSize := ParamDataSize + SizeOf(LongInt);                                   // Parameters always occupy 4 bytes each
+           end
          end
        else
-         begin
-         Ident[NumIdent].Value := -LocalDataSize - TypeSize(DataType);                       // Local variable offset from EBP (<0)
-         LocalDataSize := LocalDataSize + TypeSize(DataType);
-         end;
+         with BlockStack[BlockStackTop] do
+           begin
+           Ident[NumIdent].Value := -LocalDataSize - TypeSize(DataType);                       // Local variable offset from EBP (<0)
+           LocalDataSize := LocalDataSize + TypeSize(DataType);
+           end;
     end; // case
 
 
@@ -900,10 +921,10 @@ if InitializedGlobalDataSize >= MAXINITIALIZEDDATASIZE then
 if UninitializedGlobalDataSize >= MAXUNINITIALIZEDDATASIZE then
   Error('Maximum uninitialized data size exceeded');
 
-if LocalDataSize >= MAXSTACKSIZE then
+if BlockStack[BlockStackTop].LocalDataSize >= MAXSTACKSIZE then
   Error('Maximum local data size exceeded');
 
-if ParamDataSize >= MAXSTACKSIZE then
+if BlockStack[BlockStackTop].ParamDataSize >= MAXSTACKSIZE then
   Error('Maximum parameter data size exceeded');
 
 end;

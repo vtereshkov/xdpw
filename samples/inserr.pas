@@ -1,5 +1,6 @@
 // Inertial navigation system error estimator demo
 
+{$APPTYPE CONSOLE}
 
 program INSErr;
 
@@ -126,10 +127,10 @@ for i := 0 to Round(tstop / dt) do
   ExecuteFilter(Filter);
 
   if i mod 10 = 0 then
-    WriteLn('t ', i * dt, ' ',
-            'dVel ', Model.dV, ' ',                 Filter.x[1, 1], ' ', 
-            'dAtt ', Model.Phi / deg, ' ',          Filter.x[2, 1] / deg, ' ',
-            'Bias ', Model.omega / (deg / hr), ' ', Filter.x[3, 1] / (deg / hr));
+    WriteLn(  't ', i * dt: 6: 1,
+            '  dVel ', Model.dV: 6: 1,                 Filter.x[1, 1]: 6: 1, 
+            '  dAtt ', Model.Phi / deg: 6: 2,          Filter.x[2, 1] / deg: 6: 2,
+            '  Bias ', Model.omega / (deg / hr): 6: 2, Filter.x[3, 1] / (deg / hr): 6: 2);
   end; // for
 
 WriteLn('Done.');

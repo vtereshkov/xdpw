@@ -210,9 +210,9 @@ else if Text = '$APPTYPE' then       // Console/GUI application type directive
     end;
     
   if Text = 'CONSOLE' then
-    IsConsoleProgram := 1
+    IsConsoleProgram := TRUE
   else if Text = 'GUI' then
-    IsConsoleProgram := 0
+    IsConsoleProgram := FALSE
   else
     Error('Unknown application type ' + Text);
   end
@@ -445,14 +445,11 @@ end;
 
 
 procedure NextTok;
-var
-  DivFound: Boolean;
 begin
 Tok.Kind := EMPTYTOK;
 
 // Skip spaces, comments, directives
-DivFound := FALSE;
-while (ch in Spaces) or (ch = '{') or ((ch = '/') and not DivFound) do
+while (ch in Spaces) or (ch = '{') or (ch = '/') do
   begin
   if ch = '{' then                                                      // Multi-line comment or directive
     begin
@@ -466,12 +463,8 @@ while (ch in Spaces) or (ch = '{') or ((ch = '/') and not DivFound) do
       ReadSingleLineComment                                             // Single-line comment
     else
       begin
-      if not EndOfProgram then                                          // Discard ch and ch2
-        begin
-        Dec(UnitStack[UnitStackTop].Pos);
-        Dec(UnitStack[UnitStackTop].Pos);
-        end;       
-      DivFound := TRUE;
+      if not EndOfProgram then Dec(UnitStack[UnitStackTop].Pos);        // Discard ch2     
+      Break;
       end;
     end;
   ReadValidChar(ch);

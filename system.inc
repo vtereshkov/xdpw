@@ -70,22 +70,22 @@ var
   
 // Windows API functions
 
-function GetCommandLineA: Pointer; external 'KERNEL32.DLL' name 'GetCommandLineA';
+function GetCommandLineA: Pointer stdcall; external 'KERNEL32.DLL' name 'GetCommandLineA';
 
-function GetProcessHeap: LongInt; external 'KERNEL32.DLL' name 'GetProcessHeap';
+function GetProcessHeap: LongInt stdcall; external 'KERNEL32.DLL' name 'GetProcessHeap';
 
 function HeapAlloc(hHeap,
                    dwFlags,
-                   dwBytes: LongInt): Pointer; external 'KERNEL32.DLL' name 'HeapAlloc';
+                   dwBytes: LongInt): Pointer stdcall; external 'KERNEL32.DLL' name 'HeapAlloc';
 
 procedure HeapFree(hHeap,
                    dwFlags: LongInt; 
-                   lpMem: Pointer); external 'KERNEL32.DLL' name 'HeapFree';
+                   lpMem: Pointer) stdcall; external 'KERNEL32.DLL' name 'HeapFree';
 
-function GetStdHandle(nStdHandle: Integer): LongInt; external 'KERNEL32.DLL' name 'GetStdHandle';
+function GetStdHandle(nStdHandle: Integer): LongInt stdcall; external 'KERNEL32.DLL' name 'GetStdHandle';
 
 procedure SetConsoleMode(hConsoleHandle: LongInt; 
-                         dwMode: LongInt); external 'KERNEL32.DLL' name 'SetConsoleMode';
+                         dwMode: LongInt) stdcall; external 'KERNEL32.DLL' name 'SetConsoleMode';
 
 function CreateFileA(const lpFileName: string; 
                      dwDesiredAccess: LongInt;
@@ -93,35 +93,40 @@ function CreateFileA(const lpFileName: string;
                      lpSecurityAttributes: Pointer; 
                      dwCreationDisposition, 
                      dwFlagsAndAttributes, 
-                     hTemplateFile: LongInt): LongInt; external 'KERNEL32.DLL' name 'CreateFileA';
+                     hTemplateFile: LongInt): LongInt stdcall; external 'KERNEL32.DLL' name 'CreateFileA';
                      
 function SetFilePointer(hFile: LongInt; 
                         lDistanceToMove: LongInt; 
                         pDistanceToMoveHigh: Pointer; 
-                        dwMoveMethod: LongInt): LongInt; external 'KERNEL32.DLL' name 'SetFilePointer';
+                        dwMoveMethod: LongInt): LongInt stdcall; external 'KERNEL32.DLL' name 'SetFilePointer';
 
 function GetFileSize(hFile: LongInt; 
-                     lpFileSizeHigh: Pointer): LongInt; external 'KERNEL32.DLL' name 'GetFileSize';        
+                     lpFileSizeHigh: Pointer): LongInt stdcall; external 'KERNEL32.DLL' name 'GetFileSize';        
                      
 procedure WriteFile(hFile: LongInt;
                     lpBuffer: Pointer;
                     nNumberOfBytesToWrite: LongInt;
                     var lpNumberOfBytesWritten: LongInt;
-                    lpOverlapped: LongInt); external 'KERNEL32.DLL' name 'WriteFile';
+                    lpOverlapped: LongInt) stdcall; external 'KERNEL32.DLL' name 'WriteFile';
                     
 procedure ReadFile(hFile: LongInt;
                    lpBuffer: Pointer;
                    nNumberOfBytesToRead: LongInt;
                    var lpNumberOfBytesRead: LongInt;
-                   lpOverlapped: LongInt); external 'KERNEL32.DLL' name 'ReadFile';
+                   lpOverlapped: LongInt) stdcall; external 'KERNEL32.DLL' name 'ReadFile';
 
-procedure CloseHandle(hObject: LongInt); external 'KERNEL32.DLL' name 'CloseHandle';
+procedure CloseHandle(hObject: LongInt) stdcall; external 'KERNEL32.DLL' name 'CloseHandle';
 
-function GetLastError: LongInt; external 'KERNEL32.DLL' name 'GetLastError';
+function GetLastError: LongInt stdcall; external 'KERNEL32.DLL' name 'GetLastError';
 
-function GetTickCount: LongInt; external 'KERNEL32.DLL' name 'GetTickCount';
+function LoadLibraryA(const lpLibFileName: string): LongInt stdcall; external 'KERNEL32.DLL' name 'LoadLibraryA';
 
-procedure ExitProcess(uExitCode: Integer); external 'KERNEL32.DLL' name 'ExitProcess';
+function GetProcAddress(hModule: LongInt; 
+                        const lpProcName: string): Pointer stdcall; external 'KERNEL32.DLL' name 'GetProcAddress';
+
+function GetTickCount: LongInt stdcall; external 'KERNEL32.DLL' name 'GetTickCount';
+
+procedure ExitProcess(uExitCode: Integer) stdcall; external 'KERNEL32.DLL' name 'ExitProcess';
 
 
 
@@ -199,7 +204,161 @@ end;
 
 
 
+// String manipulation routines
+
+
+function Length(const s: string): Integer;
+begin
+Result := 0;
+while s[Result + 1] <> #0 do Inc(Result);
+end;
+
+
+
+
+procedure SetLength(var s: string; NewLength: Integer);
+begin
+if NewLength >= 0 then s[NewLength + 1] := #0;
+end;
+
+
+
+
+procedure AppendStr(var Dest: string; const Source: string);
+var
+  DestLen, i: Integer;
+begin
+DestLen := Length(Dest);
+i := 0;
+repeat 
+  Inc(i);
+  Dest[DestLen + i] := Source[i];
+until Source[i] = #0;
+end;
+
+
+
+
+procedure ConcatStr(const s1, s2: string; var s: string);
+begin
+s := s1;
+AppendStr(s, s2);
+end;
+
+
+
+
+function CompareStr(const s1, s2: string): Integer;
+var
+  i: Integer;
+begin
+Result := 0;
+i := 0;
+repeat 
+  Inc(i);
+  Result := Integer(s1[i]) - Integer(s2[i]);
+until (s1[i] = #0) or (s2[i] = #0) or (Result <> 0);
+end;
+
+
+
+
+procedure Move(const Source; var Dest; Count: Integer);
+var
+  S, D: ^string;
+  i: Integer;
+begin
+S := @Source;
+D := @Dest;
+
+if S = D then Exit;
+
+for i := 1 to Count do
+  D^[i] := S^[i];
+end;
+
+
+
+
+procedure FillChar(var Data; Count: Integer; Value: Char);
+var
+  D: ^string;
+  i: Integer;
+begin
+D := @Data;
+for i := 1 to Count do
+  D^[i] := Value;
+end;
+
+
+
+
+function ParseCmdLine(Index: Integer; var Str: string): Integer;
+var
+  CmdLine: string;
+  CmdLinePtr: ^string;
+  Param: string;
+  ParamPtr: array [0..7] of ^string;
+  i, NumParam, CmdLineLen: Integer;
+
+begin
+CmdLinePtr := GetCommandLineA;
+CmdLine := CmdLinePtr^;
+CmdLineLen := Length(CmdLine);
+
+NumParam := 1;
+ParamPtr[NumParam - 1] := @CmdLine;
+
+for i := 1 to CmdLineLen do
+  begin
+  if CmdLine[i] <= ' ' then
+    CmdLine[i] := #0;
+    
+  if (i > 1) and (CmdLine[i] > ' ') and (CmdLine[i - 1] = #0) then
+    begin
+    Inc(NumParam);
+    ParamPtr[NumParam - 1] := @CmdLine[i];
+    end;
+  end;
+  
+if Index < NumParam then
+  Str := ParamPtr[Index]^
+else
+  Str := '';
+
+Result := NumParam;  
+end;
+
+
+
+
+function ParamCount: Integer;
+var
+  Str: string;
+begin  
+Result := ParseCmdLine(0, Str) - 1;
+end; 
+
+
+
+
+function ParamStr(Index: Integer): string;
+var
+  NumParam: Integer;
+begin  
+NumParam := ParseCmdLine(Index, Result);
+end;   
+
+
+
+
 // File and console I/O routines
+
+
+procedure IStr(Number: Integer; var s: string); forward;
+procedure Str(Number: Real; var s: string; DecPlaces: Integer = 0); forward;
+
+
 
 
 procedure WriteConsole(Ch: Char);
@@ -234,7 +393,7 @@ end;
 
 
 
-procedure Rewrite(var F: file; BlockSize: Integer);
+procedure Rewrite(var F: file; BlockSize: Integer = 1);
 var
   FileRecPtr: PFileRec;
 begin
@@ -246,7 +405,7 @@ end;
 
 
 
-procedure Reset(var F: file; BlockSize: Integer);
+procedure Reset(var F: file; BlockSize: Integer = 1);
 var
   FileRecPtr: PFileRec;
 begin
@@ -349,6 +508,14 @@ end;
 
 
 
+procedure WriteRec(var F: file; P: PStream; var Buf; Len: Integer);
+begin
+BlockWrite(F, Buf, Len);
+end;
+
+
+
+
 procedure WriteCh(var F: file; P: PStream; ch: Char);
 var
   Dest: PChar;
@@ -366,6 +533,33 @@ else
     WriteConsole(ch)                
   else                                              // File output
     BlockWrite(F, ch, 1);   
+end;
+
+
+
+
+procedure WriteString(var F: file; P: PStream; const S: string);
+var
+  i: Integer;
+begin
+i := 1;
+while S[i] <> #0 do
+  begin
+  WriteCh(F, P, S[i]);
+  Inc(i);
+  end; 
+end;
+
+
+
+
+procedure WriteStringF(var F: file; P: PStream; const S: string; MinWidth, DecPlaces: Integer);
+var
+  i: Integer;
+begin
+for i := 1 to MinWidth - Length(S) do
+  WriteCh(F, P, ' '); 
+WriteString(F, P, S);
 end;
 
 
@@ -410,6 +604,17 @@ end;
 
 
 
+procedure WriteIntF(var F: file; P: PStream; Number: Integer; MinWidth, DecPlaces: Integer);
+var
+  S: string;
+begin
+IStr(Number, S);
+WriteStringF(F, P, S, MinWidth, DecPlaces);
+end;
+  
+
+
+
 procedure WriteHex(var F: file; P: PStream; Number: Integer; Digits: ShortInt);
 var
   i, Digit: ShortInt;
@@ -425,7 +630,6 @@ end;
 
 
 
-
 procedure WritePointer(var F: file; P: PStream; Number: Integer);
 begin
 WriteHex(F, P, Number, 8);
@@ -434,13 +638,26 @@ end;
 
 
 
-
-procedure WriteReal(var F: file; P: PStream; Number: Real);
-const
-  FracBits = 16;
+procedure WritePointerF(var F: file; P: PStream; Number: Integer; MinWidth, DecPlaces: Integer);
 var
-  Integ, Frac, InvWeight, Digit, IntegExpon: Integer;
-  Expon: Real;
+  i: Integer;
+begin
+for i := 1 to MinWidth - 8 do
+  WriteCh(F, P, ' ');
+WritePointer(F, P, Number);
+end;
+
+
+
+
+procedure WriteReal(var F: file; P: PStream; Number: Real; DecPlaces: Integer);
+const
+  MaxDecPlaces = 7;
+  
+var
+  Integ, Digit, IntegExpon: Integer;
+  Expon, Frac: Real;
+  WriteExpon: Boolean;
 
 begin
 // Write sign
@@ -449,40 +666,73 @@ if Number < 0 then
   WriteCh(F, P,  '-');
   Number := -Number;
   end;
-
+  
 // Normalize number
-if Number = 0 then Expon := 0 else Expon := ln(Number) / ln(10);
-if (Expon > 8) or (Expon < -3) then
+if DecPlaces > 0 then
   begin
-  IntegExpon := Trunc(Expon);
-  if IntegExpon < 0 then Dec(IntegExpon);
-  Number := Number / exp(IntegExpon * ln(10));
+  WriteExpon := FALSE;
+  IntegExpon := 0;
+  if DecPlaces > MaxDecPlaces then DecPlaces := MaxDecPlaces;
   end
-else
-  IntegExpon := 0;  
+else  
+  begin
+  WriteExpon := TRUE;  
+  DecPlaces := MaxDecPlaces;
+  
+  if Number = 0 then 
+    IntegExpon := 0 
+  else 
+    begin
+    Expon := ln(Number) / ln(10);
+    IntegExpon := Trunc(Expon);
+    Number := Number / exp(IntegExpon * ln(10));
+    
+    if Number >= 10 then
+      begin
+      Number := Number / 10;
+      Inc(IntegExpon);
+      end
+    else if Number < 1 then
+      begin
+      Number := Number * 10;
+      Dec(IntegExpon);    
+      end;
+    end;  
+  end;
 
 // Write integer part
 Integ := Trunc(Number);
-Frac  := Round((Number - Integ) * (1 shl FracBits));
+Frac  := Number - Integ;
 
 WriteInt(F, P, Integ);  WriteCh(F, P, '.');
 
 // Write fractional part
-InvWeight := 10;
-
-while InvWeight <= 10000 do
+while DecPlaces > 0 do
   begin
-  Digit := (Frac * InvWeight) shr FracBits;
+  Frac := Frac * 10;
+  Digit := Trunc(Frac);
   if Digit > 9 then Digit := 9;
+  
   WriteCh(F, P,  Char(ShortInt('0') + Digit));
-  Frac := Frac - (Digit shl FracBits) div InvWeight;
-  InvWeight := InvWeight * 10;
+  
+  Frac := Frac - Digit;  
+  Dec(DecPlaces);
   end; // while
 
 // Write exponent
-if IntegExpon <> 0 then 
+if WriteExpon then 
   begin
-  WriteCh(F, P, 'e');  WriteInt(F, P, IntegExpon);
+  WriteCh(F, P, 'e');
+
+  if IntegExpon >= 0 then
+    WriteCh(F, P, '+')
+  else
+    begin
+    WriteCh(F, P, '-');  
+    IntegExpon := -IntegExpon;
+    end;
+       
+  WriteInt(F, P, IntegExpon);
   end;
  
 end;
@@ -490,16 +740,12 @@ end;
 
 
 
-procedure WriteString(var F: file; P: PStream; const s: string);
+procedure WriteRealF(var F: file; P: PStream; Number: Real; MinWidth, DecPlaces: Integer);
 var
-  i: Integer;
+  S: string;
 begin
-i := 1;
-while s[i] <> #0 do
-  begin
-  WriteCh(F, P, s[i]);
-  Inc(i);
-  end; 
+Str(Number, S, DecPlaces);
+WriteStringF(F, P, S, MinWidth, DecPlaces);
 end;
 
 
@@ -513,9 +759,27 @@ end;
 
 
 
+procedure WriteBooleanF(var F: file; P: PStream; Flag: Boolean; MinWidth, DecPlaces: Integer);
+begin
+if Flag then WriteStringF(F, P, 'TRUE', MinWidth, DecPlaces) else WriteStringF(F, P, 'FALSE', MinWidth, DecPlaces);
+end;
+
+
+
+
 procedure WriteNewLine(var F: file; P: PStream);
 begin
 WriteCh(F, P, #13);  WriteCh(F, P, #10);
+end;
+
+
+
+
+procedure ReadRec(var F: file; P: PStream; var Buf; Len: Integer);
+var
+  LenRead: Integer;
+begin
+BlockRead(F, Buf, Len, LenRead);
 end;
 
 
@@ -746,154 +1010,6 @@ end;
 
 
 
-// String manipulation routines
-
-
-function Length(const s: string): Integer;
-begin
-Result := 0;
-while s[Result + 1] <> #0 do Inc(Result);
-end;
-
-
-
-
-procedure SetLength(var s: string; NewLength: Integer);
-begin
-if NewLength >= 0 then s[NewLength + 1] := #0;
-end;
-
-
-
-
-procedure AppendStr(var Dest: string; const Source: string);
-var
-  DestLen, i: Integer;
-begin
-DestLen := Length(Dest);
-i := 0;
-repeat 
-  Inc(i);
-  Dest[DestLen + i] := Source[i];
-until Source[i] = #0;
-end;
-
-
-
-
-procedure ConcatStr(const s1, s2: string; var s: string);
-begin
-s := s1;
-AppendStr(s, s2);
-end;
-
-
-
-
-function CompareStr(const s1, s2: string): Integer;
-var
-  i: Integer;
-begin
-Result := 0;
-i := 0;
-repeat 
-  Inc(i);
-  Result := Integer(s1[i]) - Integer(s2[i]);
-until (s1[i] = #0) or (s2[i] = #0) or (Result <> 0);
-end;
-
-
-
-
-procedure Move(const Source; var Dest; Count: Integer);
-var
-  S, D: ^string;
-  i: Integer;
-begin
-S := @Source;
-D := @Dest;
-
-if S = D then Exit;
-
-for i := 1 to Count do
-  D^[i] := S^[i];
-end;
-
-
-
-
-procedure FillChar(var Data; Count: Integer; Value: Char);
-var
-  D: ^string;
-  i: Integer;
-begin
-D := @Data;
-for i := 1 to Count do
-  D^[i] := Value;
-end;
-
-
-
-
-function ParseCmdLine(Index: Integer; var Str: string): Integer;
-var
-  CmdLine: string;
-  CmdLinePtr: ^string;
-  Param: string;
-  ParamPtr: array [0..7] of ^string;
-  i, NumParam, CmdLineLen: Integer;
-
-begin
-CmdLinePtr := GetCommandLineA;
-CmdLine := CmdLinePtr^;
-CmdLineLen := Length(CmdLine);
-
-NumParam := 1;
-ParamPtr[NumParam - 1] := @CmdLine;
-
-for i := 1 to CmdLineLen do
-  begin
-  if CmdLine[i] <= ' ' then
-    CmdLine[i] := #0;
-    
-  if (i > 1) and (CmdLine[i] > ' ') and (CmdLine[i - 1] = #0) then
-    begin
-    Inc(NumParam);
-    ParamPtr[NumParam - 1] := @CmdLine[i];
-    end;
-  end;
-  
-if Index < NumParam then
-  Str := ParamPtr[Index]^
-else
-  Str := '';
-
-Result := NumParam;  
-end;
-
-
-
-
-function ParamCount: Integer;
-var
-  Str: string;
-begin  
-Result := ParseCmdLine(0, Str) - 1;
-end; 
-
-
-
-
-function ParamStr(Index: Integer): string;
-var
-  NumParam: Integer;
-begin  
-NumParam := ParseCmdLine(Index, Result);
-end;   
-
-
-
-
 // Conversion routines
 
 
@@ -912,14 +1028,14 @@ end;
 
 
 
-procedure Str(Number: Real; var s: string);
+procedure Str{(Number: Real; var s: string; DecPlaces: Integer = 0)};
 var
   Stream: TStream;
 begin
 Stream.Data := @s;
 Stream.Index := 0;
 
-WriteReal(StdOutputFile, @Stream, Number);
+WriteReal(StdOutputFile, @Stream, Number, DecPlaces);
 s[Stream.Index + 1] := #0;
 end;
 
@@ -941,7 +1057,7 @@ end;
 
 
 
-procedure IStr(Number: Integer; var s: string);
+procedure IStr{(Number: Integer; var s: string)};
 var
   Stream: TStream;
 begin
@@ -1044,5 +1160,28 @@ for i := 0 to SizeOf(SetStorage1) - 1 do
     Result := 1;
     Exit;
     end;
-end;  
+end; 
+
+
+
+
+function TestSubset(const SetStorage1, SetStorage2: TSetStorage): Integer;
+var
+  IntersectionStorage: TSetStorage;
+begin
+SetIntersection(SetStorage1, SetStorage2, IntersectionStorage);
+if CompareSets(SetStorage1, IntersectionStorage) = 0 then Result := -1 else Result := 1;
+end;
+
+
+
+
+function TestSuperset(const SetStorage1, SetStorage2: TSetStorage): Integer;
+var
+  IntersectionStorage: TSetStorage;
+begin
+SetIntersection(SetStorage1, SetStorage2, IntersectionStorage);
+if CompareSets(SetStorage2, IntersectionStorage) = 0 then Result := 1 else Result := -1;
+end; 
+ 
  

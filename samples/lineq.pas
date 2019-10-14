@@ -1,12 +1,11 @@
 // Linear equations solver
 
+{$APPTYPE CONSOLE}
 
 program LinEq;
 
 
-
 {$I samples\gauss.inc}
-
 
 
 procedure Error;
@@ -38,7 +37,7 @@ Write('File name   : '); ReadLn(DatName);
 WriteLn;
 
 Assign(DatFile, DatName);
-Reset(DatFile, 1);
+Reset(DatFile);
 
 Err := IOResult;
 if Err <> 0 then
@@ -64,7 +63,7 @@ for i := 1 to m do
   for j := 1 to m + 1 do
     begin
     Read(DatFile, A[i, j]);
-    Write(A[i, j], ' ');
+    Write(A[i, j]: 9: 1);
     end;
   ReadLn(DatFile);  
   WriteLn;
@@ -81,7 +80,7 @@ WriteLn;
 for i := 1 to m do
   begin
   for j := 1 to m + 1 do
-    Write(A[i, j], ' ');
+    Write(A[i, j]: 9: 1);
   WriteLn;
   end;
 
@@ -90,7 +89,7 @@ WriteLn('Solution: ');
 WriteLn;
 
 for i := 1 to m do
-  WriteLn('x', i, ' = ', x[i]);
+  WriteLn('x', i, ' = ', x[i]: 10: 4);
 
 WriteLn;
 WriteLn('Done.');

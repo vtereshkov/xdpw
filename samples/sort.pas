@@ -1,5 +1,6 @@
 // Sorting demo
 
+{$APPTYPE CONSOLE}
 
 program Sort;
 
@@ -163,13 +164,13 @@ Randomize;
 for i := 1 to DataLength do
   begin
   RandomData[i] := Round((Random - 0.5) * 1000000);
-  Write(RandomData[i]);
-  if i mod 6 <> 0 then Write(#9) else WriteLn;
+  Write(RandomData[i]: 8);
+  if i mod 6 = 0 then WriteLn;
   end;
 
 WriteLn;
 WriteLn;
-Write('Select order (A - ascending, D - descending): '); Read(Order);
+Write('Select order (A - ascending, D - descending): '); ReadLn(Order);
 WriteLn;
 
 case Order of
@@ -185,12 +186,13 @@ case Order of
     end
 else
   WriteLn('Order is not selected.');
+  Ordered := nil;
   ReadLn;
   Halt;     
 end;
 
 WriteLn;
-Write('Select method (Q - quick, B - bubble, S - selection): '); Read(Method);
+Write('Select method (Q - quick, B - bubble, S - selection): '); ReadLn(Method);
 WriteLn;
 
 case Method of
@@ -221,8 +223,8 @@ WriteLn;
 
 for i := 1 to DataLength do
   begin
-  Write(RandomData[i]); 
-  if i mod 6 <> 0 then Write(#9) else WriteLn;
+  Write(RandomData[i]: 8); 
+  if i mod 6 = 0 then WriteLn;
   end;
 WriteLn;
 

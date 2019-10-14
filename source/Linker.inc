@@ -6,11 +6,12 @@
 
  
 const
-  IMGBASE    = $400000;
-  SECTALIGN  = $1000;
-  FILEALIGN  = $200;
+  IMGBASE           = $400000;
+  SECTALIGN         = $1000;
+  FILEALIGN         = $200;
   
-  MAXIMPORTS = 64;
+  MAXIMPORTLIBS     = 16;
+  MAXIMPORTS        = 64;
   
 
     
@@ -89,12 +90,11 @@ type
     PEHeader: TPEHeader;
     PEOptionalHeader: TPEOptionalHeader;
     DataDirectories: array [0..15] of TDataDirectory;
-    ImportSectionHeader, DataSectionHeader, CodeSectionHeader: TPESectionHeader;	
+    CodeSectionHeader, DataSectionHeader, BSSSectionHeader, ImportSectionHeader: TPESectionHeader;	
   end;
   
   
   TImportFuncName = array [0..31] of Char;
-  TImportFuncNames = array [0..255] of TImportFuncName;
 
 
   TImportDirectoryTableEntry = packed record
@@ -113,9 +113,9 @@ type
 
   
   TImportSection = packed record
-    DirectoryTable: array [0..MAXIMPORTS] of TImportDirectoryTableEntry;
-    LibraryNames: array [0..MAXIMPORTS - 1, 0..15] of Char;
-    LookupTable: array [0..MAXIMPORTS - 1, 0..1] of LongInt;
+    DirectoryTable: array [0..MAXIMPORTLIBS] of TImportDirectoryTableEntry;
+    LibraryNames: array [0..MAXIMPORTLIBS - 1, 0..15] of Char;
+    LookupTable: array [0..MAXIMPORTS + MAXIMPORTLIBS - 1] of LongInt;
     NameTable: array [0..MAXIMPORTS - 1] of TImportNameTableEntry;
   end;
   
@@ -139,7 +139,16 @@ const
 
 var
   Headers: THeaders;  
-  ImportSection: TImportSection; 
+  ImportSection: TImportSection;
+
+
+
+
+const
+  NumImportLibs: Integer = 0;
+  NumImports: Integer = 0;
+  NumLookupEntries: Integer = 0; 
+  LastImportLibName: TString = ''; 
   
     
 
@@ -180,12 +189,7 @@ const
   IMAGE_SCN_MEM_READ                = $40000000;
   IMAGE_SCN_MEM_WRITE               = $80000000;
 
-var
-  DataSize: Integer;
-  
 begin
-DataSize := InitializedDataSize + UninitializedDataSize;
-
 FillChar(Headers, SizeOf(Headers), #0);
 
 with Headers do
@@ -197,7 +201,7 @@ with Headers do
     PE[0]                         := 'P';  
     PE[1]                         := 'E';
     Machine                       := IMAGE_FILE_MACHINE_I386;
-    NumberOfSections              := 3;
+    NumberOfSections              := 4;
     SizeOfOptionalHeader          := SizeOf(PEOptionalHeader) + SizeOf(DataDirectories);
     Characteristics               := IMAGE_FILE_RELOCS_STRIPPED or IMAGE_FILE_EXECUTABLE_IMAGE or IMAGE_FILE_32BIT_MACHINE;
     end;
@@ -205,27 +209,74 @@ with Headers do
   with PEOptionalHeader do
     begin 
     Magic                         := $10B;                                                // PE32
-    AddressOfEntryPoint           := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN) + Align(DataSize, SECTALIGN) + ProgramEntryPoint;
+    MajorLinkerVersion            := 3; 
+    SizeOfCode                    := CodeSize;
+    SizeOfInitializedData         := InitializedDataSize;
+    SizeOfUninitializedData       := UninitializedDataSize;    
+    AddressOfEntryPoint           := Align(SizeOf(Headers), SECTALIGN) + ProgramEntryPoint;
+    BaseOfCode                    := Align(SizeOf(Headers), SECTALIGN);
+    BaseOfData                    := Align(SizeOf(Headers), SECTALIGN) + Align(CodeSize, SECTALIGN);
     ImageBase                     := IMGBASE;
     SectionAlignment              := SECTALIGN;
     FileAlignment                 := FILEALIGN;
     MajorOperatingSystemVersion   := 4;
     MajorSubsystemVersion         := 4;
-    SizeOfImage                   := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN) + Align(DataSize, SECTALIGN) + Align(CodeSize, SECTALIGN);
+    SizeOfImage                   := Align(SizeOf(Headers), SECTALIGN) + Align(CodeSize, SECTALIGN) + Align(InitializedDataSize, SECTALIGN) + Align(UninitializedDataSize, SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN);
     SizeOfHeaders                 := Align(SizeOf(Headers), FILEALIGN);
-    Subsystem                     := 2 + IsConsoleProgram;                                // Win32 GUI/console
+    Subsystem                     := 2 + Ord(IsConsoleProgram);                                // Win32 GUI/console
     SizeOfStackReserve            := $1000000;
-    SizeOfStackCommit             := $1000000;
+    SizeOfStackCommit             := $100000;
     SizeOfHeapReserve             := $1000000;
-    SizeOfHeapCommit              := $1000000;
+    SizeOfHeapCommit              := $100000;
     NumberOfRvaAndSizes           := 16;
     end;
 
   with DataDirectories[1] do                                                              // Import directory
     begin
-    VirtualAddress                := Align(SizeOf(Headers), SECTALIGN);
+    VirtualAddress                := Align(SizeOf(Headers), SECTALIGN) + Align(CodeSize, SECTALIGN) + Align(InitializedDataSize, SECTALIGN) + Align(UninitializedDataSize, SECTALIGN);
     Size                          := SizeOf(TImportSection);
     end;
+    
+  with CodeSectionHeader do
+    begin
+    Name[0]                       := '.';
+    Name[1]                       := 't';
+    Name[2]                       := 'e';
+    Name[3]                       := 'x';
+    Name[4]                       := 't';
+    VirtualSize                   := CodeSize;
+    VirtualAddress                := Align(SizeOf(Headers), SECTALIGN);
+    SizeOfRawData                 := Align(CodeSize, FILEALIGN);
+    PointerToRawData              := Align(SizeOf(Headers), FILEALIGN);
+    Characteristics               := LongInt(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE);
+    end;
+    
+  with DataSectionHeader do
+    begin
+    Name[0]                       := '.';
+    Name[1]                       := 'd';
+    Name[2]                       := 'a';
+    Name[3]                       := 't';
+    Name[4]                       := 'a';
+    VirtualSize                   := InitializedDataSize;
+    VirtualAddress                := Align(SizeOf(Headers), SECTALIGN) + Align(CodeSize, SECTALIGN);
+    SizeOfRawData                 := Align(InitializedDataSize, FILEALIGN);
+    PointerToRawData              := Align(SizeOf(Headers), FILEALIGN) + Align(CodeSize, FILEALIGN);
+    Characteristics               := LongInt(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE);
+    end;
+    
+  with BSSSectionHeader do
+    begin
+    Name[0]                       := '.';
+    Name[1]                       := 'b';
+    Name[2]                       := 's';
+    Name[3]                       := 's';
+    VirtualSize                   := UninitializedDataSize;
+    VirtualAddress                := Align(SizeOf(Headers), SECTALIGN) + Align(CodeSize, SECTALIGN) + Align(InitializedDataSize, SECTALIGN);
+    SizeOfRawData                 := 0;
+    PointerToRawData              := Align(SizeOf(Headers), FILEALIGN) + Align(CodeSize, FILEALIGN) + Align(InitializedDataSize, FILEALIGN);
+    Characteristics               := LongInt(IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE);
+    end;    
 
   with ImportSectionHeader do
     begin
@@ -236,73 +287,78 @@ with Headers do
     Name[4]                       := 't';
     Name[5]                       := 'a';
     VirtualSize                   := SizeOf(TImportSection);
-    VirtualAddress                := Align(SizeOf(Headers), SECTALIGN);
+    VirtualAddress                := Align(SizeOf(Headers), SECTALIGN) + Align(CodeSize, SECTALIGN) + Align(InitializedDataSize, SECTALIGN) + Align(UninitializedDataSize, SECTALIGN);
     SizeOfRawData                 := Align(SizeOf(TImportSection), FILEALIGN);
-    PointerToRawData              := Align(SizeOf(Headers), FILEALIGN);
+    PointerToRawData              := Align(SizeOf(Headers), FILEALIGN) + Align(CodeSize, FILEALIGN) + Align(InitializedDataSize, FILEALIGN);
     Characteristics               := LongInt(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE);
     end;
 
-  with DataSectionHeader do
-    begin
-    Name[0]                       := '.';
-    Name[1]                       := 'd';
-    Name[2]                       := 'a';
-    Name[3]                       := 't';
-    Name[4]                       := 'a';
-    VirtualSize                   := DataSize;
-    VirtualAddress                := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN);
-    SizeOfRawData                 := Align(InitializedDataSize, FILEALIGN);
-    PointerToRawData              := Align(SizeOf(Headers), FILEALIGN) + Align(SizeOf(TImportSection), FILEALIGN);
-    Characteristics               := LongInt(IMAGE_SCN_CNT_INITIALIZED_DATA or IMAGE_SCN_CNT_UNINITIALIZED_DATA or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_WRITE);
-    end;
-
-  with CodeSectionHeader do
-    begin
-    Name[0]                       := '.';
-    Name[1]                       := 't';
-    Name[2]                       := 'e';
-    Name[3]                       := 'x';
-    Name[4]                       := 't';
-    VirtualSize                   := CodeSize;
-    VirtualAddress                := Align(SizeOf(Headers), SECTALIGN) + Align(SizeOf(TImportSection), SECTALIGN) + Align(DataSize, SECTALIGN);
-    SizeOfRawData                 := Align(CodeSize, FILEALIGN);
-    PointerToRawData              := Align(SizeOf(Headers), FILEALIGN) + Align(SizeOf(TImportSection), FILEALIGN) + Align(InitializedDataSize, FILEALIGN);
-    Characteristics               := LongInt(IMAGE_SCN_CNT_CODE or IMAGE_SCN_MEM_READ or IMAGE_SCN_MEM_EXECUTE);
-    end;
-    
   end;
   
 end;
 
 
-
-
+    
 
 function AddImportFunc(const ImportLibName, ImportFuncName: TString): LongInt;
-var
-  VirtualAddress: LongInt;
 begin
-VirtualAddress := Align(SizeOf(Headers), SECTALIGN);
+// Add new import library
+if (NumImportLibs = 0) or (ImportLibName <> LastImportLibName) then
+  begin
+  if NumImportLibs <> 0 then Inc(NumLookupEntries);  // Add null entry before the first thunk of a new library    
+  
+  ImportSection.DirectoryTable[NumImportLibs].Name := SizeOf(ImportSection.DirectoryTable) + 
+                                                      SizeOf(ImportSection.LibraryNames[0]) * NumImportLibs;
+                                                                         
+  ImportSection.DirectoryTable[NumImportLibs].FirstThunk := SizeOf(ImportSection.DirectoryTable) + 
+                                                            SizeOf(ImportSection.LibraryNames) + 
+                                                            SizeOf(ImportSection.LookupTable[0]) * NumLookupEntries;
 
-ImportSection.DirectoryTable[NumImports].Name        := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
-                                                                       + SizeOf(ImportSection.LibraryNames[0]) * NumImports;
-                                                                       
-ImportSection.DirectoryTable[NumImports].FirstThunk  := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
-                                                                       + SizeOf(ImportSection.LibraryNames)
-                                                                       + SizeOf(ImportSection.LookupTable[0]) * NumImports;
+  Move(ImportLibName[1], ImportSection.LibraryNames[NumImportLibs], Length(ImportLibName));
+  
+  Inc(NumImportLibs);
+  if NumImportLibs >= MAXIMPORTLIBS then
+    Error('Maximum number of import libraries exceeded');
+  end; // if
+  
+LastImportLibName := ImportLibName;  
 
-Move(ImportLibName[1], ImportSection.LibraryNames[NumImports], Length(ImportLibName));
-
-ImportSection.LookupTable[NumImports, 0] := VirtualAddress + SizeOf(ImportSection.DirectoryTable)
-                                                           + SizeOf(ImportSection.LibraryNames)
-                                                           + SizeOf(ImportSection.LookupTable)
-                                                           + SizeOf(ImportSection.NameTable[0]) * NumImports;                                              
+// Add new import function
+ImportSection.LookupTable[NumLookupEntries] := SizeOf(ImportSection.DirectoryTable) + 
+                                               SizeOf(ImportSection.LibraryNames) + 
+                                               SizeOf(ImportSection.LookupTable) + 
+                                               SizeOf(ImportSection.NameTable[0]) * NumImports;                                              
 
 Move(ImportFuncName[1], ImportSection.NameTable[NumImports].Name, Length(ImportFuncName));
 
-Result := IMGBASE + VirtualAddress + LongInt(@ImportSection.LookupTable[NumImports, 0]) - LongInt(@ImportSection);
-Inc(NumImports);
-end;
+Result := LongInt(@ImportSection.LookupTable[NumLookupEntries]) - LongInt(@ImportSection);  // Relocatable
+
+Inc(NumLookupEntries);
+if NumLookupEntries >= MAXIMPORTS + MAXIMPORTLIBS - 1 then
+  Error('Maximum number of lookup entries exceeded');
   
+Inc(NumImports);
+if NumImports >= MAXIMPORTS then
+  Error('Maximum number of import functions exceeded');  
+end;
+
+
+
+
+procedure FixupImportSection(VirtualAddress: LongInt);
+var
+  i: Integer;
+begin
+for i := 0 to NumImportLibs - 1 do
+  with ImportSection.DirectoryTable[i] do
+    begin
+    Name := Name + VirtualAddress;
+    FirstThunk := FirstThunk + VirtualAddress;
+    end;
     
+for i := 0 to NumLookupEntries - 1 do
+  with ImportSection do
+    if LookupTable[i] <> 0 then 
+      LookupTable[i] := LookupTable[i] + VirtualAddress;  
+end;  
 
