@@ -268,6 +268,13 @@ procedure GenPopReg(Reg: TRegister);
         Result := TRUE;
         end
 
+      else if (PopReg = ECX) and (OptimizePopRegTrigger.Reg = EBP) then
+        begin
+        CodeSize := CodeSize - 6;                                              // Remove: push dword ptr [ebp + Value]                                       
+        Gen($8B); Gen($8D); GenDWord(OptimizePopRegTrigger.Value);             // mov ecx, dword ptr [ebp + Value]
+        Result := TRUE;
+        end
+
       else if (PopReg = ESI) and (OptimizePopRegTrigger.Reg = EBP) then
         begin
         CodeSize := CodeSize - 6;                                              // Remove: push dword ptr [ebp + Value]                                       
@@ -431,27 +438,33 @@ end;
 
 procedure GetArrayElementPtr(ArrType: Integer);
 
+
   function Log2(x: LongInt): ShortInt;
   var
     i: Integer;
   begin
+  for i := 0 to 31 do
+    if x = 1 shl i then 
+      begin
+      Result := i;
+      Exit;
+      end;  
   Result := -1;
-  i := 0;
-  while (i <= 31) and (Result = -1) do
-    begin
-    if x = 1 shl i then Result := i;
-    Inc(i);
-    end;
   end;
+
 
 var
   BaseTypeSize, IndexLowBound: Integer;
   Log2BaseTypeSize: ShortInt;
 
+
 begin
 GenPopReg(EAX);                                                 // pop eax           ; Array index
+GenPopReg(ESI);                                                 // pop esi           ; Array base offset
 
+BaseTypeSize := TypeSize(Types[ArrType].BaseType);
 IndexLowBound := LowBound(Types[ArrType].IndexType);
+
 if IndexLowBound = 1 then
   Gen($48)                                                      // dec eax
 else if IndexLowBound <> 0 then
@@ -459,20 +472,28 @@ else if IndexLowBound <> 0 then
   Gen($2D); GenDWord(IndexLowBound);                            // sub eax, IndexLowBound
   end;
 
-BaseTypeSize := TypeSize(Types[ArrType].BaseType);
-Log2BaseTypeSize := Log2(BaseTypeSize);
-
-if Log2BaseTypeSize > 0 then
+if (BaseTypeSize <> 1) and (BaseTypeSize <> 2) and (BaseTypeSize <> 4) and (BaseTypeSize <> 8) then
   begin
-  Gen($C1); Gen($E0); Gen(Log2BaseTypeSize);                    // shl eax, Log2BaseTypeSize
-  end
-else if Log2BaseTypeSize < 0 then
-  begin
-  Gen($69); Gen($C0); GenDWord(BaseTypeSize);                   // imul eax, BaseTypeSize
-  end;
+  Log2BaseTypeSize := Log2(BaseTypeSize);  
+  if Log2BaseTypeSize > 0 then
+    begin
+    Gen($C1); Gen($E0); Gen(Log2BaseTypeSize);                  // shl eax, Log2BaseTypeSize
+    end
+  else
+    begin
+    Gen($69); Gen($C0); GenDWord(BaseTypeSize);                 // imul eax, BaseTypeSize
+    end;  
+  end; // if
 
-GenPopReg(ESI);                                                 // pop esi            ; Array base offset
-Gen($01); Gen($C6);                                             // add esi, eax
+Gen($8D); Gen($34);                                             // lea esi, [esi + eax * ...
+case BaseTypeSize of
+  1:   Gen($06);                                                // ... * 1]
+  2:   Gen($46);                                                // ... * 2]
+  4:   Gen($86);                                                // ... * 4]
+  8:   Gen($C6)                                                 // ... * 8]
+  else Gen($06)                                                 // ... * 1]  ; already multiplied above
+end;  
+
 GenPushReg(ESI);                                                // push esi
 end;
 
