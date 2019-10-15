@@ -75,6 +75,7 @@ IsConsoleProgram := TRUE;  // Console program by default
 ZeroAll;
 FillChar(ImportSection, SizeOf(ImportSection), #0);
 
+ResetOptimizationTriggers;
 InitializeScanner(ProgramName);
 CompileProgram;
 FinalizeScanner;
