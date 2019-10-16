@@ -33,13 +33,35 @@ var
 
 
 
+procedure SetOptimizationTrigger(var Trigger: TOptimizationTrigger; SetKind: TInstruction; SetReg: TRegister; SetValue: LongInt; SetBaseTypeSize: LongInt);
+begin
+with Trigger do
+  begin
+  Kind := SetKind; 
+  Reg := SetReg;
+  Value := SetValue;
+  BaseTypeSize := SetBaseTypeSize;
+  end;
+end;
+
+
+
+  
+procedure ResetOptimizationTrigger(var Trigger: TOptimizationTrigger);
+begin
+Trigger.Kind := EMPTYOP;
+end;
+
+
+
+
 procedure ResetOptimizationTriggers;
 begin
-PopRegOptimizationTrigger.Kind := EMPTYOP;
-PopRegOptimizationPretrigger.Kind := EMPTYOP;
-PushToFPUOptimizationTrigger.Kind := EMPTYOP;
-DerefPtrOptimizationTrigger.Kind := EMPTYOP;
-GetFieldPtrOptimizationTrigger.Kind := EMPTYOP;
+ResetOptimizationTrigger(PopRegOptimizationTrigger);
+ResetOptimizationTrigger(PopRegOptimizationPretrigger);
+ResetOptimizationTrigger(PushToFPUOptimizationTrigger);
+ResetOptimizationTrigger(DerefPtrOptimizationTrigger);
+ResetOptimizationTrigger(GetFieldPtrOptimizationTrigger);
 end;
 
 
@@ -155,9 +177,7 @@ SavedPopRegOptimizationTrigger := PopRegOptimizationTrigger;
 
 Gen($68); GenDWord(Value);                            // push Value
 
-PopRegOptimizationTrigger.Kind := PUSHCONSTOP;
-PopRegOptimizationTrigger.Value := Value;
-
+SetOptimizationTrigger(PopRegOptimizationTrigger, PUSHCONSTOP, EMPTYREG, Value, 0);
 PopRegOptimizationPretrigger := SavedPopRegOptimizationTrigger;
 end;
 
@@ -168,8 +188,7 @@ procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 begin
 Gen($68); GenRelocDWord(Value, RelocType);            // push Value  ; relocatable
 
-PopRegOptimizationTrigger.Kind := PUSHRELOCCONSTOP;
-PopRegOptimizationTrigger.Value := Value;
+SetOptimizationTrigger(PopRegOptimizationTrigger, PUSHRELOCCONSTOP, EMPTYREG, Value, 0);
 end;
 
 
@@ -211,8 +230,7 @@ else
   Error('Internal fault: Illegal register');  
 end;
 
-PopRegOptimizationTrigger.Kind := PUSHREGOP;
-PopRegOptimizationTrigger.Reg := Reg;
+SetOptimizationTrigger(PopRegOptimizationTrigger, PUSHREGOP, Reg, 0, 0);
 end;  
 
 
@@ -398,7 +416,7 @@ procedure GenPushToFPU;
     Result := TRUE;
     end;
 
-  PushToFPUOptimizationTrigger.Kind := EMPTYOP;   
+  ResetOptimizationTrigger(PushToFPUOptimizationTrigger);   
   end;
   
   
@@ -415,7 +433,7 @@ end;
 procedure GenPopFromFPU;
 begin
 Gen($D9); Gen($1C); Gen($24);                                         // fstp dword ptr [esp]
-PushToFPUOptimizationTrigger.Kind := FSTPOP;
+SetOptimizationTrigger(PushToFPUOptimizationTrigger, FSTPOP, EMPTYREG, 0, 0);
 end; 
 
 
@@ -436,9 +454,10 @@ case Scope of
       begin
       Gen($8D); Gen($B5); GenDWord(Addr);                       // lea esi, [ebp + Addr]
       GenPushReg(ESI);                                          // push esi
-
-      DerefPtrOptimizationTrigger.Kind := LEAOP_PUSHREGOP;
-      DerefPtrOptimizationTrigger.Value := Addr;      
+      
+      // One of the two optimizations may succeed
+      SetOptimizationTrigger(DerefPtrOptimizationTrigger, LEAOP_PUSHREGOP, EBP, Addr, 0);
+      SetOptimizationTrigger(GetFieldPtrOptimizationTrigger, LEAOP_PUSHREGOP, EBP, Addr, 0); 
       end
     else                                      // Intermediate level variable
       begin
@@ -465,20 +484,18 @@ procedure DerefPtr(DataType: Integer);
   begin
   Result := FALSE;
   
-  // Optimization: (lea esi, [ebp + Addr]) + (push esi) -> (push dword ptr [ebp + Addr]);   subject to further push/pop optimizations
+  // Optimization: (lea esi, [ebp + Addr]) + (push esi) -> (push dword ptr [ebp + Addr])
   if DerefPtrOptimizationTrigger.Kind = LEAOP_PUSHREGOP then        
     begin
     CodeSize := CodeSize - 7;                                           // Remove: lea esi, [ebp + Addr], push esi
     Gen($FF); Gen($B5); GenDWord(DerefPtrOptimizationTrigger.Value);    // push dword ptr [ebp + Addr]
     
-    PopRegOptimizationTrigger.Kind := PUSHLOCALADDROP;
-    PopRegOptimizationTrigger.Reg := EBP;
-    PopRegOptimizationTrigger.Value := DerefPtrOptimizationTrigger.Value;    
-    
+    // Try further push/pop optimizations
+    SetOptimizationTrigger(PopRegOptimizationTrigger, PUSHLOCALADDROP, EBP, DerefPtrOptimizationTrigger.Value, 0);   
     Result := TRUE;
     end;
 
-  DerefPtrOptimizationTrigger.Kind := EMPTYOP;  
+  ResetOptimizationTrigger(DerefPtrOptimizationTrigger);  
   end;
 
 
@@ -519,8 +536,7 @@ case TypeSize(DataType) of
        Gen($FF); Gen($36);                                        // push dword ptr [esi]
        
        // Optimization was unsuccessful, try a simpler one
-       PopRegOptimizationTrigger.Kind := PUSHLOCALADDROP;
-       PopRegOptimizationTrigger.Reg := ESI;     
+       SetOptimizationTrigger(PopRegOptimizationTrigger, PUSHLOCALADDROP, ESI, 0, 0);   
        end
      end
 else
@@ -589,11 +605,9 @@ case BaseTypeSize of
   8:   Gen($C6)                                                 // ... * 8]
   else Gen($06)                                                 // ... * 1]  ; already multiplied above
 end;  
-
 GenPushReg(ESI);                                                // push esi
 
-GetFieldPtrOptimizationTrigger.Kind := LEAOP_PUSHREGOP;
-GetFieldPtrOptimizationTrigger.BaseTypeSize := BaseTypeSize; 
+SetOptimizationTrigger(GetFieldPtrOptimizationTrigger, LEAOP_PUSHREGOP, ESI, 0, BaseTypeSize);
 end;
 
 
@@ -608,25 +622,36 @@ var
   begin
   Result := FALSE;
   
-  // Optimization: (lea esi, [esi + eax * BaseTypeSize]) + (push esi) + (pop esi) + (add esi, Offset) -> (lea esi, [esi + eax * BaseTypeSize + Offset])
   if GetFieldPtrOptimizationTrigger.Kind = LEAOP_PUSHREGOP then        
-    begin
-    CodeSize := CodeSize - 4;                                       // Remove: lea esi, [esi + eax * BaseTypeSize], push esi
-   
-    Gen($8D); Gen($B4);                                             // lea esi, [esi + eax * ... + ...
-    case GetFieldPtrOptimizationTrigger.BaseTypeSize of
-      1:   Gen($06);                                                // ... * 1 + ...
-      2:   Gen($46);                                                // ... * 2 + ...
-      4:   Gen($86);                                                // ... * 4 + ...
-      8:   Gen($C6)                                                 // ... * 8 + ...
-      else Gen($06)                                                 // ... * 1 + ...  ; already multiplied above
-    end; 
-    GenDWord(Offset);                                               // ... + Offset] 
-    
-    Result := TRUE;
-    end;
+    case GetFieldPtrOptimizationTrigger.Reg of
+      // Optimization: (lea esi, [ebp + Addr]) + (push esi) + (pop esi) + (add esi, Offset) -> (lea esi, [ebp + Addr + Offset])      
+      EBP:
+        begin
+        CodeSize := CodeSize - 7;                                                     // Remove: lea esi, [ebp + Addr], push esi
+        Gen($8D); Gen($B5); GenDWord(GetFieldPtrOptimizationTrigger.Value + Offset);  // lea esi, [ebp + Addr + Offset]
+        Result := TRUE;
+        end;
+        
+      // Optimization: (lea esi, [esi + eax * BaseTypeSize]) + (push esi) + (pop esi) + (add esi, Offset) -> (lea esi, [esi + eax * BaseTypeSize + Offset])
+      ESI:  
+        begin
+        CodeSize := CodeSize - 4;                                       // Remove: lea esi, [esi + eax * BaseTypeSize], push esi
+       
+        Gen($8D); Gen($B4);                                             // lea esi, [esi + eax * ... + ...
+        case GetFieldPtrOptimizationTrigger.BaseTypeSize of
+          1:   Gen($06);                                                // ... * 1 + ...
+          2:   Gen($46);                                                // ... * 2 + ...
+          4:   Gen($86);                                                // ... * 4 + ...
+          8:   Gen($C6)                                                 // ... * 8 + ...
+          else Gen($06)                                                 // ... * 1 + ...  ; already multiplied above
+        end; 
+        GenDWord(Offset);                                               // ... + Offset] 
+        
+        Result := TRUE;
+        end;
+    end; // case    
 
-  GetFieldPtrOptimizationTrigger.Kind := EMPTYOP;  
+  ResetOptimizationTrigger(GetFieldPtrOptimizationTrigger);  
   end;
 
 
