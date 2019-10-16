@@ -11,7 +11,7 @@
 type
   TRegister = (EMPTYREG, EAX, ECX, ESI, EDI, EBP);
    
-  TInstruction = (EMPTYOP, PUSHREGOP, PUSHCONSTOP, PUSHRELOCCONSTOP, PUSHLOCALADDROP, LEAOP_PUSHREGOP);
+  TInstruction = (EMPTYOP, PUSHREGOP, PUSHCONSTOP, PUSHRELOCCONSTOP, PUSHLOCALADDROP, FSTPOP, LEAOP_PUSHREGOP);
   
   TOptimizationTrigger = record
     Kind: TInstruction;
@@ -23,7 +23,10 @@ type
 
   
 var
-  PopRegOptimizationPretrigger, PopRegOptimizationTrigger, DerefPtrOptimizationTrigger: TOptimizationTrigger;
+  PopRegOptimizationPretrigger, 
+  PopRegOptimizationTrigger,
+  PushToFPUOptimizationTrigger, 
+  DerefPtrOptimizationTrigger: TOptimizationTrigger;
 
 
 
@@ -32,6 +35,7 @@ procedure ResetOptimizationTriggers;
 begin
 PopRegOptimizationTrigger.Kind := EMPTYOP;
 PopRegOptimizationPretrigger.Kind := EMPTYOP;
+PushToFPUOptimizationTrigger.Kind := EMPTYOP;
 DerefPtrOptimizationTrigger.Kind := EMPTYOP;
 end;
 
@@ -371,6 +375,44 @@ if not OptimizePopReg(Reg) then
     Error('Internal fault: Illegal register');  
   end;
 
+end;
+
+
+
+
+procedure GenPushToFPU;
+
+
+  function OptimizeGenPushToFPU: Boolean;
+  begin
+  Result := FALSE;
+  
+  // Optimization: (fstp dword ptr [esp]) + (fld dword ptr [esp]) -> (fst dword ptr [esp])
+  if PushToFPUOptimizationTrigger.Kind = FSTPOP then
+    begin
+    CodeSize := CodeSize - 3;                                         // Remove: fstp dword ptr [esp]
+    Gen($D9); Gen($14); Gen($24);                                     // fst dword ptr [esp]
+    Result := TRUE;
+    end;
+
+  PushToFPUOptimizationTrigger.Kind := EMPTYOP;   
+  end;
+  
+  
+begin
+if not OptimizeGenPushToFPU then
+  begin
+  Gen($D9); Gen($04); Gen($24);                                       // fld dword ptr [esp]
+  end;
+end;
+
+
+
+
+procedure GenPopFromFPU;
+begin
+Gen($D9); Gen($1C); Gen($24);                                         // fstp dword ptr [esp]
+PushToFPUOptimizationTrigger.Kind := FSTPOP;
 end; 
 
 
@@ -419,23 +461,20 @@ procedure DerefPtr(DataType: Integer);
   function OptimizeDerefPtr: Boolean;
   begin
   Result := FALSE;
-
-  case DerefPtrOptimizationTrigger.Kind of
-    // Optimization: (lea esi, [ebp + Addr]) + (push esi) -> (push dword ptr [ebp + Addr]);   subject to further push/pop optimizations
-    LEAOP_PUSHREGOP:
-      begin
-      CodeSize := CodeSize - 7;                                           // Remove: lea esi, [ebp + Addr], push esi
-      Gen($FF); Gen($B5); GenDWord(DerefPtrOptimizationTrigger.Value);    // push dword ptr [ebp + Addr]
-      
-      PopRegOptimizationTrigger.Kind := PUSHLOCALADDROP;
-      PopRegOptimizationTrigger.Reg := EBP;
-      PopRegOptimizationTrigger.Value := DerefPtrOptimizationTrigger.Value;    
-      
-      Result := TRUE;
-      end;
-      
-    end; // case
+  
+  // Optimization: (lea esi, [ebp + Addr]) + (push esi) -> (push dword ptr [ebp + Addr]);   subject to further push/pop optimizations
+  if DerefPtrOptimizationTrigger.Kind = LEAOP_PUSHREGOP then        
+    begin
+    CodeSize := CodeSize - 7;                                           // Remove: lea esi, [ebp + Addr], push esi
+    Gen($FF); Gen($B5); GenDWord(DerefPtrOptimizationTrigger.Value);    // push dword ptr [ebp + Addr]
     
+    PopRegOptimizationTrigger.Kind := PUSHLOCALADDROP;
+    PopRegOptimizationTrigger.Reg := EBP;
+    PopRegOptimizationTrigger.Value := DerefPtrOptimizationTrigger.Value;    
+    
+    Result := TRUE;
+    end;
+
   DerefPtrOptimizationTrigger.Kind := EMPTYOP;  
   end;
 
@@ -665,7 +704,7 @@ end;
 
 procedure GenerateRound(TruncMode: Boolean);
 begin
-Gen($D9); Gen($04); Gen($24);                                               // fld dword ptr [esp]  ;  st = operand
+GenPushToFPU;                                                               // fld dword ptr [esp]  ;  st = operand
 
 if TruncMode then
   begin
@@ -688,8 +727,16 @@ end;// GenerateRound
 
 procedure GenerateFloat(Depth: Byte);
 begin
-Gen($DB); Gen($44); Gen($24); Gen(Depth);                             // fild dword ptr [esp + Depth]  ;  st := float(operand)
-Gen($D9); Gen($5C); Gen($24); Gen(Depth);                             // fstp dword ptr [esp + Depth]  ;  [esp] := st;  pop
+if Depth = 0 then
+  begin
+  Gen($DB); Gen($04); Gen($24);                                         // fild dword ptr [esp]  ;  st := float(operand)
+  GenPopFromFPU;                                                        // fstp dword ptr [esp]  ;  [esp] := st;  pop
+  end
+else
+  begin  
+  Gen($DB); Gen($44); Gen($24); Gen(Depth);                             // fild dword ptr [esp + Depth]  ;  st := float(operand)
+  Gen($D9); Gen($5C); Gen($24); Gen(Depth);                             // fstp dword ptr [esp + Depth]  ;  [esp] := st;  pop
+  end;
 end;// GenerateFloat
 
 
@@ -699,7 +746,7 @@ procedure GenerateMathFunction(func: TPredefProc; ResultType: Integer);
 begin
 if Types[ResultType].Kind = REALTYPE then       // Real type
   begin
-  Gen($D9); Gen($04); Gen($24);                                         // fld dword ptr [esp]  ;  st = operand
+  GenPushToFPU;                                                         // fld dword ptr [esp]  ;  st = operand
   case func of
     ABSFUNC:
       begin
@@ -748,7 +795,7 @@ if Types[ResultType].Kind = REALTYPE then       // Real type
 
   end;// case
 
-  Gen($D9); Gen($1C); Gen($24);                                         // fstp dword ptr [esp]  ;  [esp] := st;  pop
+  GenPopFromFPU;                                                        // fstp dword ptr [esp]  ;  [esp] := st;  pop
   end
 else                                // Ordinal types
   case func of
@@ -779,9 +826,9 @@ if Types[ResultType].Kind = REALTYPE then     // Real type
   begin
   if op = MINUSTOK then
     begin
-    Gen($D9); Gen($04); Gen($24);                                       // fld dword ptr [esp]  ;  st = operand
+    GenPushToFPU;                                                       // fld dword ptr [esp]  ;  st = operand
     Gen($D9); Gen($E0);                                                 // fchs
-    Gen($D9); Gen($1C); Gen($24);                                       // fstp dword ptr [esp] ;  [esp] := st;  pop
+    GenPopFromFPU;                                                      // fstp dword ptr [esp] ;  [esp] := st;  pop
     end;
   end
 else                                              // Ordinal types
@@ -815,9 +862,9 @@ procedure GenerateBinaryOperator(op: TTokenKind; ResultType: Integer);
 begin
 if Types[ResultType].Kind = REALTYPE then     // Real type
   begin
-  Gen($D9); Gen($04); Gen($24);                                         // fld dword ptr [esp]  ;  st = operand2
+  GenPushToFPU;                                                         // fld dword ptr [esp]  ;  st = operand2
   GenPopReg(EAX);                                                       // pop eax
-  Gen($D9); Gen($04); Gen($24);                                         // fld dword ptr [esp]  ;  st(1) = operand2;  st = operand1
+  GenPushToFPU;                                                         // fld dword ptr [esp]  ;  st(1) = operand2;  st = operand1
   Gen($D9); Gen($C9);                                                   // fxch                 ;  st = operand2;  st(1) = operand1
 
   case op of
@@ -839,7 +886,7 @@ if Types[ResultType].Kind = REALTYPE then     // Real type
       end;
   end;// case
 
-  Gen($D9); Gen($1C); Gen($24);                                         // fstp dword ptr [esp]  ;  [esp] := st;  pop
+  GenPopFromFPU;                                                        // fstp dword ptr [esp]  ;  [esp] := st;  pop
   end // if
 else                                          // Ordinal types
   begin
@@ -916,9 +963,9 @@ procedure GenerateRelation(rel: TTokenKind; ValType: Integer);
 begin
 if Types[ValType].Kind = REALTYPE then        // Real type
   begin
-  Gen($D9); Gen($04); Gen($24);                                         // fld dword ptr [esp]  ;  st = operand2
+  GenPushToFPU;                                                         // fld dword ptr [esp]  ;  st = operand2
   GenPopReg(EAX);                                                       // pop eax
-  Gen($D9); Gen($04); Gen($24);                                         // fld dword ptr [esp]  ;  st(1) = operand2;  st = operand1
+  GenPushToFPU;                                                         // fld dword ptr [esp]  ;  st(1) = operand2;  st = operand1
   GenPopReg(EAX);                                                       // pop eax
   Gen($DE); Gen($D9);                                                   // fcompp               ;  test st - st(1)
   Gen($DF); Gen($E0);                                                   // fnstsw ax
