@@ -9,7 +9,7 @@
 
 
 type
-  TRegister = (EMPTYREG, EAX, EBX, ECX, ESI, EDI, EBP);
+  TRegister = (EMPTYREG, EAX, ECX, ESI, EDI, EBP);
    
   TInstruction = (EMPTYOP, PUSHREGOP, PUSHCONSTOP, PUSHRELOCCONSTOP, PUSHLOCALADDROP, LEAOP_PUSHREGOP);
   
@@ -196,7 +196,6 @@ procedure GenPushReg(Reg: TRegister);
 begin  
 case Reg of
   EAX: Gen($50);            // push eax
-  EBX: Gen($53);            // push ebx
   ECX: Gen($51);            // push ecx
   ESI: Gen($56);            // push esi
   EDI: Gen($57);            // push edi
@@ -364,7 +363,6 @@ begin // GenPopReg
 if not OptimizePopReg(Reg) then
   case Reg of
     EAX: Gen($58);            // pop eax
-    EBX: Gen($5B);            // pop ebx
     ECX: Gen($59);            // pop ecx
     ESI: Gen($5E);            // pop esi
     EDI: Gen($5F);            // pop edi
@@ -939,9 +937,9 @@ if Types[ValType].Kind = REALTYPE then        // Real type
 else                                          // Ordinal types
   begin
   GenPopReg(ECX);                                                       // pop ecx
-  GenPopReg(EBX);                                                       // pop ebx   
+  GenPopReg(EAX);                                                       // pop eax
+  Gen($39); Gen($C8);                                                   // cmp eax, ecx   
   Gen($B8); GenDWord(1);                                                // mov eax, 1           ;  TRUE
-  Gen($39); Gen($CB);                                                   // cmp ebx, ecx
   case rel of
     EQTOK: Gen($74);                                                    // je  ...
     NETOK: Gen($75);                                                    // jne ...
