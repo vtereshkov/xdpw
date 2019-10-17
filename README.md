@@ -191,9 +191,13 @@ The compiler directly builds a Windows PE executable without using any external 
 * `$APPTYPE` - Set application type. Examples: `{$APPTYPE GUI}`, `{$APPTYPE CONSOLE}`
 
 #### Optimizations
-Only two simplest kinds of peephole optimizations are performed:
-* Push/pop pair optimizations 
-* Local variable loading optimizations (32-bit variables only)  
+Some simple peephole optimizations are performed:
+* Push/pop pair optimizations
+* FPU push/pop pair optimizations
+* Local variable loading optimizations (32-bit variables only)
+* Array element access optimizations
+* Record field access optimizations
+* Comparison optimizations
 
 #### Inlined procedures and functions
 The following identifiers are implemented as part of the compiler. Their names are not reserved words and can be locally redefined by the user.
