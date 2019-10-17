@@ -1572,7 +1572,7 @@ while Tok.Kind in MultiplicativeOperators do
     CheckOperator(OpTok, ValType);
 
     if UseShortCircuit then 
-      GenerateShortCircuitEpilog(OpTok.Kind)
+      GenerateShortCircuitEpilog
     else 
       GenerateBinaryOperator(OpTok.Kind, ValType);
     end;
@@ -1662,7 +1662,7 @@ while Tok.Kind in AdditiveOperators do
     CheckOperator(OpTok, ValType);
  
     if UseShortCircuit then 
-      GenerateShortCircuitEpilog(OpTok.Kind)
+      GenerateShortCircuitEpilog
     else 
       GenerateBinaryOperator(OpTok.Kind, ValType);
     end;

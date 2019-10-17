@@ -1571,7 +1571,7 @@ end;
 
 
 
-procedure GenerateShortCircuitEpilog(op: TTokenKind);
+procedure GenerateShortCircuitEpilog;
 begin
 GenerateIfElseEpilog;
 end;
