@@ -1477,9 +1477,8 @@ end;
 
 procedure GenerateForCondition;
 begin
-GenPopReg(EAX);                                                   // pop eax       ; remaining number of iterations
-GenPushReg(EAX);                                                  // push eax
-Gen($83); Gen($F8); Gen($00);                                     // cmp eax, 0
+// Check remaining number of iterations
+Gen($83); Gen($3C); Gen($24); Gen($00);                           // cmp dword ptr [esp], 0
 Gen($7F); Gen($05);                                               // jg +5
 end;
 
@@ -1504,9 +1503,7 @@ else
   GenerateIncDec(INCPROC, TypeSize(CounterType));
   
 // Decrement remaining number of iterations
-GenPopReg(EAX);                                                   // pop eax
-Gen($48);                                                         // dec eax
-GenPushReg(EAX);                                                  // push eax
+Gen($FF); Gen($0C); Gen($24);                                     // dec dword ptr [esp]
   
 GenerateWhileEpilog;
 
