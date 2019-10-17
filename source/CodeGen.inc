@@ -1554,6 +1554,31 @@ end;
 
 
 
+procedure GenerateShortCircuitProlog(op: TTokenKind);
+begin
+Gen($83); Gen($3C); Gen($24); Gen($00);                         // cmp dword ptr [esp], 0
+
+case op of
+  ANDTOK: Gen($75);                                             // jne ...
+  ORTOK:  Gen($74);                                             // je  ...
+end;
+Gen($05);                                                       // ... +5                                         
+
+GenerateIfProlog; 
+GenPopReg(EAX);                                                 // pop eax   ; remove the left-hand side if we need the right-hand side
+end;  
+
+
+
+
+procedure GenerateShortCircuitEpilog(op: TTokenKind);
+begin
+GenerateIfElseEpilog;
+end;
+
+
+
+
 procedure GenerateNestedProcsProlog;
 begin
 GenerateIfProlog;

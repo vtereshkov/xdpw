@@ -1514,7 +1514,8 @@ var
   OpTok: TToken;
   RightValType: Integer;
   LibProcIdentIndex: Integer;
-  TempStorageAddr: Integer; 
+  TempStorageAddr: Integer;
+  UseShortCircuit: Boolean; 
   
 begin
 CompileFactor(ValType, ForceCharToString);
@@ -1523,6 +1524,11 @@ while Tok.Kind in MultiplicativeOperators do
   begin
   OpTok := Tok;
   NextTok;
+  
+  UseShortCircuit := (OpTok.Kind = ANDTOK) and (Types[ValType].Kind = BOOLEANTYPE);
+  if UseShortCircuit then 
+    GenerateShortCircuitProlog(OpTok.Kind);  
+  
   CompileFactor(RightValType, ForceCharToString);
 
   // Try to convert integer to real
@@ -1564,7 +1570,11 @@ while Tok.Kind in MultiplicativeOperators do
     begin
     ValType := GetCompatibleType(ValType, RightValType);
     CheckOperator(OpTok, ValType);
-    GenerateBinaryOperator(OpTok.Kind, ValType);
+
+    if UseShortCircuit then 
+      GenerateShortCircuitEpilog(OpTok.Kind)
+    else 
+      GenerateBinaryOperator(OpTok.Kind, ValType);
     end;
     
   end;// while
@@ -1580,9 +1590,9 @@ var
   RightValType: Integer;
   LibProcIdentIndex: Integer;
   TempStorageAddr: Integer;
+  UseShortCircuit: Boolean; 
   
-  
-begin // CompileSimpleExpression
+begin
 UnaryOpTok := Tok;
 if UnaryOpTok.Kind in UnaryOperators then
   NextTok;
@@ -1598,7 +1608,12 @@ while Tok.Kind in AdditiveOperators do
   begin
   OpTok := Tok;
   NextTok;
-  CompileTerm(RightValType, ForceCharToString);
+  
+  UseShortCircuit := (OpTok.Kind = ORTOK) and (Types[ValType].Kind = BOOLEANTYPE);
+  if UseShortCircuit then 
+    GenerateShortCircuitProlog(OpTok.Kind);
+  
+  CompileTerm(RightValType, ForceCharToString); 
 
   // Try to convert integer to real
   if ConversionToRealIsPossible(ValType, RightValType) then
@@ -1645,7 +1660,11 @@ while Tok.Kind in AdditiveOperators do
     begin
     ValType := GetCompatibleType(ValType, RightValType);
     CheckOperator(OpTok, ValType);
-    GenerateBinaryOperator(OpTok.Kind, ValType);
+ 
+    if UseShortCircuit then 
+      GenerateShortCircuitEpilog(OpTok.Kind)
+    else 
+      GenerateBinaryOperator(OpTok.Kind, ValType);
     end;
   
   end;// while
