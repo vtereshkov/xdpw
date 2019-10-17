@@ -1,7 +1,7 @@
 // XD Pascal - a 32-bit compiler for Windows
 // Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov
 
-// Code generator
+// Code generator / optimizer
 
 
 
@@ -9,9 +9,19 @@
 
 
 type
-  TRegister = (EMPTYREG, EAX, ECX, ESI, EDI, EBP);
+  TRegister = (NOREG, EAX, ECX, ESI, EDI, EBP);
    
-  TInstruction = (EMPTYOP, PUSHREGOP, PUSHCONSTOP, PUSHRELOCCONSTOP, PUSHLOCALADDROP, FSTPOP, LEAOP_PUSHREGOP);
+  TInstruction = 
+    (
+    NOP, 
+    PUSH_REG, 
+    PUSH_CONST, 
+    PUSH_RELOCCONST, 
+    PUSH_LOCALADDR, 
+    FSTP, 
+    LEA_PUSH_REG,
+    CMP
+    );
   
   TOptimizationTrigger = record
     Kind: TInstruction;
@@ -24,9 +34,10 @@ type
 
   
 var
-  PopRegOptimizationPretrigger, 
-  PopRegOptimizationTrigger,
-  PushToFPUOptimizationTrigger, 
+  GenPopRegOptimizationPretrigger, 
+  GenPopRegOptimizationTrigger,
+  PushToFPUOptimizationTrigger,
+  GenerateRelationOptimizationTrigger, 
   DerefPtrOptimizationTrigger,
   GetFieldPtrOptimizationTrigger: TOptimizationTrigger;
 
@@ -49,7 +60,7 @@ end;
   
 procedure ResetOptimizationTrigger(var Trigger: TOptimizationTrigger);
 begin
-Trigger.Kind := EMPTYOP;
+Trigger.Kind := NOP;
 end;
 
 
@@ -57,9 +68,10 @@ end;
 
 procedure ResetOptimizationTriggers;
 begin
-ResetOptimizationTrigger(PopRegOptimizationTrigger);
-ResetOptimizationTrigger(PopRegOptimizationPretrigger);
+ResetOptimizationTrigger(GenPopRegOptimizationTrigger);
+ResetOptimizationTrigger(GenPopRegOptimizationPretrigger);
 ResetOptimizationTrigger(PushToFPUOptimizationTrigger);
+ResetOptimizationTrigger(GenerateRelationOptimizationTrigger);
 ResetOptimizationTrigger(DerefPtrOptimizationTrigger);
 ResetOptimizationTrigger(GetFieldPtrOptimizationTrigger);
 end;
@@ -171,14 +183,14 @@ end;
 
 procedure PushConst(Value: LongInt);
 var
-  SavedPopRegOptimizationTrigger: TOptimizationTrigger;
+  SavedGenPopRegOptimizationTrigger: TOptimizationTrigger;
 begin
-SavedPopRegOptimizationTrigger := PopRegOptimizationTrigger;
+SavedGenPopRegOptimizationTrigger := GenPopRegOptimizationTrigger;
 
 Gen($68); GenDWord(Value);                            // push Value
 
-SetOptimizationTrigger(PopRegOptimizationTrigger, PUSHCONSTOP, EMPTYREG, Value, 0);
-PopRegOptimizationPretrigger := SavedPopRegOptimizationTrigger;
+SetOptimizationTrigger(GenPopRegOptimizationTrigger, PUSH_CONST, NOREG, Value, 0);
+GenPopRegOptimizationPretrigger := SavedGenPopRegOptimizationTrigger;
 end;
 
 
@@ -188,7 +200,7 @@ procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 begin
 Gen($68); GenRelocDWord(Value, RelocType);            // push Value  ; relocatable
 
-SetOptimizationTrigger(PopRegOptimizationTrigger, PUSHRELOCCONSTOP, EMPTYREG, Value, 0);
+SetOptimizationTrigger(GenPopRegOptimizationTrigger, PUSH_RELOCCONST, NOREG, Value, 0);
 end;
 
 
@@ -230,7 +242,7 @@ else
   Error('Internal fault: Illegal register');  
 end;
 
-SetOptimizationTrigger(PopRegOptimizationTrigger, PUSHREGOP, Reg, 0, 0);
+SetOptimizationTrigger(GenPopRegOptimizationTrigger, PUSH_REG, Reg, 0, 0);
 end;  
 
 
@@ -242,14 +254,16 @@ procedure GenPopReg(Reg: TRegister);
   function OptimizePopReg: Boolean;
   var
     DoublePush: Boolean;
+    PushedValue: LongInt;
+    
   begin
   Result := FALSE;
 
-  case PopRegOptimizationTrigger.Kind of
-    PUSHREGOP:
+  case GenPopRegOptimizationTrigger.Kind of
+    PUSH_REG:
       begin
       // Optimization: (push Reg) + (pop Reg) -> 0
-      if Reg = PopRegOptimizationTrigger.Reg then                                 
+      if Reg = GenPopRegOptimizationTrigger.Reg then                                 
         begin
         Dec(CodeSize);                                                         // Remove: push Reg
         ResetOptimizationTriggers;
@@ -257,7 +271,7 @@ procedure GenPopReg(Reg: TRegister);
         end
                                              
       // Optimization: (push eax) + (pop ecx) -> (mov ecx, eax)
-      else if (Reg = ECX) and (PopRegOptimizationTrigger.Reg = EAX) then         
+      else if (Reg = ECX) and (GenPopRegOptimizationTrigger.Reg = EAX) then         
         begin
         Dec(CodeSize);                                                         // Remove: push eax
         Gen($89); Gen($C1);                                                    // mov ecx, eax
@@ -265,7 +279,7 @@ procedure GenPopReg(Reg: TRegister);
         end
         
       // Optimization: (push eax) + (pop esi) -> (mov esi, eax)
-      else if (Reg = ESI) and (PopRegOptimizationTrigger.Reg = EAX) then        
+      else if (Reg = ESI) and (GenPopRegOptimizationTrigger.Reg = EAX) then        
         begin
         Dec(CodeSize);                                                         // Remove: push eax                                       
         Gen($89); Gen($C6);                                                    // mov esi, eax
@@ -273,7 +287,7 @@ procedure GenPopReg(Reg: TRegister);
         end
         
       // Optimization: (push esi) + (pop eax) -> (mov eax, esi)
-      else if (Reg = EAX) and (PopRegOptimizationTrigger.Reg = ESI) then        
+      else if (Reg = EAX) and (GenPopRegOptimizationTrigger.Reg = ESI) then        
         begin
         Dec(CodeSize);                                                         // Remove: push esi                                       
         Gen($89); Gen($F0);                                                    // mov eax, esi
@@ -282,7 +296,7 @@ procedure GenPopReg(Reg: TRegister);
       end;
     
 
-    PUSHCONSTOP:
+    PUSH_CONST:
       begin
       // Optimization: (push Value) + (pop eax) -> (mov eax, Value)
       if Reg = EAX then                                                      
@@ -290,12 +304,13 @@ procedure GenPopReg(Reg: TRegister);
         CodeSize := CodeSize - 5;                                              // Remove: push Value                                       
         
         // Special case: (push esi) + (push Value) + (pop eax) -> (mov eax, Value) + (push esi);   subject to further push/pop optimizations 
-        DoublePush := (PopRegOptimizationPretrigger.Kind = PUSHREGOP) and (PopRegOptimizationPretrigger.Reg = ESI);   
+        DoublePush := (GenPopRegOptimizationPretrigger.Kind = PUSH_REG) and (GenPopRegOptimizationPretrigger.Reg = ESI);   
+        PushedValue := GenPopRegOptimizationTrigger.Value;
         
         if DoublePush then
           Dec(CodeSize);                                                       // Remove: push esi
         
-        Gen($B8); GenDWord(PopRegOptimizationTrigger.Value);                   // mov eax, Value
+        Gen($B8); GenDWord(PushedValue);                                       // mov eax, Value
         
         if DoublePush then
           GenPushReg(ESI);                                                     // push esi
@@ -309,61 +324,67 @@ procedure GenPopReg(Reg: TRegister);
         CodeSize := CodeSize - 5;                                              // Remove: push Value
         
         // Special case: (push eax) + (push Value) + (pop ecx) -> (mov ecx, Value) + (push eax);   subject to further push/pop optimizations
-        DoublePush := (PopRegOptimizationPretrigger.Kind = PUSHREGOP) and (PopRegOptimizationPretrigger.Reg = EAX);
+        DoublePush := (GenPopRegOptimizationPretrigger.Kind = PUSH_REG) and (GenPopRegOptimizationPretrigger.Reg = EAX);
+        PushedValue := GenPopRegOptimizationTrigger.Value;
         
         if DoublePush then
           Dec(CodeSize);                                                       // Remove: push eax
         
-        Gen($B9); GenDWord(PopRegOptimizationTrigger.Value);                   // mov ecx, Value
+        Gen($B9); GenDWord(PushedValue);                                       // mov ecx, Value
         
         if DoublePush then
+          begin
           GenPushReg(EAX);                                                     // push eax
         
+          // Try further cmp eax, ecx optimizations
+          SetOptimizationTrigger(GenerateRelationOptimizationTrigger, CMP, NOREG, PushedValue, 0);
+          end;
+          
         Result := TRUE;
         end
       end;
       
 
-    PUSHRELOCCONSTOP:
+    PUSH_RELOCCONST:
       begin
       // Optimization: (push Value) + (pop esi) -> (mov esi, Value)  
       if Reg = ESI then
         begin
         CodeSize := CodeSize - 5;                                              // Remove: push Value                                       
-        Gen($BE); GenDWord(PopRegOptimizationTrigger.Value);                   // mov esi, Value
+        Gen($BE); GenDWord(GenPopRegOptimizationTrigger.Value);                // mov esi, Value
         Result := TRUE;
         end;
       end;
       
 
-    PUSHLOCALADDROP:
+    PUSH_LOCALADDR:
       begin
       // Optimization: (push dword ptr [ebp + Value]) + (pop eax) -> (mov eax, dword ptr [ebp + Value])
-      if (Reg = EAX) and (PopRegOptimizationTrigger.Reg = EBP) then
+      if (Reg = EAX) and (GenPopRegOptimizationTrigger.Reg = EBP) then
         begin
         CodeSize := CodeSize - 6;                                              // Remove: push dword ptr [ebp + Value]                                       
-        Gen($8B); Gen($85); GenDWord(PopRegOptimizationTrigger.Value);         // mov eax, dword ptr [ebp + Value]
+        Gen($8B); Gen($85); GenDWord(GenPopRegOptimizationTrigger.Value);      // mov eax, dword ptr [ebp + Value]
         Result := TRUE;
         end
 
       // Optimization: (push dword ptr [ebp + Value]) + (pop ecx) -> (mov ecx, dword ptr [ebp + Value])
-      else if (Reg = ECX) and (PopRegOptimizationTrigger.Reg = EBP) then
+      else if (Reg = ECX) and (GenPopRegOptimizationTrigger.Reg = EBP) then
         begin
         CodeSize := CodeSize - 6;                                              // Remove: push dword ptr [ebp + Value]                                       
-        Gen($8B); Gen($8D); GenDWord(PopRegOptimizationTrigger.Value);         // mov ecx, dword ptr [ebp + Value]
+        Gen($8B); Gen($8D); GenDWord(GenPopRegOptimizationTrigger.Value);      // mov ecx, dword ptr [ebp + Value]
         Result := TRUE;
         end
 
       // Optimization: (push dword ptr [ebp + Value]) + (pop esi) -> (mov esi, dword ptr [ebp + Value])
-      else if (Reg = ESI) and (PopRegOptimizationTrigger.Reg = EBP) then
+      else if (Reg = ESI) and (GenPopRegOptimizationTrigger.Reg = EBP) then
         begin
         CodeSize := CodeSize - 6;                                              // Remove: push dword ptr [ebp + Value]                                       
-        Gen($8B); Gen($B5); GenDWord(PopRegOptimizationTrigger.Value);         // mov esi, dword ptr [ebp + Value]
+        Gen($8B); Gen($B5); GenDWord(GenPopRegOptimizationTrigger.Value);      // mov esi, dword ptr [ebp + Value]
         Result := TRUE;
         end
     
       // Optimization: (push dword ptr [esi]) + (pop eax) -> (mov eax, dword ptr [esi])
-      else if (Reg = EAX) and (PopRegOptimizationTrigger.Reg = ESI) then
+      else if (Reg = EAX) and (GenPopRegOptimizationTrigger.Reg = ESI) then
         begin
         CodeSize := CodeSize - 2;                                              // Remove: push dword ptr [esi]                                       
         Gen($8B); Gen($06);                                                    // mov eax, dword ptr [esi]
@@ -371,7 +392,7 @@ procedure GenPopReg(Reg: TRegister);
         end
         
       // Optimization: (push dword ptr [esi]) + (pop ecx) -> (mov ecx, dword ptr [esi])
-      else if (Reg = ECX) and (PopRegOptimizationTrigger.Reg = ESI) then
+      else if (Reg = ECX) and (GenPopRegOptimizationTrigger.Reg = ESI) then
         begin
         CodeSize := CodeSize - 2;                                              // Remove: push dword ptr [esi]                                       
         Gen($8B); Gen($0E);                                                    // mov ecx, dword ptr [esi]
@@ -409,7 +430,7 @@ procedure GenPushToFPU;
   Result := FALSE;
   
   // Optimization: (fstp dword ptr [esp]) + (fld dword ptr [esp]) -> (fst dword ptr [esp])
-  if PushToFPUOptimizationTrigger.Kind = FSTPOP then
+  if PushToFPUOptimizationTrigger.Kind = FSTP then
     begin
     CodeSize := CodeSize - 3;                                         // Remove: fstp dword ptr [esp]
     Gen($D9); Gen($14); Gen($24);                                     // fst dword ptr [esp]
@@ -433,7 +454,7 @@ end;
 procedure GenPopFromFPU;
 begin
 Gen($D9); Gen($1C); Gen($24);                                         // fstp dword ptr [esp]
-SetOptimizationTrigger(PushToFPUOptimizationTrigger, FSTPOP, EMPTYREG, 0, 0);
+SetOptimizationTrigger(PushToFPUOptimizationTrigger, FSTP, NOREG, 0, 0);
 end; 
 
 
@@ -456,8 +477,8 @@ case Scope of
       GenPushReg(ESI);                                          // push esi
       
       // One of the two optimizations may succeed
-      SetOptimizationTrigger(DerefPtrOptimizationTrigger, LEAOP_PUSHREGOP, EBP, Addr, 0);
-      SetOptimizationTrigger(GetFieldPtrOptimizationTrigger, LEAOP_PUSHREGOP, EBP, Addr, 0); 
+      SetOptimizationTrigger(DerefPtrOptimizationTrigger, LEA_PUSH_REG, EBP, Addr, 0);
+      SetOptimizationTrigger(GetFieldPtrOptimizationTrigger, LEA_PUSH_REG, EBP, Addr, 0); 
       end
     else                                      // Intermediate level variable
       begin
@@ -485,13 +506,13 @@ procedure DerefPtr(DataType: Integer);
   Result := FALSE;
   
   // Optimization: (lea esi, [ebp + Addr]) + (push esi) -> (push dword ptr [ebp + Addr])
-  if DerefPtrOptimizationTrigger.Kind = LEAOP_PUSHREGOP then        
+  if DerefPtrOptimizationTrigger.Kind = LEA_PUSH_REG then        
     begin
     CodeSize := CodeSize - 7;                                           // Remove: lea esi, [ebp + Addr], push esi
     Gen($FF); Gen($B5); GenDWord(DerefPtrOptimizationTrigger.Value);    // push dword ptr [ebp + Addr]
     
     // Try further push/pop optimizations
-    SetOptimizationTrigger(PopRegOptimizationTrigger, PUSHLOCALADDROP, EBP, DerefPtrOptimizationTrigger.Value, 0);   
+    SetOptimizationTrigger(GenPopRegOptimizationTrigger, PUSH_LOCALADDR, EBP, DerefPtrOptimizationTrigger.Value, 0);   
     Result := TRUE;
     end;
 
@@ -536,7 +557,7 @@ case TypeSize(DataType) of
        Gen($FF); Gen($36);                                        // push dword ptr [esi]
        
        // Optimization was unsuccessful, try a simpler one
-       SetOptimizationTrigger(PopRegOptimizationTrigger, PUSHLOCALADDROP, ESI, 0, 0);   
+       SetOptimizationTrigger(GenPopRegOptimizationTrigger, PUSH_LOCALADDR, ESI, 0, 0);   
        end
      end
 else
@@ -607,7 +628,7 @@ case BaseTypeSize of
 end;  
 GenPushReg(ESI);                                                // push esi
 
-SetOptimizationTrigger(GetFieldPtrOptimizationTrigger, LEAOP_PUSHREGOP, ESI, 0, BaseTypeSize);
+SetOptimizationTrigger(GetFieldPtrOptimizationTrigger, LEA_PUSH_REG, ESI, 0, BaseTypeSize);
 end;
 
 
@@ -622,7 +643,7 @@ var
   begin
   Result := FALSE;
   
-  if GetFieldPtrOptimizationTrigger.Kind = LEAOP_PUSHREGOP then        
+  if GetFieldPtrOptimizationTrigger.Kind = LEA_PUSH_REG then        
     case GetFieldPtrOptimizationTrigger.Reg of
       // Optimization: (lea esi, [ebp + Addr]) + (push esi) + (pop esi) + (add esi, Offset) -> (lea esi, [ebp + Addr + Offset])      
       EBP:
@@ -1026,6 +1047,24 @@ end;
 
 
 procedure GenerateRelation(rel: TTokenKind; ValType: Integer);
+
+
+  function OptimizeGenerateRelation: Boolean;
+  begin
+  Result := FALSE;
+  
+  // Optimization: (mov ecx, Value) + (push eax) + (pop eax) + (cmp eax, ecx) -> (cmp eax, Value)
+  if GenerateRelationOptimizationTrigger.Kind = CMP then
+    begin
+    CodeSize := CodeSize - 6;                                           // Remove: mov ecx, Value, push eax
+    Gen($3D); GenDWord(GenerateRelationOptimizationTrigger.Value);      // cmp eax, Value
+    Result := TRUE;
+    end;
+
+  ResetOptimizationTrigger(GenerateRelationOptimizationTrigger);
+  end;
+
+
 begin
 if Types[ValType].Kind = REALTYPE then        // Real type
   begin
@@ -1050,8 +1089,11 @@ if Types[ValType].Kind = REALTYPE then        // Real type
 else                                          // Ordinal types
   begin
   GenPopReg(ECX);                                                       // pop ecx
-  GenPopReg(EAX);                                                       // pop eax
-  Gen($39); Gen($C8);                                                   // cmp eax, ecx   
+  if not OptimizeGenerateRelation then
+    begin
+    GenPopReg(EAX);                                                     // pop eax
+    Gen($39); Gen($C8);                                                 // cmp eax, ecx
+    end;   
   Gen($B8); GenDWord(1);                                                // mov eax, 1           ;  TRUE
   case rel of
     EQTOK: Gen($74);                                                    // je  ...
