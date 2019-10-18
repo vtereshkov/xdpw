@@ -27,12 +27,13 @@ var
 begin
 ch := #0;
 if UnitStackTop > 0 then
-  if UnitStack[UnitStackTop].Pos < UnitStack[UnitStackTop].Size then
-    begin
-    Ptr := PChar(Integer(UnitStack[UnitStackTop].Buffer) + UnitStack[UnitStackTop].Pos);
-    ch := Ptr^;
-    Inc(UnitStack[UnitStackTop].Pos);
-    end; 
+  with UnitStack[UnitStackTop] do
+    if Pos < Size then
+      begin
+      Ptr := PChar(Integer(Buffer) + Pos);
+      ch := Ptr^;
+      Inc(Pos);
+      end; 
 end;
   
 
@@ -50,19 +51,23 @@ if IOResult <> 0 then
   Error('Unable to open source file ' + Name);
 
 Inc(UnitStackTop);
-UnitStack[UnitStackTop].FileName := Name;
-UnitStack[UnitStackTop].Size := FileSize(F);
-UnitStack[UnitStackTop].Pos := 0;
-UnitStack[UnitStackTop].Line := 1;
 
-GetMem(UnitStack[UnitStackTop].Buffer, UnitStack[UnitStackTop].Size);
+with UnitStack[UnitStackTop] do
+  begin
+  FileName := Name;
+  Size := FileSize(F);
+  Pos := 0;
+  Line := 1;
 
-ActualSize := 0;
-BlockRead(F, UnitStack[UnitStackTop].Buffer^, UnitStack[UnitStackTop].Size, ActualSize);
-Close(F);
+  GetMem(Buffer, Size);
 
-if ActualSize <> UnitStack[UnitStackTop].Size then
-  Error('Unable to read source file ' + Name);
+  ActualSize := 0;
+  BlockRead(F, Buffer^, Size, ActualSize);
+  Close(F);
+
+  if ActualSize <> Size then
+    Error('Unable to read source file ' + Name);
+  end;  
 end;
 
 
@@ -70,9 +75,10 @@ end;
 
 procedure LeaveIncludedFile(var ch: Char);
 begin
-FreeMem(UnitStack[UnitStackTop].Buffer, UnitStack[UnitStackTop].Size);
-Dec(UnitStackTop);
+with UnitStack[UnitStackTop] do
+  FreeMem(Buffer, Size);
   
+Dec(UnitStackTop);  
 ReadCharSafe(ch);  
 
 if UnitStackTop = 0 then EndOfProgram := TRUE;
@@ -118,10 +124,11 @@ begin
 if EndOfProgram then
   ch := #0
 else
-  if UnitStack[UnitStackTop].Pos >= UnitStack[UnitStackTop].Size then
-    LeaveIncludedFile(ch)
-  else
-    ReadCharSafe(ch);
+  with UnitStack[UnitStackTop] do 
+    if Pos >= Size then
+      LeaveIncludedFile(ch)
+    else
+      ReadCharSafe(ch);
 
 if ch = #10 then Inc(UnitStack[UnitStackTop].Line);  // End of line found
 end;

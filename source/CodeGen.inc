@@ -1595,7 +1595,7 @@ end;
 
 
 
-procedure GenerateProgramProlog;
+procedure GenerateFPUInit;
 begin
 Gen($DB); Gen($E3);                                           // fninit
 end;
@@ -1603,35 +1603,11 @@ end;
 
 
 
-procedure GenerateProgramEpilog;
-begin
-
-end;
-
-
-
-
-procedure GenerateStackFrameProlog(TotalLocalVarsSize: Integer);
+procedure GenerateStackFrameProlog;
 begin
 GenPushReg(EBP);                                              // push ebp
 Gen($8B); Gen($EC);                                           // mov ebp, esp
-Gen($81); Gen($EC); GenDWord(TotalLocalVarsSize);             // sub esp, TotalLocalVarsSize
-end;
 
-
-
-
-procedure GenerateStackFrameEpilog;
-begin
-Gen($8B); Gen($E5);                                           // mov esp, ebp
-GenPopReg(EBP);                                               // pop ebp
-end;
-
-
-
-
-procedure GenerateTempStorageProlog;
-begin
 SaveCodePos;
 
 Gen($90);                                                     // nop   ; actual stack storage size will be inserted here 
@@ -1645,12 +1621,15 @@ end;
 
 
 
-procedure GenerateTempStorageEpilog(TotalTempStorageSize: Integer);
+procedure GenerateStackFrameEpilog(TotalStackStorageSize: LongInt);
 var
   CodePos: Integer;
 begin
 CodePos := RestoreCodePos;
-GenAt(CodePos, $81); GenAt(CodePos + 1, $EC); GenDWordAt(CodePos + 2, TotalTempStorageSize);      // sub esp, TotalTempStorageSize
+GenAt(CodePos, $81); GenAt(CodePos + 1, $EC); GenDWordAt(CodePos + 2, TotalStackStorageSize);     // sub esp, TotalStackStorageSize
+
+Gen($8B); Gen($E5);                                                                               // mov esp, ebp
+GenPopReg(EBP);                                                                                   // pop ebp
 end;
 
 

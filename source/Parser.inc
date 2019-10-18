@@ -3331,21 +3331,20 @@ with BlockStack[BlockStackTop] do
   
 CompileDeclarations;
 
+if BlockStack[BlockStackTop].Index = 1 then
+  ProgramEntryPoint := GetCodeSize;
+
+GenerateStackFrameProlog;
+
 if BlockStack[BlockStackTop].Index = 1 then          // Main program
   begin
-  ProgramEntryPoint := GetCodeSize;
-  GenerateProgramProlog;
-  GenerateTempStorageProlog;
+  GenerateFPUInit;
   
   // Initialize heap and console I/O
   LibProcIdentIndex := GetIdent('INITSYSTEM');
   GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);  
-  end
-else
-  begin
-  GenerateStackFrameProlog(BlockStack[BlockStackTop].LocalDataSize);     // Procedure or function
-  GenerateTempStorageProlog;
   end;
+
 
 // Block body
 GenerateGotoProlog;
@@ -3371,24 +3370,23 @@ if (BlockStack[BlockStackTop].Index <> 1) and (Ident[BlockIdentIndex].Kind = FUN
     DerefPtr(Ident[BlockIdentIndex].DataType);
   SaveStackTopToEAX;
   end;
-  
-GenerateTempStorageEpilog(BlockStack[BlockStackTop].TempDataSize);
 
 if BlockStack[BlockStackTop].Index = 1 then          // Main program
   begin
-  GenerateProgramEpilog;    
   LibProcIdentIndex := GetIdent('EXITPROCESS');  
   PushConst(0);
   InverseStack(Ident[LibProcIdentIndex].NumParams);
   GenerateCall(Ident[LibProcIdentIndex].Value, 1, 1);
-  end
-else
+  end;
+
+GenerateStackFrameEpilog(BlockStack[BlockStackTop].LocalDataSize + BlockStack[BlockStackTop].TempDataSize);
+
+if BlockStack[BlockStackTop].Index <> 1 then         
   begin
   TotalNumParams := Ident[BlockIdentIndex].NumParams;
-    if (Ident[BlockIdentIndex].Kind = FUNC) and (Types[Ident[BlockIdentIndex].DataType].Kind in StructuredTypes) then
-      Inc(TotalNumParams);                     // Deallocate space allocated for structured Result as a hidden VAR parameter
-      
-  GenerateStackFrameEpilog;
+  if (Ident[BlockIdentIndex].Kind = FUNC) and (Types[Ident[BlockIdentIndex].DataType].Kind in StructuredTypes) then
+    Inc(TotalNumParams);                            // Deallocate space allocated for structured Result as a hidden VAR parameter
+    
   GenerateReturn(TotalNumParams * SizeOf(LongInt), Ident[BlockIdentIndex].NestingLevel);
   end;
   
