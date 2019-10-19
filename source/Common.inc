@@ -792,13 +792,15 @@ end;
 
 
 
-function GetIdentUnsafe(const Name: TString): Integer;
+function GetIdentUnsafe(const Name: TString; AllowForwardReference: Boolean = FALSE): Integer;
 var
   IdentIndex, BlockStackIndex: Integer;
 begin
 for BlockStackIndex := BlockStackTop downto 1 do
   for IdentIndex := NumIdent downto 1 do
-    if (Ident[IdentIndex].Name = Name) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex].Index) then 
+    if (Ident[IdentIndex].Name = Name) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex].Index) and
+       (AllowForwardReference or (Ident[IdentIndex].Kind <> USERTYPE) or (Types[Ident[IdentIndex].DataType].Kind <> FORWARDTYPE))
+    then 
       begin
       Result := IdentIndex;
       Exit;
@@ -810,9 +812,9 @@ end;
 
 
 
-function GetIdent(const Name: TString): Integer;
+function GetIdent(const Name: TString; AllowForwardReference: Boolean = FALSE): Integer;
 begin
-Result := GetIdentUnsafe(Name);
+Result := GetIdentUnsafe(Name, AllowForwardReference);
 if Result = 0 then
   Error('Unknown identifier ' + Name);
 end;

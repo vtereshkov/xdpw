@@ -786,11 +786,11 @@ else
   AssertIdent;
   
   if AllowForwardReference then
-    IdentIndex := GetIdentUnsafe(Tok.Name)
+    IdentIndex := GetIdentUnsafe(Tok.Name, AllowForwardReference)
   else
-    IdentIndex := GetIdent(Tok.Name);                         
+    IdentIndex := GetIdent(Tok.Name, AllowForwardReference);                         
   
-  if IdentIndex = 0 then                                    // Forward-referenced type
+  if AllowForwardReference and ((IdentIndex = 0) or (Ident[IdentIndex].Block <> BlockStack[BlockStackTop].Index)) then
     begin
     // Add new forward-referenced type
     Inc(NumTypes);
@@ -804,9 +804,11 @@ else
     end
   else
     begin
+    // Use existing type
     if Ident[IdentIndex].Kind <> USERTYPE then
       Error('Type name expected');
-    DataType := Ident[IdentIndex].DataType;                 // Usual type
+  
+    DataType := Ident[IdentIndex].DataType;
     end;
 end; // case
 
@@ -2702,7 +2704,6 @@ end;// CompileType
 
 
 
-
 procedure CompileBlock(BlockIdentIndex: Integer);
 
 
@@ -2797,20 +2798,36 @@ procedure CompileBlock(BlockIdentIndex: Integer);
 
 
 
-  procedure CheckForwardResolutions;
+  procedure ResolveForwardReferences;
   var
-    TypeIndex: Integer;
-  begin
-  // Search for unresolved forward references
+    TypeIndex, TypeIdentIndex, FieldIndex: Integer;
+    DataType: Integer;    
+  begin 
   for TypeIndex := 1 to NumTypes do
-    if (Types[TypeIndex].Kind = FORWARDTYPE) and
-       (Types[TypeIndex].Block = BlockStack[BlockStackTop].Index) then
-      Error('Unresolved forward reference to type ' + Types[TypeIndex].TypeIdentName);
-  end; // CheckForwardResolutions
-  
-  
- 
+    if Types[TypeIndex].Kind = FORWARDTYPE then
+      begin
+      TypeIdentIndex := GetIdent(Types[TypeIndex].TypeIdentName);     
+      
+      if Ident[TypeIdentIndex].Kind <> USERTYPE then
+        Error('Type name expected');
+        
+      // Forward reference resolution
+      DataType := Ident[TypeIdentIndex].DataType;
+      
+      Types[TypeIndex] := Types[DataType];
+      
+      if Types[DataType].Kind = RECORDTYPE then
+        for FieldIndex := 1 to Types[DataType].NumFields do
+          begin
+          New(Types[TypeIndex].Field[FieldIndex]);
+          Types[TypeIndex].Field[FieldIndex]^ := Types[DataType].Field[FieldIndex]^;
+          end;
+      end; // if    
+  end; // ResolveForwardReferences    
 
+
+
+ 
   procedure CompileLabelDeclarations;
   begin
   repeat
@@ -3002,7 +3019,6 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   var
     NameTok: TToken;
     VarType: Integer;
-    TypeIndex, FieldIndex: Integer;
   begin
   repeat
     AssertIdent;
@@ -3012,28 +3028,12 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     EatTok(EQTOK);
 
     CompileType(VarType);
-    DeclareIdent(NameTok.Name, USERTYPE, 0, VarType, VALPASSING, 0, 0.0, EMPTYPROC);
-
-    // Check if this type was forward-referenced
-    for TypeIndex := 1 to NumTypes do
-      if (Types[TypeIndex].Kind = FORWARDTYPE) and
-         (Types[TypeIndex].TypeIdentName = NameTok.Name) and
-         (Types[TypeIndex].Block = BlockStack[BlockStackTop].Index) then
-        begin
-        // Forward type reference resolution
-        Types[TypeIndex] := Types[VarType];
-        if Types[VarType].Kind = RECORDTYPE then
-          for FieldIndex := 1 to Types[VarType].NumFields do
-            begin
-            New(Types[TypeIndex].Field[FieldIndex]);
-            Types[TypeIndex].Field[FieldIndex]^ := Types[VarType].Field[FieldIndex]^;
-            end;
-        end;// if    
-
+    DeclareIdent(NameTok.Name, USERTYPE, 0, VarType, VALPASSING, 0, 0.0, EMPTYPROC);   
+    
     EatTok(SEMICOLONTOK);
   until Tok.Kind <> IDENTTOK;
 
-  CheckForwardResolutions;
+  ResolveForwardReferences;
   end; // CompileTypeDeclarations
   
   
@@ -3069,7 +3069,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     EatTok(SEMICOLONTOK);
   until Tok.Kind <> IDENTTOK;
 
-  CheckForwardResolutions;
+  ResolveForwardReferences;
   end; // CompileVarDeclarations
 
 
