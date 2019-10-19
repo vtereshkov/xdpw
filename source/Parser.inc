@@ -2154,12 +2154,29 @@ procedure CompileStatement{(LoopNesting: Integer)};
   
   WithNesting := WithNesting - DeltaWithNesting;
   end; // CompileWithStatement
+  
+  
+  
+  
+  function IsCurrentOrOuterFunc(FuncIdentIndex: Integer): Boolean;
+  var
+    BlockStackIndex: Integer;
+  begin
+  if Ident[FuncIdentIndex].Kind = FUNC then
+    for BlockStackIndex := BlockStackTop downto 1 do
+      if BlockStack[BlockStackIndex].Index = Ident[FuncIdentIndex].ProcAsBlock then
+          begin
+          Result := TRUE;
+          Exit;
+          end;        
+  Result := FALSE;
+  end; // IsCurrentOrOuterFunc
 
 
 
   
 var
-  IdentIndex, ResultIdentIndex: Integer;
+  IdentIndex: Integer;
   DesignatorType: Integer;
 
   
@@ -2200,13 +2217,16 @@ case Tok.Kind of
             
             if Tok.Kind = ASSIGNTOK then                                // Special case: assignment to a function name
               begin
-              if (Ident[IdentIndex].Kind <> FUNC) or (Ident[IdentIndex].ProcAsBlock <> BlockStack[BlockStackTop].Index) then
-                Error('Current function name expected but ' + Ident[IdentIndex].Name + ' found');
+              if not IsCurrentOrOuterFunc(IdentIndex) then
+                Error('Function name expected but ' + Ident[IdentIndex].Name + ' found');
 
-              ResultIdentIndex := GetIdent('RESULT');
-              PushVarPtr(Ident[ResultIdentIndex].Value, LOCAL, 0, UNINITDATARELOC);
+              // Push pointer to Result
+              PushVarPtr(Ident[Ident[IdentIndex].ResultIdentIndex].Value, 
+                         LOCAL, 
+                         BlockStackTop - Ident[Ident[IdentIndex].ResultIdentIndex].NestingLevel, 
+                         UNINITDATARELOC);
               
-              DesignatorType := Ident[ResultIdentIndex].DataType;
+              DesignatorType := Ident[Ident[IdentIndex].ResultIdentIndex].DataType;
               if Types[DesignatorType].Kind in StructuredTypes then 
                 DerefPtr(POINTERTYPEINDEX);                        
 
@@ -3207,10 +3227,14 @@ procedure CompileBlock(BlockIdentIndex: Integer);
 
     // Allocate Result variable if the current block is a function
     if Ident[BlockIdentIndex].Kind = FUNC then
+      begin
       if Types[Ident[BlockIdentIndex].DataType].Kind in StructuredTypes then    // For functions returning structured variables, Result is a hidden VAR parameter 
         DeclareIdent('RESULT', VARIABLE, TotalNumParams, Ident[BlockIdentIndex].DataType, VARPASSING, 0, 0.0, EMPTYPROC)
       else                                                                      // Otherwise, Result is a hidden local variable
         DeclareIdent('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].DataType, VALPASSING, 0, 0.0, EMPTYPROC);
+        
+      Ident[BlockIdentIndex].ResultIdentIndex := NumIdent;
+      end;  
     end;// else
     
 
@@ -3363,7 +3387,7 @@ if ForLoopNesting <> 0 then
 // If function, return Result value via the EAX register
 if (BlockStack[BlockStackTop].Index <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) then
   begin
-  PushVarPtr(Ident[GetIdent('RESULT')].Value, LOCAL, 0, UNINITDATARELOC);
+  PushVarPtr(Ident[Ident[BlockIdentIndex].ResultIdentIndex].Value, LOCAL, 0, UNINITDATARELOC);
   if Types[Ident[BlockIdentIndex].DataType].Kind in StructuredTypes then
     DerefPtr(POINTERTYPEINDEX)
   else  

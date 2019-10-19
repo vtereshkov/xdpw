@@ -225,6 +225,7 @@ type
     NumParams: Integer;
     NumDefaultParams: Integer;
     Param: PParams;
+    ResultIdentIndex: Integer;
     ProcAsBlock: Integer;
     PredefProc: TPredefProc;
     IsUnresolvedForward: Boolean;
