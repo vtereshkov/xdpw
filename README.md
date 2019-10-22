@@ -52,7 +52,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 ProgramOrUnit = ("program" | "unit") Ident ";" 
                 ["interface"] [UsesClause] Block "." .
                 
-UsesClause = "uses" Ident {";" Ident} .                
+UsesClause = "uses" Ident {"," Ident} ";" .                
 
 Block = { Declarations } (CompoundStatement | "end") .
 
@@ -269,7 +269,7 @@ function UpCase(ch: Char): Char;
 * `life.pas`     - The Game of Life
 * `sort.pas`     - Array sorting demo
 * `fft.pas`      - Fast Fourier Transform demo
-* `inserr.pas`   - Inertial navigation system error estimation demo. Uses `kalman.inc` unit
+* `inserr.pas`   - Inertial navigation system error estimation demo. Uses `kalman.pas` unit
 * `list.pas`     - Linked list operations demo
 * `gui.pas`      - GUI application demo. Uses `windows.pas` unit
 
