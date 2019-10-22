@@ -16,8 +16,8 @@ uses Common, CodeGen;
 
 
 function AddImportFunc(const ImportLibName, ImportFuncName: TString): LongInt;
-procedure ClearImportSection;
-procedure LinkAndWrite(const ExeName: TString);
+procedure InitializeLinker;
+procedure LinkAndWriteProgram(const ExeName: TString);
 
 
 
@@ -384,7 +384,7 @@ end;
 
 
 
-procedure ClearImportSection;
+procedure InitializeLinker;
 begin
 FillChar(ImportSection, SizeOf(ImportSection), #0);
 end;
@@ -392,13 +392,16 @@ end;
 
 
 
-procedure LinkAndWrite{(const ExeName: TString)};
+procedure LinkAndWriteProgram{(const ExeName: TString)};
 var
   OutFile: TOutFile;
+  CodeSize: Integer;
   
 begin
 if ProgramEntryPoint = 0 then 
   Error('Program entry point not found');
+
+CodeSize := GetCodeSize;
   
 FillHeaders(CodeSize, InitializedGlobalDataSize, UninitializedGlobalDataSize);
 

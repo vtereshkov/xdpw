@@ -14,7 +14,17 @@ interface
 uses Common;
 
 
-procedure ResetOptimizationTriggers;
+const
+  MAXCODESIZE =  1 * 1024 * 1024;
+
+
+var
+  Code: array [0..MAXCODESIZE - 1] of Byte;
+
+
+// Peephole optimizations: [PretriggerOp +] TriggerOp + TargetOp -> TargetOp' [+ PretriggerOp]
+
+procedure InitializeCodeGen;
 function GetCodeSize: LongInt;
 procedure PushConst(Value: LongInt);
 procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
@@ -91,10 +101,18 @@ procedure GenerateExitEpilog;
 implementation
 
 
-// Peephole optimizations: [PretriggerOp +] TriggerOp + TargetOp -> TargetOp' [+ PretriggerOp]
+const
+  MAXRELOCS = 20000;
+  
 
 
 type
+  TRelocatable = record
+    RelocType: TRelocType;
+    Pos: LongInt;
+    Value: LongInt;
+  end;
+
   TRegister = (NOREG, EAX, ECX, ESI, EDI, EBP);
    
   TInstruction = 
@@ -117,9 +135,14 @@ type
   end;
   
   
-
   
 var
+  CodePosStack: array [0..1023] of Integer;
+  CodeSize, CodePosStackTop: Integer;
+  
+  Reloc: array [1..MAXRELOCS] of TRelocatable;
+  NumRelocs: Integer;   
+
   GenPopRegOptimizationPretrigger, 
   GenPopRegOptimizationTrigger,
   PushToFPUOptimizationTrigger,
@@ -160,6 +183,18 @@ ResetOptimizationTrigger(PushToFPUOptimizationTrigger);
 ResetOptimizationTrigger(GenerateRelationOptimizationTrigger);
 ResetOptimizationTrigger(DerefPtrOptimizationTrigger);
 ResetOptimizationTrigger(GetFieldPtrOptimizationTrigger);
+end;
+
+
+
+
+procedure InitializeCodeGen;
+begin
+CodeSize        := 0; 
+CodePosStackTop := 0;
+NumRelocs       := 0;
+
+ResetOptimizationTriggers;
 end;
 
 

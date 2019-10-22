@@ -3442,10 +3442,10 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       end;// while
       
       
-    if IsUnit and IsInterfaceSection and (BlockStack[BlockStackTop].Index = 1) and (Tok.Kind = IMPLEMENTATIONTOK) then
+    if IsUnit and IsInterfaceSection and (BlockStack[BlockStackTop].Index = 1) then
       begin
+      EatTok(IMPLEMENTATIONTOK);
       IsInterfaceSection := FALSE;
-      NextTok;
       end
     else
       Break;    

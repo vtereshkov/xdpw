@@ -13,7 +13,6 @@ uses Common, Scanner, Parser, CodeGen, Linker;
 
 
 
-
 procedure ChangeExt(const InStr, Ext: TString; var OutStr: TString);
 var
   i, DotPos: Integer;
@@ -52,14 +51,10 @@ if ParamCount < 1 then
   Halt(1);
   end;
 
-FillOperatorSets;
-FillTypeSets; 
-IsConsoleProgram := TRUE;  // Console program by default  
-
-ZeroAll;
-ClearImportSection;
-ResetOptimizationTriggers;
-    
+InitializeCommon;
+InitializeLinker;
+InitializeCodeGen;
+   
 for ParamIndex := 0 to ParamCount do
   begin 
   if ParamIndex = 0 then
@@ -77,9 +72,9 @@ for ParamIndex := 0 to ParamCount do
   end;
 
 ChangeExt(UnitName, 'exe', ExeName);
-LinkAndWrite(ExeName);
+LinkAndWriteProgram(ExeName);
 
-WriteLn('Compilation complete. Code size: ', CodeSize, ' bytes. Data size: ', InitializedGlobalDataSize + UninitializedGlobalDataSize, ' bytes.');
-DisposeAll;
+WriteLn('Compilation complete. Code size: ', GetCodeSize, ' bytes. Data size: ', InitializedGlobalDataSize + UninitializedGlobalDataSize, ' bytes.');
+FinalizeCommon;
 end.
 

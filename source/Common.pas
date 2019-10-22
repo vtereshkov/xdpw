@@ -26,14 +26,12 @@ const
   MAXBLOCKNESTING           = 10;
   MAXPARAMS                 = 20;
   MAXFIELDS                 = 100;
-  MAXRELOCS                 = 20000;
   MAXLOOPNESTING            = 20;
   MAXWITHNESTING            = 20;
   MAXGOTOS                  = 100;
   MAXBREAKCALLS             = 100;
   MAXEXITCALLS              = 100;
 
-  MAXCODESIZE               =  1 * 1024 * 1024;
   MAXINITIALIZEDDATASIZE    =  1 * 1024 * 1024;
   MAXUNINITIALIZEDDATASIZE  = 32 * 1024 * 1024;
   MAXSTACKSIZE              = 16 * 1024 * 1024;
@@ -276,12 +274,6 @@ type
     FORWARDTYPE:     (TypeIdentName: TString);   
   end;
   
-  TRelocatable = record
-    RelocType: TRelocType;
-    Pos: LongInt;
-    Value: LongInt;
-  end;
-
   TBlock = record
     Index: Integer;
     LocalDataSize, ParamDataSize, TempDataSize: LongInt;
@@ -370,12 +362,9 @@ const
 var
   Ident: array [1..MAXIDENTS] of TIdentifier;
   Types: array [1..MAXTYPES] of TType;
-  Code: array [0..MAXCODESIZE - 1] of Byte;
   InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of Char;
-  CodePosStack: array [0..1023] of Integer;
   Units: array [1..MAXUNITS] of TUnit;
   BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
-  Reloc: array [1..MAXRELOCS] of TRelocatable;
   Gotos: array [1..MAXGOTOS] of TGoto;
   BreakCall, ContinueCall: array [1..MAXLOOPNESTING] of TBreakContinueExitCallList;
   ExitCall: TBreakContinueExitCallList;
@@ -389,18 +378,15 @@ var
   
   IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of TTypeKind;
 
-  NumIdent, NumTypes, NumUnits, NumBlocks, BlockStackTop, NumRelocs, NumGotos, ForLoopNesting, WithNesting,
-  CodeSize, CodePosStackTop, 
+  NumIdent, NumTypes, NumUnits, NumBlocks, BlockStackTop, NumGotos, ForLoopNesting, WithNesting,
   InitializedGlobalDataSize, UninitializedGlobalDataSize, ProgramEntryPoint: Integer;
   
   IsConsoleProgram: Boolean;
   
 
 
-procedure ZeroAll;
-procedure FillOperatorSets;
-procedure FillTypeSets;
-procedure DisposeAll;
+procedure InitializeCommon;
+procedure FinalizeCommon;
 function GetTokSpelling(TokKind: TTokenKind): TString;
 procedure Error(const Msg: TString);
 procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
@@ -425,32 +411,7 @@ function FieldInsideWithFound(const Name: TString): Boolean;
 implementation
 
 
-procedure ZeroAll;
-begin
-FillChar(Ident, SizeOf(Ident), #0);
-FillChar(Types, SizeOf(Types), #0);
-FillChar(Units, SizeOf(Units), #0);
-FillChar(InitializedGlobalData, SizeOf(InitializedGlobalData), #0);
 
-NumIdent                    := 0; 
-NumTypes                    := 0;
-NumUnits                    := 0; 
-NumBlocks                   := 0; 
-BlockStackTop               := 0; 
-NumRelocs                   := 0;
-NumGotos                    := 0;
-ForLoopNesting              := 0;
-WithNesting                 := 0;
-CodeSize                    := 0; 
-CodePosStackTop             := 0;
-InitializedGlobalDataSize   := 0;
-UninitializedGlobalDataSize := 0;
-ProgramEntryPoint           := 0;
-end;
-
-
-
-  
 procedure FillOperatorSets;
 begin
 MultiplicativeOperators := [MULTOK, DIVTOK, IDIVTOK, MODTOK, SHLTOK, SHRTOK, ANDTOK];
@@ -479,7 +440,35 @@ end;
 
 
 
-procedure DisposeAll;
+procedure InitializeCommon;
+begin
+FillChar(Ident, SizeOf(Ident), #0);
+FillChar(Types, SizeOf(Types), #0);
+FillChar(Units, SizeOf(Units), #0);
+FillChar(InitializedGlobalData, SizeOf(InitializedGlobalData), #0);
+
+NumIdent                    := 0; 
+NumTypes                    := 0;
+NumUnits                    := 0; 
+NumBlocks                   := 0; 
+BlockStackTop               := 0; 
+NumGotos                    := 0;
+ForLoopNesting              := 0;
+WithNesting                 := 0;
+InitializedGlobalDataSize   := 0;
+UninitializedGlobalDataSize := 0;
+ProgramEntryPoint           := 0;
+
+IsConsoleProgram            := TRUE;  // Console program by default 
+
+FillOperatorSets;
+FillTypeSets;
+end;
+
+
+
+
+procedure FinalizeCommon;
 var
   i, j: Integer;
   
@@ -561,7 +550,7 @@ if NumUnits >= 1 then
 else
   WriteLn('Error: ', Msg);  
 
-DisposeAll;
+FinalizeCommon;
 Halt(1);
 end;
 

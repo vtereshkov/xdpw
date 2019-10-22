@@ -7,10 +7,7 @@ unit System;
 interface
 
 
-const
-  pi = 3.1415927;
- 
-  
+const  
   // Windows API constants
   
   STD_INPUT_HANDLE      = -10;
@@ -28,7 +25,12 @@ const
   
   FILE_BEGIN            = 0;
   FILE_CURRENT          = 1;
-  FILE_END              = 2;
+  FILE_END              = 2;  
+
+  
+  // Other constants
+  
+  pi = 3.1415927;  
 
 
 
@@ -52,24 +54,15 @@ type
 
   PStream = ^TStream;
 
-  TSetStorage = array [0..255] of Boolean;  
+  TSetStorage = array [0..255] of Boolean; 
+
+
+
+var 
+  StdInputFile, StdOutputFile: file;  
   
 
 
-var
-  RandSeed: Integer;
-  
-  Heap: LongInt;
-  
-  Buffer: string;
-  IOError: Integer;
-  LastReadChar: Char;
-  
-  StdInputFile, StdOutputFile: file;
-  StdInputHandle, StdOutputHandle: LongInt;
-  
-  
-  
 // Windows API functions
 
 function GetCommandLineA: Pointer stdcall; external 'KERNEL32.DLL' name 'GetCommandLineA';
@@ -151,7 +144,9 @@ function ParseCmdLine(Index: Integer; var Str: string): Integer;
 function ParamCount: Integer;
 function ParamStr(Index: Integer): string;
 procedure IStr(Number: Integer; var s: string);
-procedure Str(Number: Real; var s: string; DecPlaces: Integer = 0); forward;
+procedure Str(Number: Real; var s: string; DecPlaces: Integer = 0);
+procedure Val(const s: string; var Number: Real; var Code: Integer);
+procedure IVal(const s: string; var Number: Integer; var Code: Integer);
 procedure Assign(var F: file; const Name: string);
 procedure Rewrite(var F: file; BlockSize: Integer = 1);
 procedure Reset(var F: file; BlockSize: Integer = 1);
@@ -181,8 +176,6 @@ procedure ReadBoolean(var F: file; P: PStream; var Value: Boolean);
 procedure ReadReal(var F: file; P: PStream; var Number: Real);
 procedure ReadString(var F: file; P: PStream; const s: string);
 procedure ReadNewLine(var F: file; P: PStream);
-procedure Val(const s: string; var Number: Real; var Code: Integer);
-procedure IVal(const s: string; var Number: Integer; var Code: Integer);
 function UpCase(ch: Char): Char;
 procedure InitSet(var SetStorage: TSetStorage);
 procedure AddToSet(var SetStorage: TSetStorage; FromVal, ToVal: Integer);
@@ -197,6 +190,15 @@ function TestSuperset(const SetStorage1, SetStorage2: TSetStorage): Integer;
 
 
 implementation
+
+
+var
+  RandSeed: Integer;  
+  Heap: LongInt;  
+  IOError: Integer;
+  LastReadChar: Char;  
+  StdInputHandle, StdOutputHandle: LongInt;
+  
 
 
 // Initialization
