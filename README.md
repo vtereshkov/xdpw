@@ -6,7 +6,6 @@
 XD Pascal is a small educational self-hosting compiler for a Pascal language dialect. Any comments, suggestions, or bug reports are appreciated. Feel free to contact the author on GitHub or by e-mail VTereshkov@mail.ru. Enjoy.
 
 ### Features
-* Recursive descent parsing
 * Native x86 code generation (32 bit Windows executables)
 * Support for both console and GUI applications
 * No external assembler or linker needed
@@ -18,7 +17,7 @@ XD Pascal is a small educational self-hosting compiler for a Pascal language dia
 ### Usage
 Type in the command prompt:
 ```
-xdpw <file.pas>
+xdpw <unit1.pas> <unit2.pas> ... <prog.pas>
 ```
 The source file should be specified with its extension (.pas).
  
@@ -42,7 +41,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 
 #### Limitations
 * No object-oriented programming
-* No `uses` clause. The `$I` directive should be used instead (Turbo Pascal 3 style)
+* Units cannot be compiled separately
 * No `Double` and `Extended` types 
 * Arrays, records and sets cannot be passed to subroutines without `const` or `var`
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
@@ -50,15 +49,20 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 
 #### Formal grammar
 ```
-Program = "program" Ident ";" Block "." .
+ProgramOrUnit = ("program" | "unit") Ident ";" 
+                ["interface"] [UsesClause] Block "." .
+                
+UsesClause = "uses" Ident {";" Ident} .                
 
-Block = { Declarations } CompoundStatement .
+Block = { Declarations } (CompoundStatement | "end") .
 
-Declarations = LabelDeclarations |
-               ConstDeclarations | 
-               TypeDeclarations |
-               VarDeclarations |
-               ProcFuncDeclarations .
+Declarations = DeclarationSection ["implementation" DeclarationSection] .
+
+DeclarationSection = LabelDeclarations |
+                     ConstDeclarations | 
+                     TypeDeclarations |
+                     VarDeclarations |
+                     ProcFuncDeclarations .
                
 LabelDeclarations = "label" Ident {"," Ident} ";"               
              
@@ -80,9 +84,9 @@ TypeDeclarations = "type" Ident "=" Type ";" {Ident "=" Type ";"} .
 VarDeclarations = "var" IdentList ":" Type ";" {IdentList ":" Type ";"} .
 
 ProcFuncDeclarations = ("procedure" | "function") Ident [FormalParams] [":" TypeIdent] 
-                       ["stdcall"] ";" (Directive | Block) .
+                       ["stdcall"] ";" [(Directive | Block) ";"] .
 
-Directive = ("forward" | ("external" StringLiteral "name" StringLiteral)) ";" .         
+Directive = "forward" | ("external" StringLiteral "name" StringLiteral) .         
 
 ActualParams = "(" [ (Expression | Designator) |
               {"," (Expression | Designator)} ] ")" .
@@ -184,10 +188,9 @@ StringLiteral = "'" {Character | "'" "'"} "'".
 ```
 
 ### Compiler 
-The compiler directly builds a Windows PE executable without using any external assembler or linker.
+The compiler is based on a recursive descent parser. It directly builds a Windows PE executable without using any external assembler or linker.
 
 #### Directives
-* `$I` - Include source file. Examples: `{$I windows.inc}`, `{$I samples\gauss.inc}`
 * `$APPTYPE` - Set application type. Examples: `{$APPTYPE GUI}`, `{$APPTYPE CONSOLE}`
 
 #### Optimizations
@@ -262,13 +265,13 @@ function UpCase(ch: Char): Char;
 
 ### Samples
 * `factor.pas`   - Integer factorization demo
-* `lineq.pas`    - Linear equation solver. Uses `gauss.inc` unit. Requires `eq.txt`, `eqerr.txt`, or similar data file
+* `lineq.pas`    - Linear equation solver. Uses `gauss.pas` unit. Requires `eq.txt`, `eqerr.txt`, or similar data file
 * `life.pas`     - The Game of Life
 * `sort.pas`     - Array sorting demo
 * `fft.pas`      - Fast Fourier Transform demo
 * `inserr.pas`   - Inertial navigation system error estimation demo. Uses `kalman.inc` unit
 * `list.pas`     - Linked list operations demo
-* `gui.pas`      - GUI application demo. Uses `windows.inc` unit
+* `gui.pas`      - GUI application demo. Uses `windows.pas` unit
 
 ### Known issues
 

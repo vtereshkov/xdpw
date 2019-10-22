@@ -1,24 +1,15 @@
 // XD Pascal - a 32-bit compiler for Windows
 // Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov
 
-// Main program
-
-
-
-program XDPW;
-
-
 {$APPTYPE CONSOLE}
 {$I-}
 {$H-}
 {$J+}
 
+program XDPW;
 
-{$I Common.inc}
-{$I Scanner.inc}
-{$I CodeGen.inc}
-{$I Linker.inc}
-{$I Parser.inc}
+
+uses Common, Scanner, Parser, CodeGen, Linker;
 
 
 
@@ -45,8 +36,8 @@ end;
 
 
 var
-  ProgramName, ExeName: TString;
-  OutFile: TOutFile;
+  UnitName, ExeName: TString;
+  ParamIndex: Integer;
 
 
 
@@ -57,62 +48,38 @@ WriteLn('Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov');
 
 if ParamCount < 1 then
   begin
-  WriteLn('Usage: xdpw <file.pas>');
+  WriteLn('Usage: xdpw <unit1.pas> <unit2.pas> ... <prog.pas>');
   Halt(1);
-  end;  
-  
-ProgramName := ParamStr(1);
-
-
-// Compile
-WriteLn('Compiling ', ProgramName);
+  end;
 
 FillOperatorSets;
-FillTypeSets;
- 
+FillTypeSets; 
 IsConsoleProgram := TRUE;  // Console program by default  
 
 ZeroAll;
-FillChar(ImportSection, SizeOf(ImportSection), #0);
-
+ClearImportSection;
 ResetOptimizationTriggers;
-InitializeScanner(ProgramName);
-CompileProgram;
-FinalizeScanner;
+    
+for ParamIndex := 0 to ParamCount do
+  begin 
+  if ParamIndex = 0 then
+    UnitName := 'System.pas'
+  else
+    begin
+    UnitName := ParamStr(ParamIndex); 
+    WriteLn('Compiling ', UnitName);
+    end;
 
-FillHeaders(CodeSize, InitializedGlobalDataSize, UninitializedGlobalDataSize);
+  // Compile
+  InitializeScanner(UnitName);
+  CompileProgramOrUnit;
+  FinalizeScanner;
+  end;
 
-Relocate(IMGBASE + Headers.CodeSectionHeader.VirtualAddress,
-         IMGBASE + Headers.DataSectionHeader.VirtualAddress,
-         IMGBASE + Headers.BSSSectionHeader.VirtualAddress,
-         IMGBASE + Headers.ImportSectionHeader.VirtualAddress);
-
-FixupImportSection(Headers.ImportSectionHeader.VirtualAddress);
-
-
-// Write output file
-ChangeExt(ProgramName, 'exe', ExeName);
-Assign(OutFile, ExeName);
-Rewrite(OutFile, 1);
-
-if IOResult <> 0 then
-  Error('Unable to open output file ' + ExeName);
-  
-BlockWrite(OutFile, Headers, SizeOf(Headers));
-Pad(OutFile, SizeOf(Headers), FILEALIGN);
-
-BlockWrite(OutFile, Code, CodeSize);
-Pad(OutFile, CodeSize, FILEALIGN);
-
-BlockWrite(OutFile, InitializedGlobalData, InitializedGlobalDataSize);
-Pad(OutFile, InitializedGlobalDataSize, FILEALIGN);
-
-BlockWrite(OutFile, ImportSection, SizeOf(ImportSection));
-Pad(OutFile, SizeOf(ImportSection), FILEALIGN);
-
-Close(OutFile);
-
+ChangeExt(UnitName, 'exe', ExeName);
+LinkAndWrite(ExeName);
 
 WriteLn('Compilation complete. Code size: ', CodeSize, ' bytes. Data size: ', InitializedGlobalDataSize + UninitializedGlobalDataSize, ' bytes.');
+DisposeAll;
 end.
 

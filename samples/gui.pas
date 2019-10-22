@@ -6,7 +6,7 @@
 program GUI;
 
 
-{$I windows.inc}
+uses Windows;
 
 
 const
