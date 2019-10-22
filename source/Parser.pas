@@ -3554,7 +3554,7 @@ else
   // Main block of a program, or a procedure as part of a program/unit  
   
   if BlockStack[BlockStackTop].Index = 1 then
-    ProgramEntryPoint := GetCodeSize;
+    SetProgramEntryPoint;
 
   GenerateStackFrameProlog;
 

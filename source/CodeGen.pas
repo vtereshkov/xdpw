@@ -102,7 +102,10 @@ implementation
 
 
 const
-  MAXRELOCS = 20000;
+  MAXRELOCS       = 20000;
+  MAXGOTOS        = 100;
+  MAXLOOPNESTING  = 20;
+  MAXBREAKCALLS   = 100;
   
 
 
@@ -112,7 +115,21 @@ type
     Pos: LongInt;
     Value: LongInt;
   end;
+  
+  TGoto = record
+    Pos: LongInt;
+    LabelIndex: Integer;
+    ForLoopNesting: Integer;
+  end;  
+  
+  TBreakContinueExitCallList = record
+    NumCalls: Integer;
+    Pos: array [1..MAXBREAKCALLS] of LongInt;
+  end; 
+   
 
+  // Optimization-related types
+  
   TRegister = (NOREG, EAX, ECX, ESI, EDI, EBP);
    
   TInstruction = 
@@ -141,7 +158,13 @@ var
   CodeSize, CodePosStackTop: Integer;
   
   Reloc: array [1..MAXRELOCS] of TRelocatable;
-  NumRelocs: Integer;   
+  NumRelocs: Integer;
+
+  Gotos: array [1..MAXGOTOS] of TGoto;
+  NumGotos: Integer;
+  
+  BreakCall, ContinueCall: array [1..MAXLOOPNESTING] of TBreakContinueExitCallList;
+  ExitCall: TBreakContinueExitCallList;   
 
   GenPopRegOptimizationPretrigger, 
   GenPopRegOptimizationTrigger,
@@ -193,6 +216,7 @@ begin
 CodeSize        := 0; 
 CodePosStackTop := 0;
 NumRelocs       := 0;
+NumGotos        := 0;
 
 ResetOptimizationTriggers;
 end;

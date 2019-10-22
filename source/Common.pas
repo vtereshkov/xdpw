@@ -26,22 +26,16 @@ const
   MAXBLOCKNESTING           = 10;
   MAXPARAMS                 = 20;
   MAXFIELDS                 = 100;
-  MAXLOOPNESTING            = 20;
   MAXWITHNESTING            = 20;
-  MAXGOTOS                  = 100;
-  MAXBREAKCALLS             = 100;
-  MAXEXITCALLS              = 100;
 
   MAXINITIALIZEDDATASIZE    =  1 * 1024 * 1024;
   MAXUNINITIALIZEDDATASIZE  = 32 * 1024 * 1024;
-  MAXSTACKSIZE              = 16 * 1024 * 1024;
-  
+  MAXSTACKSIZE              = 16 * 1024 * 1024;  
 
 
 
 type
   TString  = string;  
-  TKeyName = string;
   
   TInFile = file;  
   TOutFile = file;  
@@ -138,7 +132,6 @@ type
   
   TTypeKind = (EMPTYTYPE, ANYTYPE, INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE, CHARTYPE, BOOLEANTYPE, REALTYPE,
                POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, PROCEDURALTYPE, FORWARDTYPE);  
-
 
 
 
@@ -290,17 +283,6 @@ type
     Size, Pos, Line: Integer;
   end;    
   
-  TGoto = record
-    Pos: LongInt;
-    LabelIndex: Integer;
-    ForLoopNesting: Integer;
-  end;  
-  
-  TBreakContinueExitCallList = record
-    NumCalls: Integer;
-    Pos: array [1..MAXBREAKCALLS] of LongInt;
-  end;  
-  
   TWithDesignator = record
     TempPointer: Integer;
     DataType: Integer;
@@ -308,8 +290,56 @@ type
   
   
 
+var
+  Ident: array [1..MAXIDENTS] of TIdentifier;
+  Types: array [1..MAXTYPES] of TType;
+  InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of Char;
+  Units: array [1..MAXUNITS] of TUnit;
+  BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
+  WithStack: array [1..MAXWITHNESTING] of TWithDesignator;
+
+  UnitFile: TUnitFile;
+  
+  MultiplicativeOperators, AdditiveOperators, UnaryOperators, RelationOperators,
+  OperatorsForIntegers, OperatorsForReals, OperatorsForBooleans: set of TTokenKind;
+  
+  IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of TTypeKind;
+
+  NumIdent, NumTypes, NumUnits, NumBlocks, BlockStackTop, ForLoopNesting, WithNesting,
+  InitializedGlobalDataSize, UninitializedGlobalDataSize: Integer;
+  
+  IsConsoleProgram: Boolean;
+  
+
+
+procedure InitializeCommon;
+procedure FinalizeCommon;
+function GetTokSpelling(TokKind: TTokenKind): TString;
+procedure Error(const Msg: TString);
+procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
+function LowBound(DataType: Integer): Integer;
+function HighBound(DataType: Integer): Integer;
+function TypeSize(DataType: Integer): Integer;
+function GetCompatibleType(LeftType, RightType: Integer): Integer;
+function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
+function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
+procedure CheckOperator(const Tok: TToken; DataType: Integer); 
+function GetKeyword(const Name: TString): TTokenKind;
+function GetUnit(const Name: TString): Integer;
+function GetIdentUnsafe(const Name: TString; AllowForwardReference: Boolean = FALSE): Integer;
+function GetIdent(const Name: TString; AllowForwardReference: Boolean = FALSE): Integer;
+function GetFieldUnsafe(RecType: Integer; const Name: TString): Integer;
+function GetField(RecType: Integer; const Name: TString): Integer;
+function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const Name: TString): Integer;
+function FieldInsideWithFound(const Name: TString): Boolean;
+
+
+
+implementation
+
+
 const
-  Keyword: array [1..NUMKEYWORDS] of TKeyName = 
+  Keyword: array [1..NUMKEYWORDS] of TString = 
     (
     'AND',
     'ARRAY',
@@ -355,60 +385,7 @@ const
     'WITH',
     'XOR'
     );
-    
-    
- 
 
-var
-  Ident: array [1..MAXIDENTS] of TIdentifier;
-  Types: array [1..MAXTYPES] of TType;
-  InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of Char;
-  Units: array [1..MAXUNITS] of TUnit;
-  BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
-  Gotos: array [1..MAXGOTOS] of TGoto;
-  BreakCall, ContinueCall: array [1..MAXLOOPNESTING] of TBreakContinueExitCallList;
-  ExitCall: TBreakContinueExitCallList;
-  WithStack: array [1..MAXWITHNESTING] of TWithDesignator;
-
-  Tok: TToken;
-  UnitFile: TUnitFile;
-  
-  MultiplicativeOperators, AdditiveOperators, UnaryOperators, RelationOperators,
-  OperatorsForIntegers, OperatorsForReals, OperatorsForBooleans: set of TTokenKind;
-  
-  IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of TTypeKind;
-
-  NumIdent, NumTypes, NumUnits, NumBlocks, BlockStackTop, NumGotos, ForLoopNesting, WithNesting,
-  InitializedGlobalDataSize, UninitializedGlobalDataSize, ProgramEntryPoint: Integer;
-  
-  IsConsoleProgram: Boolean;
-  
-
-
-procedure InitializeCommon;
-procedure FinalizeCommon;
-function GetTokSpelling(TokKind: TTokenKind): TString;
-procedure Error(const Msg: TString);
-procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
-function LowBound(DataType: Integer): Integer;
-function HighBound(DataType: Integer): Integer;
-function TypeSize(DataType: Integer): Integer;
-function GetCompatibleType(LeftType, RightType: Integer): Integer;
-function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
-function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
-procedure CheckOperator(const Tok: TToken; DataType: Integer); 
-function GetKeyword(const Name: TKeyName): TTokenKind;
-function GetUnit(const Name: TString): Integer;
-function GetIdentUnsafe(const Name: TString; AllowForwardReference: Boolean = FALSE): Integer;
-function GetIdent(const Name: TString; AllowForwardReference: Boolean = FALSE): Integer;
-function GetFieldUnsafe(RecType: Integer; const Name: TString): Integer;
-function GetField(RecType: Integer; const Name: TString): Integer;
-function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const Name: TString): Integer;
-function FieldInsideWithFound(const Name: TString): Boolean;
-
-
-
-implementation
 
 
 
@@ -452,12 +429,10 @@ NumTypes                    := 0;
 NumUnits                    := 0; 
 NumBlocks                   := 0; 
 BlockStackTop               := 0; 
-NumGotos                    := 0;
 ForLoopNesting              := 0;
 WithNesting                 := 0;
 InitializedGlobalDataSize   := 0;
 UninitializedGlobalDataSize := 0;
-ProgramEntryPoint           := 0;
 
 IsConsoleProgram            := TRUE;  // Console program by default 
 
@@ -798,7 +773,7 @@ end;
 
 
 
-function GetKeyword{(const Name: TKeyName): TTokenKind};
+function GetKeyword{(const Name: TString): TTokenKind};
 var
   Max, Mid, Min: Integer;
   Found: Boolean;

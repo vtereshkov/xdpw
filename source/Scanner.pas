@@ -14,6 +14,10 @@ interface
 uses Common;
 
 
+var
+  Tok: TToken;  
+
+
 procedure InitializeScanner(const Name: TString);
 procedure FinalizeScanner;
 procedure NextTok;

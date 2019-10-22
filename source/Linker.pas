@@ -11,18 +11,17 @@ unit Linker;
 interface
 
 
-
 uses Common, CodeGen;
 
 
-function AddImportFunc(const ImportLibName, ImportFuncName: TString): LongInt;
 procedure InitializeLinker;
+procedure SetProgramEntryPoint;
+function AddImportFunc(const ImportLibName, ImportFuncName: TString): LongInt;
 procedure LinkAndWriteProgram(const ExeName: TString);
 
 
 
 implementation
-
 
  
 const
@@ -145,6 +144,7 @@ type
 var
   Headers: THeaders;  
   ImportSection: TImportSection;
+  ProgramEntryPoint: LongInt;
   
   
   
@@ -317,6 +317,26 @@ with Headers do
 end;
 
 
+
+
+procedure InitializeLinker;
+begin
+FillChar(ImportSection, SizeOf(ImportSection), #0);
+ProgramEntryPoint := 0;
+end;
+
+
+
+
+procedure SetProgramEntryPoint;
+begin
+if ProgramEntryPoint <> 0 then
+  Error('Duplicate program entry point');
+  
+ProgramEntryPoint := GetCodeSize;
+end;
+
+
     
 
 function AddImportFunc{(const ImportLibName, ImportFuncName: TString): LongInt};
@@ -379,14 +399,6 @@ for i := 0 to NumLookupEntries - 1 do
   with ImportSection do
     if LookupTable[i] <> 0 then 
       LookupTable[i] := LookupTable[i] + VirtualAddress;  
-end;
-
-
-
-
-procedure InitializeLinker;
-begin
-FillChar(ImportSection, SizeOf(ImportSection), #0);
 end;
 
 
