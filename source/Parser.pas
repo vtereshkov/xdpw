@@ -45,7 +45,7 @@ if BlockStack[BlockStackTop].Index = 1 then Scope := GLOBAL else Scope := LOCAL;
 
 i := GetIdentUnsafe(Name);
 
-if (i > 0) and (Ident[i].Block = BlockStack[BlockStackTop].Index) then
+if (i > 0) and (Ident[i].UnitIndex = NumUnits) and (Ident[i].Block = BlockStack[BlockStackTop].Index) then
   Error('Duplicate identifier ' + Name);
 
 Inc(NumIdent);
