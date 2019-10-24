@@ -199,6 +199,10 @@ var
   LastReadChar: Char;  
   StdInputHandle, StdOutputHandle: LongInt;
   
+  
+  
+procedure PtrStr(Number: Integer; var s: string); forward;  
+  
 
 
 // Initialization
@@ -427,28 +431,6 @@ end;
 
 
 
-
-procedure WriteConsole(Ch: Char);
-var
-  LenWritten: Integer;
-begin
-WriteFile(StdOutputHandle, @Ch, 1, LenWritten, 0);
-end;
-
-
-
-
-procedure ReadConsole(var Ch: Char);
-var
-  LenRead: Integer;
-begin
-ReadFile(StdInputHandle, @Ch, 1, LenRead, 0);
-WriteConsole(Ch);
-end;
-
-
-
-
 procedure Assign{(var F: file; const Name: string)};
 var
   FileRecPtr: PFileRec;
@@ -586,20 +568,15 @@ end;
 procedure WriteCh(var F: file; P: PStream; ch: Char);
 var
   Dest: PChar;
-  FileRecPtr: PFileRec;
-begin
-FileRecPtr := @F;  
-if P <> nil then                                    // String stream output
+begin 
+if P = nil then                                     // Console or file output
+  BlockWrite(F, ch, 1)
+else                                                // String stream output 
   begin                      
   Dest := PChar(Integer(P^.Data) + P^.Index);
   Dest^ := ch;
   Inc(P^.Index);
-  end
-else  
-  if FileRecPtr^.Handle = StdOutputHandle then      // Console output
-    WriteConsole(ch)                
-  else                                              // File output
-    BlockWrite(F, ch, 1);   
+  end  
 end;
 
 
@@ -607,14 +584,16 @@ end;
 
 procedure WriteString(var F: file; P: PStream; const S: string);
 var
-  i: Integer;
+  Dest: PChar;
 begin
-i := 1;
-while S[i] <> #0 do
-  begin
-  WriteCh(F, P, S[i]);
-  Inc(i);
-  end; 
+if P = nil then                                     // Console or file output
+  BlockWrite(F, S, Length(S))
+else                                                // String stream output
+  begin                      
+  Dest := PChar(Integer(P^.Data) + P^.Index);
+  Move(S, Dest^, Length(S));
+  P^.Index := P^.Index + Length(S);
+  end 
 end;
 
 
@@ -622,11 +601,17 @@ end;
 
 procedure WriteStringF{(var F: file; P: PStream; const S: string; MinWidth, DecPlaces: Integer)};
 var
-  i: Integer;
+  Spaces: string;
+  i, NumSpaces: Integer;
 begin
-for i := 1 to MinWidth - Length(S) do
-  WriteCh(F, P, ' '); 
-WriteString(F, P, S);
+NumSpaces := MinWidth - Length(S);
+if NumSpaces < 0 then NumSpaces := 0;
+
+for i := 1 to NumSpaces do
+  Spaces[i] := ' ';
+Spaces[NumSpaces + 1] := #0;  
+  
+WriteString(F, P, Spaces + S);
 end;
 
 
@@ -682,11 +667,11 @@ end;
 
 
 
-procedure WriteHex(var F: file; P: PStream; Number: Integer; Digits: ShortInt);
+procedure WritePointer(var F: file; P: PStream; Number: Integer);
 var
   i, Digit: ShortInt;
 begin
-for i := Digits - 1 downto 0 do
+for i := 7 downto 0 do
   begin
   Digit := (Number shr (i shl 2)) and $0F;
   if Digit <= 9 then Digit := ShortInt('0') + Digit else Digit := ShortInt('A') + Digit - 10;
@@ -697,21 +682,12 @@ end;
 
 
 
-procedure WritePointer(var F: file; P: PStream; Number: Integer);
-begin
-WriteHex(F, P, Number, 8);
-end;
-
-
-
-
 procedure WritePointerF{(var F: file; P: PStream; Number: Integer; MinWidth, DecPlaces: Integer)};
 var
-  i: Integer;
+  S: string;
 begin
-for i := 1 to MinWidth - 8 do
-  WriteCh(F, P, ' ');
-WritePointer(F, P, Number);
+PtrStr(Number, S);
+WriteStringF(F, P, S, MinWidth, DecPlaces);
 end;
 
 
@@ -857,28 +833,35 @@ var
   Len: Integer;
   Dest: PChar;
   FileRecPtr: PFileRec;
-begin
-FileRecPtr := @F;   
+  
+const
+  LF: Char = #10;
+  
+begin   
 if P <> nil then                                      // String stream input
   begin                      
   Dest := PChar(Integer(P^.Data) + P^.Index);
   ch := Dest^;
   Inc(P^.Index);
   end
-else  
+else
+  begin
+  FileRecPtr := @F;
+  BlockRead(F, ch, 1, Len); 
+ 
   if FileRecPtr^.Handle = StdInputHandle then         // Console input
     begin
-    ReadConsole(ch);
-    if ch = #13 then WriteConsole(#10);
+    BlockWrite(StdOutputFile, ch, 1);
+    if ch = #13 then BlockWrite(StdOutputFile, LF, 1);     
     end 
   else                                                // File input
     begin
-    BlockRead(F, ch, 1, Len);
     if ch = #10 then BlockRead(F, ch, 1, Len);
     if Len <> 1 then ch := #0;
     end;
+  end;  
 
-LastReadChar := ch;             // Required by ReadNewLine
+LastReadChar := ch;                                   // Required by ReadNewLine
 end;
 
 
@@ -1132,6 +1115,20 @@ Stream.Data := @s;
 Stream.Index := 0;
 
 WriteInt(StdOutputFile, @Stream, Number);
+s[Stream.Index + 1] := #0;
+end;
+
+
+
+
+procedure PtrStr{(Number: Integer; var s: string)};
+var
+  Stream: TStream;
+begin
+Stream.Data := @s;
+Stream.Index := 0;
+
+WritePointer(StdOutputFile, @Stream, Number);
 s[Stream.Index + 1] := #0;
 end;
 
