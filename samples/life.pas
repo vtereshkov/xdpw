@@ -6,11 +6,12 @@ program Life;
 
 
 const
-  FieldSize = 20;
+  Width = 8;
+  Height = 25;
 
 
 type
-  TField = array [1..FieldSize * FieldSize] of Boolean;
+  TField = array [0..Height - 1, 0..Width - 1] of Boolean;
 
 
 var
@@ -18,35 +19,23 @@ var
 
 
 
-function ind(i, j: Integer): Integer;              // Linear index of a cell modulo field size
-begin
-while i > FIELDSIZE do i := i - FIELDSIZE;
-while i < 1         do i := i + FIELDSIZE;
-while j > FIELDSIZE do j := j - FIELDSIZE;
-while j < 1         do j := j + FIELDSIZE;
-
-Result := FIELDSIZE * (i - 1) + j;
-end;
-
-
-
-
 procedure Redraw;
 var
   i, j: Integer;
   ch: Char;
+  s: string;
 begin
-WriteLn;
-for i := 1 to FieldSize do
+s := '';
+for i := 0 to Height - 1 do
   begin
-  for j := 1 to FieldSize do
+  for j := 0 to Width - 1 do
     begin
-    if Fld[ind(i, j)] then ch := 'O' else ch := '.';
-    Write(ch);
-    end;
-  WriteLn;
+    if Fld[i, j] then ch := 'O' else ch := '.';
+    s := s + ch;
+    end;  
+  if i < Height - 1 then s := s + #13 + #10;
   end;
-WriteLn;  
+Write(s);
 end; // Redraw
 
 
@@ -58,9 +47,9 @@ var
 begin
 Randomize;
 
-for i := 1 to FieldSize do
-  for j := 1 to FieldSize do
-    Fld[ind(i, j)] := Random > 0.5;
+for i := 0 to Height - 1 do
+  for j := 0 to Width - 1 do
+    Fld[i, j] := Random > 0.5;
 end; // Init
 
 
@@ -72,27 +61,24 @@ var
   i, j, ni, nj, n: Integer;
 begin
 
-for i := 1 to FieldSize do
-  for j := 1 to FieldSize do
+for i := 0 to Height - 1 do
+  for j := 0 to Width - 1 do
     begin
     // Count cell neighbors
     n := 0;
     for ni := i - 1 to i + 1 do
       for nj := j - 1 to j + 1 do
-        if Fld[ind(ni, nj)] and not ((ni = i) and (nj = j)) then Inc(n);
+        if Fld[(ni + Height) mod Height, (nj + Width) mod Width] and not ((ni = i) and (nj = j)) then Inc(n);
 
     // Revive or kill the current cell in the next generation
-    if Fld[ind(i, j)] then
-      NextFld[ind(i, j)] := (n > 1) and (n < 4)  // Kill the cell or keep it alive
+    if Fld[i, j] then
+      NextFld[i, j] := (n > 1) and (n < 4)  // Kill the cell or keep it alive
     else
-      NextFld[ind(i, j)] := n = 3;               // Revive the cell or keep it dead
+      NextFld[i, j] := n = 3;               // Revive the cell or keep it dead
     end; // for j...
 
 // Make new generation
-for i := 1 to FieldSize do
-  for j := 1 to FieldSize do
-    Fld[ind(i, j)] := NextFld[ind(i, j)];
-
+Fld := NextFld;
 end; // Regenerate
 
 
@@ -109,7 +95,7 @@ Init;
 repeat   
   Redraw;
   Regenerate;
-  Write('Enter Q for quit: '); ReadLn(ch);
+  ReadLn(ch);
 until (ch = 'Q') or (ch = 'q');
 
 end.
