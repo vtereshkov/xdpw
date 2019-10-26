@@ -139,9 +139,9 @@ type
     PUSH_CONST, 
     PUSH_RELOCCONST, 
     PUSH_LOCALADDR, 
-    FSTP, 
     LEA_PUSH_REG,
-    CMP
+    MOV_CONST,
+    FSTP
     );
   
   TOptimizationTrigger = record
@@ -171,7 +171,8 @@ var
   PushToFPUOptimizationTrigger,
   GenerateRelationOptimizationTrigger, 
   DerefPtrOptimizationTrigger,
-  GetFieldPtrOptimizationTrigger: TOptimizationTrigger;
+  GetFieldPtrOptimizationTrigger,
+  GenerateAssignmentOptimizationTrigger: TOptimizationTrigger;
 
 
 
@@ -206,6 +207,7 @@ ResetOptimizationTrigger(PushToFPUOptimizationTrigger);
 ResetOptimizationTrigger(GenerateRelationOptimizationTrigger);
 ResetOptimizationTrigger(DerefPtrOptimizationTrigger);
 ResetOptimizationTrigger(GetFieldPtrOptimizationTrigger);
+ResetOptimizationTrigger(GenerateAssignmentOptimizationTrigger);
 end;
 
 
@@ -459,6 +461,9 @@ procedure GenPopReg(Reg: TRegister);
         
         if DoublePush then
           GenPushReg(ESI);                                                     // push esi
+
+        // Try further assignment optimizations
+        SetOptimizationTrigger(GenerateAssignmentOptimizationTrigger, MOV_CONST, EAX, PushedValue, 0);  
          
         Result := TRUE;
         end
@@ -482,7 +487,7 @@ procedure GenPopReg(Reg: TRegister);
           GenPushReg(EAX);                                                     // push eax
         
           // Try further cmp eax, ecx optimizations
-          SetOptimizationTrigger(GenerateRelationOptimizationTrigger, CMP, NOREG, PushedValue, 0);
+          SetOptimizationTrigger(GenerateRelationOptimizationTrigger, PUSH_REG, EAX, PushedValue, 0);
           end;
           
         Result := TRUE;
@@ -1199,7 +1204,7 @@ procedure GenerateRelation{(rel: TTokenKind; ValType: Integer)};
   Result := FALSE;
   
   // Optimization: (mov ecx, Value) + (push eax) + (pop eax) + (cmp eax, ecx) -> (cmp eax, Value)
-  if GenerateRelationOptimizationTrigger.Kind = CMP then
+  if GenerateRelationOptimizationTrigger.Kind = PUSH_REG then
     begin
     CodeSize := CodeSize - 6;                                           // Remove: mov ecx, Value, push eax
     Gen($3D); GenDWord(GenerateRelationOptimizationTrigger.Value);      // cmp eax, Value
@@ -1260,27 +1265,61 @@ end;
 
 
 procedure GenerateAssignment{(DesignatorType: Integer)};
+
+
+  function OptimizeGenerateAssignment: Boolean;
+  begin
+  Result := FALSE;
+  
+  // Optimization: (mov eax, Value) + (mov [esi], al/ax/eax) -> (mov byte/word/dword ptr [esi], Value)
+  if GenerateAssignmentOptimizationTrigger.Kind = MOV_CONST then
+    begin
+    CodeSize := CodeSize - 5;                                                                       // Remove: mov eax, Value   
+    GenPopReg(ESI);     
+    
+    case TypeSize(DesignatorType) of
+      1: begin
+         Gen($C6); Gen($06); Gen(Byte(GenerateAssignmentOptimizationTrigger.Value));                // mov byte ptr [esi], Value
+         end;
+      2: begin
+         Gen($66); Gen($C7); Gen($06); GenWord(Word(GenerateAssignmentOptimizationTrigger.Value));  // mov word ptr [esi], Value
+         end;
+      4: begin
+         Gen($C7); Gen($06); GenDWord(GenerateAssignmentOptimizationTrigger.Value);                 // mov dword ptr [esi], Value
+         end
+      else
+        Error('Internal fault: Illegal designator size');
+      end; // case
+    
+    Result := TRUE;
+    end;
+    
+  ResetOptimizationTrigger(GenerateAssignmentOptimizationTrigger);    
+  end;
+  
+
 begin
 // ECX should be preserved
+GenPopReg(EAX);                                                           // pop eax   ; source value
 
-// Source value
-GenPopReg(EAX);                                                         // pop eax
-// Destination address
-GenPopReg(ESI);                                                         // pop esi
+if not OptimizeGenerateAssignment then
+  begin                                                         
+  GenPopReg(ESI);                                                         // pop esi   ; destination address
 
-case TypeSize(DesignatorType) of
-  1: begin
-     Gen($88); Gen($06);                                                // mov [esi], al
-     end;
-  2: begin
-     Gen($66); Gen($89); Gen($06);                                      // mov [esi], ax
-     end;
-  4: begin
-     Gen($89); Gen($06);                                                // mov [esi], eax
-     end
-else
-  Error('Internal fault: Illegal designator size');
-end;
+  case TypeSize(DesignatorType) of
+    1: begin
+       Gen($88); Gen($06);                                                // mov [esi], al
+       end;
+    2: begin
+       Gen($66); Gen($89); Gen($06);                                      // mov [esi], ax
+       end;
+    4: begin
+       Gen($89); Gen($06);                                                // mov [esi], eax
+       end
+    else
+      Error('Internal fault: Illegal designator size');
+    end; // case  
+  end; // if
 
 end;
 
