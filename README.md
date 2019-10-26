@@ -200,6 +200,7 @@ Some simple peephole optimizations are performed:
 * Local variable loading optimizations (32-bit variables only)
 * Array element access optimizations
 * Record field access optimizations
+* Assignment optimizations
 * Comparison optimizations
 
 #### Inlined procedures and functions
