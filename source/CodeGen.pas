@@ -1461,7 +1461,7 @@ end;
 procedure GenerateIfCondition;
 begin
 GenPopReg(EAX);                                             // pop eax
-Gen($83); Gen($F8); Gen($00);                               // cmp eax, 0
+Gen($85); Gen($C0);                                         // test eax, eax
 Gen($75); Gen($05);                                         // jne +5
 end;
 
@@ -1741,8 +1741,7 @@ end;
 procedure GenerateShortCircuitProlog{(op: TTokenKind)};
 begin
 GenPopReg(EAX);                                                 // pop eax
-Gen($83); Gen($F8); Gen($00);                                   // cmp eax, 0
-
+Gen($85); Gen($C0);                                             // test eax, eax
 case op of
   ANDTOK: Gen($75);                                             // jne ...
   ORTOK:  Gen($74);                                             // je  ...
