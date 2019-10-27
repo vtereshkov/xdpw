@@ -141,6 +141,7 @@ type
     PUSH_LOCALADDR, 
     LEA_PUSH_REG,
     MOV_CONST,
+    Jxx,
     FSTP
     );
   
@@ -169,7 +170,8 @@ var
   GenPopRegOptimizationPretrigger, 
   GenPopRegOptimizationTrigger,
   PushToFPUOptimizationTrigger,
-  GenerateRelationOptimizationTrigger, 
+  GenerateRelationOptimizationTrigger,
+  GenerateIfConditionOptimizationTrigger,
   DerefPtrOptimizationTrigger,
   GetFieldPtrOptimizationTrigger,
   GenerateAssignmentOptimizationTrigger: TOptimizationTrigger;
@@ -205,6 +207,7 @@ ResetOptimizationTrigger(GenPopRegOptimizationTrigger);
 ResetOptimizationTrigger(GenPopRegOptimizationPretrigger);
 ResetOptimizationTrigger(PushToFPUOptimizationTrigger);
 ResetOptimizationTrigger(GenerateRelationOptimizationTrigger);
+ResetOptimizationTrigger(GenerateIfConditionOptimizationTrigger);
 ResetOptimizationTrigger(DerefPtrOptimizationTrigger);
 ResetOptimizationTrigger(GetFieldPtrOptimizationTrigger);
 ResetOptimizationTrigger(GenerateAssignmentOptimizationTrigger);
@@ -1215,7 +1218,12 @@ procedure GenerateRelation{(rel: TTokenKind; ValType: Integer)};
   end;
 
 
+var
+  JumpOpCode: Byte;
+
 begin
+JumpOpCode := 0;
+
 if Types[ValType].Kind = REALTYPE then        // Real type
   begin
   GenPushToFPU;                                                         // fld dword ptr [esp]  ;  st = operand2
@@ -1228,12 +1236,12 @@ if Types[ValType].Kind = REALTYPE then        // Real type
   Gen($B8); GenDWord(1);                                                // mov eax, 1           ;  TRUE
 
   case rel of
-    EQTOK: Gen($74);                                                    // je  ...
-    NETOK: Gen($75);                                                    // jne ...
-    GTTOK: Gen($77);                                                    // ja  ...
-    GETOK: Gen($73);                                                    // jae ...
-    LTTOK: Gen($72);                                                    // jb  ...
-    LETOK: Gen($76);                                                    // jbe ...
+    EQTOK: JumpOpCode := $74;                                           // je  ...
+    NETOK: JumpOpCode := $75;                                           // jne ...
+    GTTOK: JumpOpCode := $77;                                           // ja  ...
+    GETOK: JumpOpCode := $73;                                           // jae ...
+    LTTOK: JumpOpCode := $72;                                           // jb  ...
+    LETOK: JumpOpCode := $76;                                           // jbe ...
   end;// case
   end
 else                                          // Ordinal types
@@ -1245,19 +1253,22 @@ else                                          // Ordinal types
     Gen($39); Gen($C8);                                                 // cmp eax, ecx
     end;   
   Gen($B8); GenDWord(1);                                                // mov eax, 1           ;  TRUE
+  
   case rel of
-    EQTOK: Gen($74);                                                    // je  ...
-    NETOK: Gen($75);                                                    // jne ...
-    GTTOK: Gen($7F);                                                    // jg  ...
-    GETOK: Gen($7D);                                                    // jge ...
-    LTTOK: Gen($7C);                                                    // jl  ...
-    LETOK: Gen($7E);                                                    // jle ...
+    EQTOK: JumpOpCode := $74;                                           // je  ...
+    NETOK: JumpOpCode := $75;                                           // jne ...
+    GTTOK: JumpOpCode := $7F;                                           // jg  ...
+    GETOK: JumpOpCode := $7D;                                           // jge ...
+    LTTOK: JumpOpCode := $7C;                                           // jl  ...
+    LETOK: JumpOpCode := $7E;                                           // jle ...
   end;// case
   end;// else
 
-Gen($02);                                                               // ... +2
+Gen(JumpOpCode); Gen($02);                                              // ... +2
 Gen($31); Gen($C0);                                                     // xor eax, eax             ;  FALSE
 GenPushReg(EAX);                                                        // push eax
+
+SetOptimizationTrigger(GenerateIfConditionOptimizationTrigger, Jxx, NOREG, JumpOpCode, 0);
 end;
 
 
@@ -1459,10 +1470,35 @@ end;
 
 
 procedure GenerateIfCondition;
+
+
+  function OptimizeGenerateIfCondition: Boolean;
+  var
+    OpCode: Byte;
+  begin
+  Result := FALSE;
+  
+  // Optimization: (mov eax, 1) + (jxx +2) + (xor eax, eax) + (push eax) + (pop eax) + (test eax, eax) + (jne +5) -> (jxx +5)
+  if GenerateIfConditionOptimizationTrigger.Kind = Jxx then
+    begin
+    OpCode := GenerateIfConditionOptimizationTrigger.Value;
+    
+    CodeSize := CodeSize - 10;            // Remove: mov eax, 1,  jxx +2,  xor eax, eax,  push eax
+    Gen(OpCode); Gen($05);                // jxx +5
+    Result := TRUE;
+    end;
+    
+  ResetOptimizationTrigger(GenerateIfConditionOptimizationTrigger);  
+  end;
+  
+
 begin
-GenPopReg(EAX);                                             // pop eax
-Gen($85); Gen($C0);                                         // test eax, eax
-Gen($75); Gen($05);                                         // jne +5
+if not OptimizeGenerateIfCondition then
+  begin
+  GenPopReg(EAX);                                             // pop eax
+  Gen($85); Gen($C0);                                         // test eax, eax
+  Gen($75); Gen($05);                                         // jne +5
+  end;
 end;
 
 
@@ -1741,12 +1777,12 @@ end;
 procedure GenerateShortCircuitProlog{(op: TTokenKind)};
 begin
 GenPopReg(EAX);                                                 // pop eax
-Gen($85); Gen($C0);                                             // test eax, eax
+Gen($85); Gen($C0);                                             // test eax, eax  
 case op of
   ANDTOK: Gen($75);                                             // jne ...
   ORTOK:  Gen($74);                                             // je  ...
 end;
-Gen($05);                                                       // ... +5                                         
+Gen($05);                                                       // ... +5
 
 GenerateIfProlog; 
 end;  

@@ -195,13 +195,14 @@ The compiler is based on a recursive descent parser. It directly builds a Window
 
 #### Optimizations
 Some simple peephole optimizations are performed:
-* Push/pop pair optimizations
-* FPU push/pop pair optimizations
+* Push/pop elimination
+* FPU push/pop elimination
 * Local variable loading optimizations (32-bit variables only)
 * Array element access optimizations
 * Record field access optimizations
 * Assignment optimizations
 * Comparison optimizations
+* Condition testing optimizations
 
 #### Inlined procedures and functions
 The following identifiers are implemented as part of the compiler. Their names are not reserved words and can be locally redefined by the user.
