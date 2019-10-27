@@ -521,43 +521,37 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
   function GetReadProcIdent(DataType: Integer): Integer;
   begin
   Result := 0;
-
-  if (Types[DataType].Kind = INTEGERTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = INTEGERTYPE)) then
-        Result := GetIdent('READINT')                 // Integer argument
-        
-  else if (Types[DataType].Kind = SMALLINTTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = SMALLINTTYPE)) then
-        Result := GetIdent('READSMALLINT')            // Small integer argument
-        
-  else if (Types[DataType].Kind = SHORTINTTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = SHORTINTTYPE)) then
-        Result := GetIdent('READSHORTINT')            // Short integer argument
-        
-  else if (Types[DataType].Kind = WORDTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = WORDTYPE)) then
-        Result := GetIdent('READWORD')                // Word argument
-
-  else if (Types[DataType].Kind = BYTETYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = BYTETYPE)) then
-        Result := GetIdent('READBYTE')                // Byte argument
-       
-  else if (Types[DataType].Kind = BOOLEANTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = BOOLEANTYPE)) then
-        Result := GetIdent('READBOOLEAN')             // Boolean argument
   
-  else if (Types[DataType].Kind = CHARTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = CHARTYPE)) then
-        Result := GetIdent('READCH')                  // Character argument
-        
-  else if Types[DataType].Kind = REALTYPE then
-        Result := GetIdent('READREAL')                // Real argument
-        
-  else if (Types[DataType].Kind = ARRAYTYPE) and (Types[DataType].BaseType = CHARTYPEINDEX) then
-        Result := GetIdent('READSTRING')              // String argument
-        
-  else
-    Error('Incompatible types');
+  with Types[DataType] do
+    if (Kind = INTEGERTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = INTEGERTYPE)) then
+          Result := GetIdent('READINT')                 // Integer argument
+          
+    else if (Kind = SMALLINTTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = SMALLINTTYPE)) then
+          Result := GetIdent('READSMALLINT')            // Small integer argument
+          
+    else if (Kind = SHORTINTTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = SHORTINTTYPE)) then
+          Result := GetIdent('READSHORTINT')            // Short integer argument
+          
+    else if (Kind = WORDTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = WORDTYPE)) then
+          Result := GetIdent('READWORD')                // Word argument
+
+    else if (Kind = BYTETYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = BYTETYPE)) then
+          Result := GetIdent('READBYTE')                // Byte argument
+         
+    else if (Kind = BOOLEANTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = BOOLEANTYPE)) then
+          Result := GetIdent('READBOOLEAN')             // Boolean argument
+    
+    else if (Kind = CHARTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = CHARTYPE)) then
+          Result := GetIdent('READCH')                  // Character argument
+          
+    else if Kind = REALTYPE then
+          Result := GetIdent('READREAL')                // Real argument
+          
+    else if (Kind = ARRAYTYPE) and (BaseType = CHARTYPEINDEX) then
+          Result := GetIdent('READSTRING')              // String argument
+          
+    else
+      Error('Incompatible types');
  
   end; // GetReadProcIdent
   
@@ -567,25 +561,24 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
   begin
   Result := 0;
   
-  if (Types[DataType].Kind in IntegerTypes) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind in IntegerTypes)) then
-        Result := GetIdent('WRITEINTF')                 // Integer argument
-        
-  else if (Types[DataType].Kind = BOOLEANTYPE) or
-    ((Types[DataType].Kind = SUBRANGETYPE) and (Types[Types[DataType].BaseType].Kind = BOOLEANTYPE)) then
-        Result := GetIdent('WRITEBOOLEANF')             // Boolean argument
-        
-  else if Types[DataType].Kind = REALTYPE then
-        Result := GetIdent('WRITEREALF')                // Real argument
-        
-  else if Types[DataType].Kind = POINTERTYPE then
-        Result := GetIdent('WRITEPOINTERF')             // Pointer argument
-        
-  else if (Types[DataType].Kind = ARRAYTYPE) and (Types[DataType].BaseType = CHARTYPEINDEX) then
-        Result := GetIdent('WRITESTRINGF')              // String argument
-        
-  else
-    Error('Incompatible types');
+  with Types[DataType] do
+    if (Kind in IntegerTypes) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind in IntegerTypes)) then
+          Result := GetIdent('WRITEINTF')                 // Integer argument
+          
+    else if (Kind = BOOLEANTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = BOOLEANTYPE)) then
+          Result := GetIdent('WRITEBOOLEANF')             // Boolean argument
+          
+    else if Kind = REALTYPE then
+          Result := GetIdent('WRITEREALF')                // Real argument
+          
+    else if Kind = POINTERTYPE then
+          Result := GetIdent('WRITEPOINTERF')             // Pointer argument
+          
+    else if (Kind = ARRAYTYPE) and (BaseType = CHARTYPEINDEX) then
+          Result := GetIdent('WRITESTRINGF')              // String argument
+          
+    else
+      Error('Incompatible types');
   
   end; // GetWriteProcIdentIndex
   
@@ -2614,21 +2607,24 @@ procedure CompileType{(var DataType: Integer)};
   procedure CompileRecordType(var DataType: Integer);
   
 
-    procedure DeclareField(const Name: TString; RecType, FieldType: Integer; var NextFieldOffset: Integer);
+    procedure DeclareField(const FieldName: TString; RecType, FieldType: Integer; var NextFieldOffset: Integer);
     var
       i: Integer;
     begin
     for i := 1 to Types[RecType].NumFields do
-      if Types[RecType].Field[i]^.Name = Name then
-        Error('Duplicate field ' + Name);
+      if Types[RecType].Field[i]^.Name = FieldName then
+        Error('Duplicate field ' + FieldName);
 
     // Add new field
     Inc(Types[RecType].NumFields);
     New(Types[RecType].Field[Types[RecType].NumFields]);
     
-    Types[RecType].Field[Types[RecType].NumFields]^.Name     := Name;
-    Types[RecType].Field[Types[RecType].NumFields]^.DataType := FieldType;
-    Types[RecType].Field[Types[RecType].NumFields]^.Offset   := NextFieldOffset;
+    with Types[RecType].Field[Types[RecType].NumFields]^ do
+      begin
+      Name     := FieldName;
+      DataType := FieldType;
+      Offset   := NextFieldOffset;
+      end;
     
     NextFieldOffset := NextFieldOffset + TypeSize(FieldType);
     end; // DeclareField

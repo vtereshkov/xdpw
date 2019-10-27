@@ -324,14 +324,14 @@ function GetCompatibleType(LeftType, RightType: Integer): Integer;
 function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
 function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
 procedure CheckOperator(const Tok: TToken; DataType: Integer); 
-function GetKeyword(const Name: TString): TTokenKind;
-function GetUnit(const Name: TString): Integer;
-function GetIdentUnsafe(const Name: TString; AllowForwardReference: Boolean = FALSE): Integer;
-function GetIdent(const Name: TString; AllowForwardReference: Boolean = FALSE): Integer;
-function GetFieldUnsafe(RecType: Integer; const Name: TString): Integer;
-function GetField(RecType: Integer; const Name: TString): Integer;
-function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const Name: TString): Integer;
-function FieldInsideWithFound(const Name: TString): Boolean;
+function GetKeyword(const KeywordName: TString): TTokenKind;
+function GetUnit(const UnitName: TString): Integer;
+function GetIdentUnsafe(const IdentName: TString; AllowForwardReference: Boolean = FALSE): Integer;
+function GetIdent(const IdentName: TString; AllowForwardReference: Boolean = FALSE): Integer;
+function GetFieldUnsafe(RecType: Integer; const FieldName: TString): Integer;
+function GetField(RecType: Integer; const FieldName: TString): Integer;
+function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer;
+function FieldInsideWithFound(const FieldName: TString): Boolean;
 
 
 
@@ -747,33 +747,30 @@ end;
 
 procedure CheckOperator{(const Tok: TToken; DataType: Integer)}; 
 begin
-if Types[DataType].Kind = SUBRANGETYPE then
-  CheckOperator(Tok, Types[DataType].BaseType)
-else 
-  begin
-  if not (Types[DataType].Kind in OrdinalTypes) and 
-    (Types[DataType].Kind <> REALTYPE) and 
-    (Types[DataType].Kind <> POINTERTYPE) and
-    (Types[DataType].Kind <> PROCEDURALTYPE) 
-  then
-    Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
-   
-  if ((Types[DataType].Kind in IntegerTypes)  and not (Tok.Kind in OperatorsForIntegers)) or
-     ((Types[DataType].Kind = REALTYPE)       and not (Tok.Kind in OperatorsForReals)) or   
-     ((Types[DataType].Kind = CHARTYPE)       and not (Tok.Kind in RelationOperators)) or
-     ((Types[DataType].Kind = BOOLEANTYPE)    and not (Tok.Kind in OperatorsForBooleans)) or
-     ((Types[DataType].Kind = POINTERTYPE)    and not (Tok.Kind in RelationOperators)) or
-     ((Types[DataType].Kind = ENUMERATEDTYPE) and not (Tok.Kind in RelationOperators)) or
-     ((Types[DataType].Kind = PROCEDURALTYPE) and not (Tok.Kind in RelationOperators)) 
-  then
-    Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
-  end;  
+with Types[DataType] do
+  if Kind = SUBRANGETYPE then
+    CheckOperator(Tok, BaseType)
+  else 
+    begin
+    if not (Kind in OrdinalTypes) and (Kind <> REALTYPE) and (Kind <> POINTERTYPE) and (Kind <> PROCEDURALTYPE) then
+      Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
+     
+    if ((Kind in IntegerTypes)  and not (Tok.Kind in OperatorsForIntegers)) or
+       ((Kind = REALTYPE)       and not (Tok.Kind in OperatorsForReals)) or   
+       ((Kind = CHARTYPE)       and not (Tok.Kind in RelationOperators)) or
+       ((Kind = BOOLEANTYPE)    and not (Tok.Kind in OperatorsForBooleans)) or
+       ((Kind = POINTERTYPE)    and not (Tok.Kind in RelationOperators)) or
+       ((Kind = ENUMERATEDTYPE) and not (Tok.Kind in RelationOperators)) or
+       ((Kind = PROCEDURALTYPE) and not (Tok.Kind in RelationOperators)) 
+    then
+      Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
+    end;  
 end;  
 
 
 
 
-function GetKeyword{(const Name: TString): TTokenKind};
+function GetKeyword{(const KeywordName: TString): TTokenKind};
 var
   Max, Mid, Min: Integer;
   Found: Boolean;
@@ -786,11 +783,11 @@ Max := NUMKEYWORDS;
 
 repeat
   Mid := (Min + Max) div 2;
-  if Name > Keyword[Mid] then
+  if KeywordName > Keyword[Mid] then
     Min := Mid + 1
   else
     Max := Mid - 1;
-  Found := Name = Keyword[Mid];
+  Found := KeywordName = Keyword[Mid];
 until Found or (Min > Max);
 
 if Found then Result := TTokenKind(Ord(ANDTOK) - 1 + Mid);
@@ -799,52 +796,48 @@ end;
 
 
 
-function GetUnit{(const Name: TString): Integer};
+function GetUnit{(const UnitName: TString): Integer};
 var
   UnitIndex: Integer;
 begin
 for UnitIndex := 1 to NumUnits do
-  if Units[UnitIndex].Name = Name then 
+  if Units[UnitIndex].Name = UnitName then 
     begin
     Result := UnitIndex;
     Exit;
     end;
       
 Result := 0;
-Error('Unknown unit ' + Name);
+Error('Unknown unit ' + UnitName);
 end;
 
 
 
 
-function GetIdentUnsafe{(const Name: TString; AllowForwardReference: Boolean = FALSE): Integer};
+function GetIdentUnsafe{(const IdentName: TString; AllowForwardReference: Boolean = FALSE): Integer};
 var
   IdentIndex, BlockStackIndex: Integer;
 begin
 // First search the current unit 
 for BlockStackIndex := BlockStackTop downto 1 do
   for IdentIndex := NumIdent downto 1 do
-    if (Ident[IdentIndex].Name = Name) and
-       (Ident[IdentIndex].UnitIndex = NumUnits) and 
-       (Ident[IdentIndex].Block = BlockStack[BlockStackIndex].Index) and       
-       (AllowForwardReference or (Ident[IdentIndex].Kind <> USERTYPE) or (Types[Ident[IdentIndex].DataType].Kind <> FORWARDTYPE))
-    then 
-      begin
-      Result := IdentIndex;
-      Exit;
-      end;          
+    with Ident[IdentIndex] do
+      if (Name = IdentName) and (UnitIndex = NumUnits) and (Block = BlockStack[BlockStackIndex].Index) and       
+         (AllowForwardReference or (Kind <> USERTYPE) or (Types[DataType].Kind <> FORWARDTYPE))
+      then 
+        begin
+        Result := IdentIndex;
+        Exit;
+        end;          
 
 // If unsuccessful, search other used units
 for IdentIndex := NumIdent downto 1 do
-  if (Ident[IdentIndex].Name = Name) and
-     (Ident[IdentIndex].UnitIndex <> NumUnits) and 
-      Ident[IdentIndex].IsExported and
-      Units[Ident[IdentIndex].UnitIndex].IsUsed 
-  then 
-    begin
-    Result := IdentIndex;
-    Exit;
-    end; 
+  with Ident[IdentIndex] do  
+    if (Name = IdentName) and (UnitIndex <> NumUnits) and IsExported and Units[UnitIndex].IsUsed then 
+      begin
+      Result := IdentIndex;
+      Exit;
+      end; 
      
 Result := 0;
 end;
@@ -852,22 +845,22 @@ end;
 
 
 
-function GetIdent{(const Name: TString; AllowForwardReference: Boolean = FALSE): Integer};
+function GetIdent{(const IdentName: TString; AllowForwardReference: Boolean = FALSE): Integer};
 begin
-Result := GetIdentUnsafe(Name, AllowForwardReference);
+Result := GetIdentUnsafe(IdentName, AllowForwardReference);
 if Result = 0 then
-  Error('Unknown identifier ' + Name);
+  Error('Unknown identifier ' + IdentName);
 end;
 
 
 
 
-function GetFieldUnsafe{(RecType: Integer; const Name: TString): Integer};
+function GetFieldUnsafe{(RecType: Integer; const FieldName: TString): Integer};
 var
   FieldIndex: Integer;
 begin
 for FieldIndex := 1 to Types[RecType].NumFields do
-  if Types[RecType].Field[FieldIndex]^.Name = Name then
+  if Types[RecType].Field[FieldIndex]^.Name = FieldName then
     begin
     Result := FieldIndex;
     Exit;
@@ -879,24 +872,24 @@ end;
 
 
 
-function GetField{(RecType: Integer; const Name: TString): Integer};
+function GetField{(RecType: Integer; const FieldName: TString): Integer};
 begin
-Result := GetFieldUnsafe(RecType, Name);
+Result := GetFieldUnsafe(RecType, FieldName);
 if Result = 0 then
-  Error('Unknown field ' + Name);
+  Error('Unknown field ' + FieldName);
 end;
 
 
 
 
-function GetFieldInsideWith{(var RecPointer: Integer; var RecType: Integer; const Name: TString): Integer};
+function GetFieldInsideWith{(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer};
 var
   FieldIndex, WithIndex: Integer;
 begin 
 for WithIndex := WithNesting downto 1 do
   begin
   RecType := WithStack[WithIndex].DataType;
-  FieldIndex := GetFieldUnsafe(RecType, Name);
+  FieldIndex := GetFieldUnsafe(RecType, FieldName);
   
   if FieldIndex <> 0 then
     begin
@@ -912,12 +905,12 @@ end;
 
 
 
-function FieldInsideWithFound{(const Name: TString): Boolean};
+function FieldInsideWithFound{(const FieldName: TString): Boolean};
 var
   RecPointer: Integer; 
   RecType: Integer;        
 begin
-Result := GetFieldInsideWith(RecPointer, RecType, Name) <> 0;
+Result := GetFieldInsideWith(RecPointer, RecType, FieldName) <> 0;
 end;
 
 
