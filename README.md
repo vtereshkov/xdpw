@@ -2,6 +2,8 @@
 
 # XD Pascal Compiler for Windows
 
+_Dedicated to my father Mikhail Tereshkov, who instilled in me a taste for engineering_ 
+
 ## Summary
 XD Pascal is a small educational self-hosting compiler for a Pascal language dialect. Any comments, suggestions, or bug reports are appreciated. Feel free to contact the author on GitHub or by e-mail VTereshkov@mail.ru. Enjoy.
 
