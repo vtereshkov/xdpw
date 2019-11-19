@@ -379,9 +379,9 @@ procedure GenPopReg(Reg: TRegister);
 
   function OptimizePopReg: Boolean;
   var
-    DoublePush: Boolean;
-    PushedValue: LongInt;
-    PrevOpCode, PrevPrevOpCode: Byte;
+    HasPushRegPrefix, HasPushAddrPrefix, HasPushStackPrefix: Boolean;
+    Value, Addr: LongInt;
+    PrevOpCode: Byte;
     
   begin
   Result := FALSE;
@@ -431,20 +431,19 @@ procedure GenPopReg(Reg: TRegister);
   // Optimization: (push Value) + (pop eax) -> (mov eax, Value)
   else if (Reg = EAX) and (PrevOpCode = $68) then                               // Previous: push Value                                                      
     begin
-    PushedValue := PrevInstrDWord(0, 1); 
-    PrevPrevOpCode := PrevInstrByte(1, 0);
+    Value := PrevInstrDWord(0, 1);
+
+    // Special case: (push esi) + (push Value) + (pop eax) -> (mov eax, Value) + (push esi)
+    HasPushRegPrefix := (PrevInstrByte(1, 0) = $56) and (Value <> Reloc[NumRelocs].Value);  // Previous: push esi 
     
     RemovePrevInstr(0);                                                         // Remove: push Value                                       
-    
-    // 'Double push' special case: (push esi) + (push Value) + (pop eax) -> (mov eax, Value) + (push esi)
-    DoublePush := (PrevPrevOpCode = $56) and (PushedValue <> Reloc[NumRelocs].Value);  // Previous: push esi, push Value (non-relocatable)  
-    
-    if DoublePush then                                                
+        
+    if HasPushRegPrefix then                                                
       RemovePrevInstr(0);                                                       // Remove: push esi
        
-    GenNew($B8); GenDWord(PushedValue);                                         // mov eax, Value
+    GenNew($B8); GenDWord(Value);                                               // mov eax, Value
     
-    if DoublePush then                                                                                  
+    if HasPushRegPrefix then                                                                                  
       GenPushReg(ESI);                                                          // push esi
     
     Result := TRUE;
@@ -454,21 +453,35 @@ procedure GenPopReg(Reg: TRegister);
   // Optimization: (push Value) + (pop ecx) -> (mov ecx, Value)  
   else if (Reg = ECX) and (PrevOpCode = $68) then                               // Previous: push Value
     begin
-    PushedValue := PrevInstrDWord(0, 1); 
-    PrevPrevOpCode := PrevInstrByte(1, 0);
+    Value := PrevInstrDWord(0, 1);
+    Addr  := PrevInstrDWord(1, 2); 
+
+    // Special case: (push eax) + (push Value) + (pop ecx) -> (mov ecx, Value) + (push eax)
+    HasPushRegPrefix   := (PrevInstrByte(1, 0) = $50) and (Value <> Reloc[NumRelocs].Value); // Previous: push eax
+
+    // Special case: (push [ebp + Addr]) + (push Value) + (pop ecx) -> (mov ecx, Value) + (push [ebp + Addr])                              
+    HasPushAddrPrefix  := (PrevInstrByte(1, 0) = $FF) and (PrevInstrByte(1, 1) = $B5) and (Value <> Reloc[NumRelocs].Value); // Previous: push [ebp + Addr] 
+   
+    // Special case: (push dword ptr [esi]) + (push Value) + (pop ecx) -> (mov ecx, Value) + (push dword ptr [esi])                              
+    HasPushStackPrefix := (PrevInstrByte(1, 0) = $FF) and (PrevInstrByte(1, 1) = $36) and (Value <> Reloc[NumRelocs].Value); // Previous: push dword ptr [esi]     
     
     RemovePrevInstr(0);                                                         // Remove: push Value                                       
+        
+    if HasPushRegPrefix or HasPushAddrPrefix or HasPushStackPrefix then                                                
+      RemovePrevInstr(0);                                                       // Remove: push eax / push [ebp + Addr] 
     
-    // 'Double push' special case: (push eax) + (push Value) + (pop ecx) -> (mov ecx, Value) + (push eax)
-    DoublePush := (PrevPrevOpCode = $50) and (PushedValue <> Reloc[NumRelocs].Value);  // Previous: push eax, push Value (non-relocatable)  
+    GenNew($B9); GenDWord(Value);                                               // mov ecx, Value
     
-    if DoublePush then                                                
-      RemovePrevInstr(0);                                                       // Remove: push esi
-    
-    GenNew($B9); GenDWord(PushedValue);                                         // mov ecx, Value
-    
-    if DoublePush then
-      GenPushReg(EAX);                                                          // push eax
+    if HasPushRegPrefix then 
+      GenPushReg(EAX)                                                           // push eax
+    else if HasPushAddrPrefix then
+      begin
+      GenNew($FF); Gen($B5); GenDWord(Addr);                                    // push [ebp + Addr]
+      end
+    else if HasPushStackPrefix then
+      begin
+      GenNew($FF); Gen($36);                                                    // push dword ptr [esi]
+      end;        
       
     Result := TRUE;
     end
@@ -477,9 +490,9 @@ procedure GenPopReg(Reg: TRegister);
   // Optimization: (push Value) + (pop esi) -> (mov esi, Value)  
   else if (Reg = ESI) and (PrevOpCode = $68) then                             // Previous: push Value
     begin
-    PushedValue := PrevInstrDWord(0, 1);       
+    Value := PrevInstrDWord(0, 1);       
     RemovePrevInstr(0);                                                       // Remove: push Value                                       
-    GenNew($BE); GenDWord(PushedValue);                                       // mov esi, Value
+    GenNew($BE); GenDWord(Value);                                             // mov esi, Value
     Result := TRUE;
     end
 
@@ -487,7 +500,7 @@ procedure GenPopReg(Reg: TRegister);
   // Optimization: (push dword ptr [ebp + Value]) + (pop Reg) -> (mov Reg, dword ptr [ebp + Value])
   else if (Reg in [EAX, ECX, ESI]) and (PrevOpCode = $FF) and (PrevInstrByte(0, 1) = $B5) then   // Previous: push dword ptr [ebp + Value]
     begin
-    PushedValue := PrevInstrDWord(0, 2);
+    Value := PrevInstrDWord(0, 2);
     RemovePrevInstr(0);                                                       // Remove: push dword ptr [ebp + Value]
                                    
     GenNew($8B);                                                              // mov ...        
@@ -496,7 +509,7 @@ procedure GenPopReg(Reg: TRegister);
       ECX: Gen($8D);                                                          // ... ecx, dword ptr [epb + ...
       ESI: Gen($B5);                                                          // ... esi, dword ptr [epb + ...
     end;  
-    GenDWord(PushedValue);                                                    // ... Value]
+    GenDWord(Value);                                                          // ... Value]
 
     Result := TRUE;
     end
@@ -514,7 +527,20 @@ procedure GenPopReg(Reg: TRegister);
     end;
   
     Result := TRUE;
+    end
+    
+    
+  // Optimization: (push esi) + (mov eax, [ebp + Value]) + (pop esi) -> (mov eax, [ebp + Value])
+  else if (Reg = ESI) and (PrevInstrByte(1, 0) = $56)                                             // Previous: push esi
+                      and (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $85) then        // Previous: mov eax, [ebp + Value]
+    begin
+    Value := PrevInstrDWord(0, 2);    
+    RemovePrevInstr(1);                                                       // Remove: push esi, mov eax, [ebp + Value]
+    GenNew($8B); Gen($85); GenDWord(Value);                                   // mov eax, [ebp + Value]      
+    Result := TRUE;
     end;
+    
+    
          
   end;
 
@@ -676,6 +702,7 @@ procedure GetArrayElementPtr{(ArrType: Integer)};
   function OptimizeGetArrayElementPtr: Boolean;
   var
     BaseAddr, IndexAddr: LongInt;
+    Index: Integer;
   begin
   Result := FALSE;
   
@@ -691,7 +718,23 @@ procedure GetArrayElementPtr{(ArrType: Integer)};
     GenNew($8B); Gen($85); GenDWord(IndexAddr);     // mov eax, [ebp + IndexAddr] 
             
     Result := TRUE;
+    end
+    
+  // Optimization: (push BaseAddr) + (mov eax, Index) + (pop esi) -> (mov esi, BaseAddr) + (mov eax, Index) 
+  else if (PrevInstrByte(1, 0) = $68) and (PrevInstrByte(0, 0) = $B8) then    // Previous: push BaseAddr, mov eax, Index
+    begin
+    BaseAddr  := PrevInstrDWord(1, 1);
+    Index     := PrevInstrDWord(0, 1);
+    
+    RemovePrevInstr(1);                             // Remove: push BaseAddr, mov eax, Index
+    
+    GenNew($BE); GenDWord(BaseAddr);                // mov esi, BaseAddr         ; suilable for relocatable addresses (instruction length is the same as for push BaseAddr)
+    GenNew($B8); GenDWord(Index);                   // mov eax, Index 
+            
+    Result := TRUE;
     end;
+    
+    
     
   end; 
 
@@ -1238,29 +1281,29 @@ procedure GenerateAssignment{(DesignatorType: Integer)};
 
   function OptimizeGenerateAssignment: Boolean;
   var
-    Mov, MovPush: Boolean;
+    IsMov, IsMovPush: Boolean;
     Value: LongInt;
   begin
   Result := FALSE;
   
-  Mov := PrevInstrByte(0, 0) = $B8;                                           // Previous: mov eax, Value    
-  MovPush := (PrevInstrByte(1, 0) = $B8) and (PrevInstrByte(0, 0) = $56);     // Previous: mov eax, Value, push esi
+  IsMov := PrevInstrByte(0, 0) = $B8;                                           // Previous: mov eax, Value    
+  IsMovPush := (PrevInstrByte(1, 0) = $B8) and (PrevInstrByte(0, 0) = $56);     // Previous: mov eax, Value, push esi
   
-  if Mov then
+  if IsMov then
     Value := PrevInstrDWord(0, 1)
   else
     Value := PrevInstrDWord(1, 1);  
   
   // Optimization: (mov eax, Value) + [(push esi) + (pop esi)] + (mov [esi], al/ax/eax) -> (mov byte/word/dword ptr [esi], Value)  ; non-relocatable
-  if (Mov or MovPush) and (Value <> Reloc[NumRelocs].Value) then                               
+  if (IsMov or IsMovPush) and (Value <> Reloc[NumRelocs].Value) then                               
     begin  
-    if MovPush then
+    if IsMovPush then
       GenPopReg(ESI);                                             // pop esi   ; destination address
       
     Value := PrevInstrDWord(0, 1);
     RemovePrevInstr(0);                                           // Remove: mov eax, Value
 
-    if Mov then
+    if IsMov then
       GenPopReg(ESI);                                             // pop esi   ; destination address     
                 
     case TypeSize(DesignatorType) of
