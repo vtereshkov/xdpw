@@ -1,8 +1,27 @@
 // XD Pascal - a 32-bit compiler for Windows
 // Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov
 
-// Linker
+{$I-}
+{$H-}
+{$J+}
 
+unit Linker;
+
+
+interface
+
+
+uses Common, CodeGen;
+
+
+procedure InitializeLinker;
+procedure SetProgramEntryPoint;
+function AddImportFunc(const ImportLibName, ImportFuncName: TString): LongInt;
+procedure LinkAndWriteProgram(const ExeName: TString);
+
+
+
+implementation
 
  
 const
@@ -121,6 +140,14 @@ type
   
 
 
+
+var
+  Headers: THeaders;  
+  ImportSection: TImportSection;
+  ProgramEntryPoint: LongInt;
+  
+  
+  
 const
   DOSStub: TDOSStub = 
     (
@@ -135,14 +162,6 @@ const
     );
 
  
-  
-
-var
-  Headers: THeaders;  
-  ImportSection: TImportSection;
-
-
-
 
 const
   NumImportLibs: Integer = 0;
@@ -298,9 +317,29 @@ with Headers do
 end;
 
 
+
+
+procedure InitializeLinker;
+begin
+FillChar(ImportSection, SizeOf(ImportSection), #0);
+ProgramEntryPoint := 0;
+end;
+
+
+
+
+procedure SetProgramEntryPoint;
+begin
+if ProgramEntryPoint <> 0 then
+  Error('Duplicate program entry point');
+  
+ProgramEntryPoint := GetCodeSize;
+end;
+
+
     
 
-function AddImportFunc(const ImportLibName, ImportFuncName: TString): LongInt;
+function AddImportFunc{(const ImportLibName, ImportFuncName: TString): LongInt};
 begin
 // Add new import library
 if (NumImportLibs = 0) or (ImportLibName <> LastImportLibName) then
@@ -360,5 +399,53 @@ for i := 0 to NumLookupEntries - 1 do
   with ImportSection do
     if LookupTable[i] <> 0 then 
       LookupTable[i] := LookupTable[i] + VirtualAddress;  
-end;  
+end;
+
+
+
+
+procedure LinkAndWriteProgram{(const ExeName: TString)};
+var
+  OutFile: TOutFile;
+  CodeSize: Integer;
+  
+begin
+if ProgramEntryPoint = 0 then 
+  Error('Program entry point not found');
+
+CodeSize := GetCodeSize;
+  
+FillHeaders(CodeSize, InitializedGlobalDataSize, UninitializedGlobalDataSize);
+
+Relocate(IMGBASE + Headers.CodeSectionHeader.VirtualAddress,
+         IMGBASE + Headers.DataSectionHeader.VirtualAddress,
+         IMGBASE + Headers.BSSSectionHeader.VirtualAddress,
+         IMGBASE + Headers.ImportSectionHeader.VirtualAddress);
+
+FixupImportSection(Headers.ImportSectionHeader.VirtualAddress);
+
+// Write output file
+Assign(OutFile, ExeName);
+Rewrite(OutFile, 1);
+
+if IOResult <> 0 then
+  Error('Unable to open output file ' + ExeName);
+  
+BlockWrite(OutFile, Headers, SizeOf(Headers));
+Pad(OutFile, SizeOf(Headers), FILEALIGN);
+
+BlockWrite(OutFile, Code, CodeSize);
+Pad(OutFile, CodeSize, FILEALIGN);
+
+BlockWrite(OutFile, InitializedGlobalData, InitializedGlobalDataSize);
+Pad(OutFile, InitializedGlobalDataSize, FILEALIGN);
+
+BlockWrite(OutFile, ImportSection, SizeOf(ImportSection));
+Pad(OutFile, SizeOf(ImportSection), FILEALIGN);
+
+Close(OutFile); 
+end;
+
+
+end. 
 

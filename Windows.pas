@@ -1,8 +1,10 @@
 // XD Pascal - a 32-bit compiler for Windows
 // Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov
 
-// Windows API library
+unit Windows;
 
+
+interface
 
 
 const
@@ -122,13 +124,15 @@ procedure Ellipse(hDC: LongInt; left, top, right, bottom: Integer) stdcall; exte
 
 procedure PostQuitMessage(nExitCode: Integer) stdcall; external 'USER32.DLL' name 'PostQuitMessage';
 
-
-
-
-// Auxiliary routines
-
-
 procedure StrToChars(const S: string; var Chars: array of Char);
+
+
+
+
+implementation
+
+
+procedure StrToChars{(const S: string; var Chars: array of Char)};
 var
   Len: Integer;
 begin
@@ -136,4 +140,7 @@ Len := Length(S);
 Move(S[1], Chars, Len);
 Chars[Len] := #0;
 end;
+
+
+end.
 

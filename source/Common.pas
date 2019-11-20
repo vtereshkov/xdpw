@@ -1,43 +1,41 @@
 // XD Pascal - a 32-bit compiler for Windows
 // Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov
 
-// Common structures and routines
+{$I-}
+{$H-}
+{$J+}
 
+unit Common;
+
+
+interface
 
 
 const
   VERSIONMAJOR              = 0;
   VERSIONMINOR              = 9;
   
-  NUMKEYWORDS               = 39;          
+  NUMKEYWORDS               = 43;          
   MAXSTRLENGTH              = 255;
   MAXSETELEMENTS            = 256;
   MAXENUMELEMENTS           = 256;
   MAXIDENTS                 = 1000;
   MAXTYPES                  = 1000;
+  MAXUNITS                  = 100;
   MAXBLOCKS                 = 1000;
   MAXBLOCKNESTING           = 10;
   MAXPARAMS                 = 20;
-  MAXUNITNESTING            = 5;
   MAXFIELDS                 = 100;
-  MAXRELOCS                 = 20000;
-  MAXLOOPNESTING            = 20;
   MAXWITHNESTING            = 20;
-  MAXGOTOS                  = 100;
-  MAXBREAKCALLS             = 100;
-  MAXEXITCALLS              = 100;
 
-  MAXCODESIZE               =  1 * 1024 * 1024;
   MAXINITIALIZEDDATASIZE    =  1 * 1024 * 1024;
   MAXUNINITIALIZEDDATASIZE  = 32 * 1024 * 1024;
-  MAXSTACKSIZE              = 16 * 1024 * 1024;
-  
+  MAXSTACKSIZE              = 16 * 1024 * 1024;  
 
 
 
 type
   TString  = string;  
-  TKeyName = string;
   
   TInFile = file;  
   TOutFile = file;  
@@ -86,7 +84,9 @@ type
     FUNCTIONTOK,
     GOTOTOK,
     IFTOK,
+    IMPLEMENTATIONTOK,
     INTOK,
+    INTERFACETOK,
     LABELTOK,
     MODTOK,
     NILTOK,
@@ -105,7 +105,9 @@ type
     THENTOK,
     TOTOK,
     TYPETOK,
+    UNITTOK,
     UNTILTOK,
+    USESTOK,
     VARTOK,
     WHILETOK,
     WITHTOK,
@@ -130,7 +132,6 @@ type
   
   TTypeKind = (EMPTYTYPE, ANYTYPE, INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE, CHARTYPE, BOOLEANTYPE, REALTYPE,
                POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, PROCEDURALTYPE, FORWARDTYPE);  
-
 
 
 
@@ -216,6 +217,7 @@ type
   TIdentifier = record
     Kind: TIdentKind;
     Name: TString;
+    UnitIndex: Integer;
     Block: Integer;                       // Index of a block in which the identifier is defined
     NestingLevel: Byte;    
     RecType: Integer;                     // Parent record type code for a field
@@ -225,10 +227,12 @@ type
     NumParams: Integer;
     NumDefaultParams: Integer;
     Param: PParams;
+    ResultIdentIndex: Integer;
     ProcAsBlock: Integer;
     PredefProc: TPredefProc;
     IsUnresolvedForward: Boolean;
     IsStdCall: Boolean;
+    IsExported: Boolean;
     ForLoopNesting: Integer;              // Number of nested FOR loops where the label is defined
   case DataType: Integer of
     INTEGERTYPEINDEX: (Value: LongInt);   // Value for an ordinal constant, address for a label, variable, procedure or function
@@ -263,33 +267,21 @@ type
     FORWARDTYPE:     (TypeIdentName: TString);   
   end;
   
-  TRelocatable = record
-    RelocType: TRelocType;
-    Pos: LongInt;
-    Value: LongInt;
-  end;
-
   TBlock = record
     Index: Integer;
     LocalDataSize, ParamDataSize, TempDataSize: LongInt;
-  end;  
-    
+  end;
+  
   TUnit = record
+    Name: TString;
+    IsUsed: Boolean;
+  end;  
+
+  TUnitFile = record
     FileName: TString;
     Buffer: PChar;
     Size, Pos, Line: Integer;
-  end;  
-  
-  TGoto = record
-    Pos: LongInt;
-    LabelIndex: Integer;
-    ForLoopNesting: Integer;
-  end;  
-  
-  TBreakContinueExitCallList = record
-    NumCalls: Integer;
-    Pos: array [1..MAXBREAKCALLS] of LongInt;
-  end;  
+  end;    
   
   TWithDesignator = record
     TempPointer: Integer;
@@ -298,8 +290,56 @@ type
   
   
 
+var
+  Ident: array [1..MAXIDENTS] of TIdentifier;
+  Types: array [1..MAXTYPES] of TType;
+  InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of Char;
+  Units: array [1..MAXUNITS] of TUnit;
+  BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
+  WithStack: array [1..MAXWITHNESTING] of TWithDesignator;
+
+  UnitFile: TUnitFile;
+  
+  MultiplicativeOperators, AdditiveOperators, UnaryOperators, RelationOperators,
+  OperatorsForIntegers, OperatorsForReals, OperatorsForBooleans: set of TTokenKind;
+  
+  IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of TTypeKind;
+
+  NumIdent, NumTypes, NumUnits, NumBlocks, BlockStackTop, ForLoopNesting, WithNesting,
+  InitializedGlobalDataSize, UninitializedGlobalDataSize: Integer;
+  
+  IsConsoleProgram: Boolean;
+  
+
+
+procedure InitializeCommon;
+procedure FinalizeCommon;
+function GetTokSpelling(TokKind: TTokenKind): TString;
+procedure Error(const Msg: TString);
+procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
+function LowBound(DataType: Integer): Integer;
+function HighBound(DataType: Integer): Integer;
+function TypeSize(DataType: Integer): Integer;
+function GetCompatibleType(LeftType, RightType: Integer): Integer;
+function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
+function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
+procedure CheckOperator(const Tok: TToken; DataType: Integer); 
+function GetKeyword(const KeywordName: TString): TTokenKind;
+function GetUnit(const UnitName: TString): Integer;
+function GetIdentUnsafe(const IdentName: TString; AllowForwardReference: Boolean = FALSE): Integer;
+function GetIdent(const IdentName: TString; AllowForwardReference: Boolean = FALSE): Integer;
+function GetFieldUnsafe(RecType: Integer; const FieldName: TString): Integer;
+function GetField(RecType: Integer; const FieldName: TString): Integer;
+function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer;
+function FieldInsideWithFound(const FieldName: TString): Boolean;
+
+
+
+implementation
+
+
 const
-  Keyword: array [1..NUMKEYWORDS] of TKeyName = 
+  Keyword: array [1..NUMKEYWORDS] of TString = 
     (
     'AND',
     'ARRAY',
@@ -316,7 +356,9 @@ const
     'FUNCTION',
     'GOTO',
     'IF',
+    'IMPLEMENTATION',
     'IN',
+    'INTERFACE',
     'LABEL',
     'MOD',
     'NIL',
@@ -335,77 +377,18 @@ const
     'THEN',
     'TO',
     'TYPE',
+    'UNIT',
     'UNTIL',
+    'USES',
     'VAR',
     'WHILE',
     'WITH',
     'XOR'
     );
-    
-    
- 
-
-var
-  Ident: array [1..MAXIDENTS] of TIdentifier;
-  Types: array [1..MAXTYPES] of TType;
-  UnitStack: array [1..MAXUNITNESTING] of TUnit;
-  Code: array [0..MAXCODESIZE - 1] of Byte;
-  InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of Char;
-  CodePosStack: array [0..1023] of Integer;
-  BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
-  Reloc: array [1..MAXRELOCS] of TRelocatable;
-  Gotos: array [1..MAXGOTOS] of TGoto;
-  BreakCall, ContinueCall: array [1..MAXLOOPNESTING] of TBreakContinueExitCallList;
-  ExitCall: TBreakContinueExitCallList;
-  WithStack: array [1..MAXWITHNESTING] of TWithDesignator;
-
-  Tok: TToken;
-  
-  MultiplicativeOperators, AdditiveOperators, UnaryOperators, RelationOperators,
-  OperatorsForIntegers, OperatorsForReals, OperatorsForBooleans: set of TTokenKind;
-  
-  IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of TTypeKind;
-
-  NumIdent, NumTypes, NumBlocks, BlockStackTop, NumRelocs, NumGotos, ForLoopNesting, WithNesting,
-  CodeSize, CodePosStackTop, 
-  InitializedGlobalDataSize, UninitializedGlobalDataSize, ProgramEntryPoint,
-  UnitStackTop: Integer;
-  
-  IsConsoleProgram: Boolean;
-  
-
-
-
-function GetCodeSize: LongInt; forward;
 
 
 
 
-procedure ZeroAll;
-begin
-FillChar(Ident, SizeOf(Ident), #0);
-FillChar(Types, SizeOf(Types), #0);
-FillChar(UnitStack, SizeOf(UnitStack), #0);
-FillChar(InitializedGlobalData, SizeOf(InitializedGlobalData), #0);
-
-NumIdent                    := 0; 
-NumTypes                    := 0; 
-NumBlocks                   := 0; 
-BlockStackTop               := 0; 
-NumRelocs                   := 0;
-NumGotos                    := 0;
-ForLoopNesting              := 0;
-WithNesting                 := 0;
-CodeSize                    := 0; 
-CodePosStackTop             := 0;
-InitializedGlobalDataSize   := 0;
-UninitializedGlobalDataSize := 0;
-ProgramEntryPoint           := 0;
-end;
-
-
-
-  
 procedure FillOperatorSets;
 begin
 MultiplicativeOperators := [MULTOK, DIVTOK, IDIVTOK, MODTOK, SHLTOK, SHRTOK, ANDTOK];
@@ -434,9 +417,34 @@ end;
 
 
 
-procedure DisposeAll;
+procedure InitializeCommon;
+begin
+FillChar(Ident, SizeOf(Ident), #0);
+FillChar(Types, SizeOf(Types), #0);
+FillChar(Units, SizeOf(Units), #0);
+FillChar(InitializedGlobalData, SizeOf(InitializedGlobalData), #0);
+
+NumIdent                    := 0; 
+NumTypes                    := 0;
+NumUnits                    := 0; 
+NumBlocks                   := 0; 
+BlockStackTop               := 0; 
+ForLoopNesting              := 0;
+WithNesting                 := 0;
+InitializedGlobalDataSize   := 0;
+UninitializedGlobalDataSize := 0;
+
+IsConsoleProgram            := TRUE;  // Console program by default 
+
+FillOperatorSets;
+FillTypeSets;
+end;
+
+
+
+
+procedure FinalizeCommon;
 var
-  Buffer: Pointer;
   i, j: Integer;
   
 begin
@@ -458,18 +466,19 @@ for i := 1 to NumTypes do
       Dispose(Types[i].Field[j]);
   end;
 
-// Dispose of unit input buffers
-for i := UnitStackTop downto 1 do
-  begin
-  Buffer := UnitStack[i].Buffer;
-  FreeMem(Buffer, UnitStack[i].Size);
-  end; 
+// Dispose of unit input buffer
+with UnitFile do
+  if Buffer <> nil then
+    begin
+    FreeMem(Buffer, Size);
+    Buffer := nil;
+    end;
 end;
 
 
 
 
-function GetTokSpelling(TokKind: TTokenKind): TString;
+function GetTokSpelling{(TokKind: TTokenKind): TString};
 begin
 case TokKind of
   EMPTYTOK:                          Result := 'no token';
@@ -509,21 +518,21 @@ end;
 
 
   
-procedure Error(const Msg: TString);
+procedure Error{(const Msg: TString)};
 begin
-if UnitStackTop >= 1 then
-  WriteLn('Error ', UnitStack[UnitStackTop].FileName, ' ', UnitStack[UnitStackTop].Line, ': ', Msg)
+if NumUnits >= 1 then
+  WriteLn('Error ', UnitFile.FileName, ' ', UnitFile.Line, ': ', Msg)
 else
   WriteLn('Error: ', Msg);  
 
-DisposeAll;
+FinalizeCommon;
 Halt(1);
 end;
 
 
 
 
-procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
+procedure DefineStaticString{(var Tok: TToken; const StrValue: TString)};
 var
   i: Integer;
 begin
@@ -546,7 +555,7 @@ end;
 
 
 
-function LowBound(DataType: Integer): Integer;
+function LowBound{(DataType: Integer): Integer};
 begin
 Result := 0;
 case Types[DataType].Kind of
@@ -567,7 +576,7 @@ end;
 
 
 
-function HighBound(DataType: Integer): Integer;
+function HighBound{(DataType: Integer): Integer};
 begin
 Result := 0;
 case Types[DataType].Kind of
@@ -588,7 +597,7 @@ end;
 
 
 
-function TypeSize(DataType: Integer): Integer;
+function TypeSize{(DataType: Integer): Integer};
 var
   CurSize: Integer;
   i: Integer;
@@ -626,7 +635,7 @@ end;
 
 
 
-function GetCompatibleType(LeftType, RightType: Integer): Integer;
+function GetCompatibleType{(LeftType, RightType: Integer): Integer};
 begin
 Result := 0;
 
@@ -686,7 +695,7 @@ end;
 
 
 
-function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
+function GetCompatibleRefType{(LeftType, RightType: Integer): Integer};
 begin
 // This function is asymmetric and implies Variable(LeftType) := Variable(RightType)
 Result := 0;
@@ -725,7 +734,7 @@ end;
 
 
 
-function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
+function ConversionToRealIsPossible{(SrcType, DestType: Integer): Boolean};
 begin
 // Implicit type conversion is possible if DestType is real and SrcType is integer or a subrange of integer
 Result := (Types[DestType].Kind = REALTYPE) and
@@ -736,35 +745,32 @@ end;
 
 
 
-procedure CheckOperator(const Tok: TToken; DataType: Integer); 
+procedure CheckOperator{(const Tok: TToken; DataType: Integer)}; 
 begin
-if Types[DataType].Kind = SUBRANGETYPE then
-  CheckOperator(Tok, Types[DataType].BaseType)
-else 
-  begin
-  if not (Types[DataType].Kind in OrdinalTypes) and 
-    (Types[DataType].Kind <> REALTYPE) and 
-    (Types[DataType].Kind <> POINTERTYPE) and
-    (Types[DataType].Kind <> PROCEDURALTYPE) 
-  then
-    Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
-   
-  if ((Types[DataType].Kind in IntegerTypes)  and not (Tok.Kind in OperatorsForIntegers)) or
-     ((Types[DataType].Kind = REALTYPE)       and not (Tok.Kind in OperatorsForReals)) or   
-     ((Types[DataType].Kind = CHARTYPE)       and not (Tok.Kind in RelationOperators)) or
-     ((Types[DataType].Kind = BOOLEANTYPE)    and not (Tok.Kind in OperatorsForBooleans)) or
-     ((Types[DataType].Kind = POINTERTYPE)    and not (Tok.Kind in RelationOperators)) or
-     ((Types[DataType].Kind = ENUMERATEDTYPE) and not (Tok.Kind in RelationOperators)) or
-     ((Types[DataType].Kind = PROCEDURALTYPE) and not (Tok.Kind in RelationOperators)) 
-  then
-    Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
-  end;  
+with Types[DataType] do
+  if Kind = SUBRANGETYPE then
+    CheckOperator(Tok, BaseType)
+  else 
+    begin
+    if not (Kind in OrdinalTypes) and (Kind <> REALTYPE) and (Kind <> POINTERTYPE) and (Kind <> PROCEDURALTYPE) then
+      Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
+     
+    if ((Kind in IntegerTypes)  and not (Tok.Kind in OperatorsForIntegers)) or
+       ((Kind = REALTYPE)       and not (Tok.Kind in OperatorsForReals)) or   
+       ((Kind = CHARTYPE)       and not (Tok.Kind in RelationOperators)) or
+       ((Kind = BOOLEANTYPE)    and not (Tok.Kind in OperatorsForBooleans)) or
+       ((Kind = POINTERTYPE)    and not (Tok.Kind in RelationOperators)) or
+       ((Kind = ENUMERATEDTYPE) and not (Tok.Kind in RelationOperators)) or
+       ((Kind = PROCEDURALTYPE) and not (Tok.Kind in RelationOperators)) 
+    then
+      Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
+    end;  
 end;  
 
 
 
 
-function GetKeyword(const Name: TKeyName): TTokenKind;
+function GetKeyword{(const KeywordName: TString): TTokenKind};
 var
   Max, Mid, Min: Integer;
   Found: Boolean;
@@ -777,11 +783,11 @@ Max := NUMKEYWORDS;
 
 repeat
   Mid := (Min + Max) div 2;
-  if Name > Keyword[Mid] then
+  if KeywordName > Keyword[Mid] then
     Min := Mid + 1
   else
     Max := Mid - 1;
-  Found := Name = Keyword[Mid];
+  Found := KeywordName = Keyword[Mid];
 until Found or (Min > Max);
 
 if Found then Result := TTokenKind(Ord(ANDTOK) - 1 + Mid);
@@ -790,155 +796,71 @@ end;
 
 
 
+function GetUnit{(const UnitName: TString): Integer};
+var
+  UnitIndex: Integer;
+begin
+for UnitIndex := 1 to NumUnits do
+  if Units[UnitIndex].Name = UnitName then 
+    begin
+    Result := UnitIndex;
+    Exit;
+    end;
+      
+Result := 0;
+Error('Unknown unit ' + UnitName);
+end;
 
-function GetIdentUnsafe(const Name: TString): Integer;
+
+
+
+function GetIdentUnsafe{(const IdentName: TString; AllowForwardReference: Boolean = FALSE): Integer};
 var
   IdentIndex, BlockStackIndex: Integer;
 begin
+// First search the current unit 
 for BlockStackIndex := BlockStackTop downto 1 do
   for IdentIndex := NumIdent downto 1 do
-    if (Ident[IdentIndex].Name = Name) and (Ident[IdentIndex].Block = BlockStack[BlockStackIndex].Index) then 
+    with Ident[IdentIndex] do
+      if (Name = IdentName) and (UnitIndex = NumUnits) and (Block = BlockStack[BlockStackIndex].Index) and       
+         (AllowForwardReference or (Kind <> USERTYPE) or (Types[DataType].Kind <> FORWARDTYPE))
+      then 
+        begin
+        Result := IdentIndex;
+        Exit;
+        end;          
+
+// If unsuccessful, search other used units
+for IdentIndex := NumIdent downto 1 do
+  with Ident[IdentIndex] do  
+    if (Name = IdentName) and (UnitIndex <> NumUnits) and IsExported and Units[UnitIndex].IsUsed then 
       begin
       Result := IdentIndex;
       Exit;
-      end;
-      
+      end; 
+     
 Result := 0;
 end;
 
 
 
 
-function GetIdent(const Name: TString): Integer;
+function GetIdent{(const IdentName: TString; AllowForwardReference: Boolean = FALSE): Integer};
 begin
-Result := GetIdentUnsafe(Name);
+Result := GetIdentUnsafe(IdentName, AllowForwardReference);
 if Result = 0 then
-  Error('Unknown identifier ' + Name);
+  Error('Unknown identifier ' + IdentName);
 end;
 
 
 
 
-procedure DeclareIdent(const Name: TString; Kind: TIdentKind; TotalNumParams: Integer; DataType: Integer; PassMethod: TPassMethod; ConstValue: LongInt; FracConstValue: Single; PredefProc: TPredefProc);
-var
-  i, AdditionalStackItems: Integer;
-  Scope: TScope;
-begin
-if BlockStack[BlockStackTop].Index = 1 then Scope := GLOBAL else Scope := LOCAL;
-
-i := GetIdentUnsafe(Name);
-
-if (i > 0) and (Ident[i].Block = BlockStack[BlockStackTop].Index) then
-  Error('Duplicate identifier ' + Name);
-
-Inc(NumIdent);
-if NumIdent > MAXIDENTS then
-  Error('Maximum number of identifiers exceeded');
-  
-Ident[NumIdent].Name := Name;
-Ident[NumIdent].Kind := Kind;
-Ident[NumIdent].Scope := Scope;
-Ident[NumIdent].RelocType := UNINITDATARELOC;
-Ident[NumIdent].DataType := DataType;
-Ident[NumIdent].Block := BlockStack[BlockStackTop].Index;
-Ident[NumIdent].NestingLevel := BlockStackTop;
-Ident[NumIdent].NumParams := 0;
-Ident[NumIdent].PassMethod := PassMethod;
-Ident[NumIdent].IsUnresolvedForward := FALSE;
-Ident[NumIdent].IsStdCall := FALSE;
-Ident[NumIdent].ForLoopNesting := 0;
-
-case Kind of
-  PROC, FUNC:
-    if PredefProc = EMPTYPROC then
-      begin
-      Ident[NumIdent].Value := GetCodeSize;                              // Routine entry point address
-      Ident[NumIdent].PredefProc := EMPTYPROC;
-      end
-    else
-      begin
-      Ident[NumIdent].Value := 0;
-      Ident[NumIdent].PredefProc := PredefProc;                       // Predefined routine index
-      end;
-
-  VARIABLE:
-    case Scope of
-     GLOBAL:
-       begin
-       Ident[NumIdent].Value := UninitializedGlobalDataSize;                                 // Variable address (relocatable)
-       UninitializedGlobalDataSize := UninitializedGlobalDataSize + TypeSize(DataType);
-       end;// else
-
-     LOCAL:
-       if TotalNumParams > 0 then
-         begin          
-         if Ident[NumIdent].NestingLevel = 2 then                                            // Inside a non-nested routine
-           AdditionalStackItems := 1                                                         // Return address
-         else                                                                                // Inside a nested routine
-           AdditionalStackItems := 2;                                                        // Return address, static link (hidden parameter)  
-
-         with BlockStack[BlockStackTop] do
-           begin
-           Ident[NumIdent].Value := (AdditionalStackItems + TotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from EBP (>0)
-           ParamDataSize := ParamDataSize + SizeOf(LongInt);                                   // Parameters always occupy 4 bytes each
-           end
-         end
-       else
-         with BlockStack[BlockStackTop] do
-           begin
-           Ident[NumIdent].Value := -LocalDataSize - TypeSize(DataType);                       // Local variable offset from EBP (<0)
-           LocalDataSize := LocalDataSize + TypeSize(DataType);
-           end;
-    end; // case
-
-
-  CONSTANT:
-    if PassMethod = VALPASSING then                                     // Untyped constant
-      if Types[DataType].Kind = REALTYPE then
-        Ident[NumIdent].FracValue := FracConstValue                     // Real constant value
-      else
-        Ident[NumIdent].Value := ConstValue                             // Ordinal constant value
-    else                                                                // Typed constant (actually an initialized global variable)    
-      begin
-      Ident[NumIdent].Kind := VARIABLE;
-      Ident[NumIdent].Scope := GLOBAL;
-      Ident[NumIdent].RelocType := INITDATARELOC;
-      Ident[NumIdent].PassMethod := VALPASSING;
-      
-      Ident[NumIdent].Value := InitializedGlobalDataSize;               // Typed constant address (relocatable)
-      InitializedGlobalDataSize := InitializedGlobalDataSize + TypeSize(DataType);      
-      end;
-      
-  GOTOLABEL:
-    Ident[NumIdent].IsUnresolvedForward := TRUE;
-
-end;// case
-
-
-if InitializedGlobalDataSize >= MAXINITIALIZEDDATASIZE then
-  Error('Maximum initialized data size exceeded');
-
-if UninitializedGlobalDataSize >= MAXUNINITIALIZEDDATASIZE then
-  Error('Maximum uninitialized data size exceeded');
-
-if BlockStack[BlockStackTop].LocalDataSize >= MAXSTACKSIZE then
-  Error('Maximum local data size exceeded');
-
-if BlockStack[BlockStackTop].ParamDataSize >= MAXSTACKSIZE then
-  Error('Maximum parameter data size exceeded');
-
-end;
-
-
-
-
-
-function GetFieldUnsafe(RecType: Integer; const Name: TString): Integer;
+function GetFieldUnsafe{(RecType: Integer; const FieldName: TString): Integer};
 var
   FieldIndex: Integer;
 begin
 for FieldIndex := 1 to Types[RecType].NumFields do
-  if Types[RecType].Field[FieldIndex]^.Name = Name then
+  if Types[RecType].Field[FieldIndex]^.Name = FieldName then
     begin
     Result := FieldIndex;
     Exit;
@@ -950,24 +872,24 @@ end;
 
 
 
-function GetField(RecType: Integer; const Name: TString): Integer;
+function GetField{(RecType: Integer; const FieldName: TString): Integer};
 begin
-Result := GetFieldUnsafe(RecType, Name);
+Result := GetFieldUnsafe(RecType, FieldName);
 if Result = 0 then
-  Error('Unknown field ' + Name);
+  Error('Unknown field ' + FieldName);
 end;
 
 
 
 
-function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const Name: TString): Integer;
+function GetFieldInsideWith{(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer};
 var
   FieldIndex, WithIndex: Integer;
 begin 
 for WithIndex := WithNesting downto 1 do
   begin
   RecType := WithStack[WithIndex].DataType;
-  FieldIndex := GetFieldUnsafe(RecType, Name);
+  FieldIndex := GetFieldUnsafe(RecType, FieldName);
   
   if FieldIndex <> 0 then
     begin
@@ -983,11 +905,13 @@ end;
 
 
 
-function FieldInsideWithFound(const Name: TString): Boolean;
+function FieldInsideWithFound{(const FieldName: TString): Boolean};
 var
   RecPointer: Integer; 
   RecType: Integer;        
 begin
-Result := GetFieldInsideWith(RecPointer, RecType, Name) <> 0;
+Result := GetFieldInsideWith(RecPointer, RecType, FieldName) <> 0;
 end;
 
+
+end.

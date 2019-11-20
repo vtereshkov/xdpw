@@ -5,10 +5,11 @@
 program LinEq;
 
 
-{$I samples\gauss.inc}
+uses Gauss;
 
 
-procedure Error;
+
+procedure Error(const E: string);
 begin
 WriteLn;
 WriteLn('Error: ' + E + '.');
@@ -71,7 +72,7 @@ for i := 1 to m do
 
 Close(DatFile);
 
-SolveLinearSystem(A, x, m);
+SolveLinearSystem(A, x, m, @Error);
 
 WriteLn;
 WriteLn('Triangularized matrix:');

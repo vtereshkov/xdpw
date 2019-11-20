@@ -5,7 +5,7 @@
 program INSErr;
 
 
-{$I samples\kalman.inc}
+uses Kalman;
 
 
 

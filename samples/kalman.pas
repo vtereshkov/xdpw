@@ -1,5 +1,9 @@
 // Kalman filter implementation
 
+unit Kalman;
+
+
+interface
 
 
 const
@@ -14,10 +18,15 @@ type
     n, m, s: SmallInt;
     x, xapri, z: TMatrix;
     Phi, G, H, Q, R, P, Papri, K: TMatrix;
-  end;  
+  end;
 
 
 
+procedure ExecuteFilter(var KF: TKalmanFilter);
+  
+
+
+implementation
 
 
 procedure Transpose(m, n: SmallInt; var C, CT: TMatrix);
@@ -185,13 +194,13 @@ end;
 
 
 
-procedure ExecuteFilter(var KF: TKalmanFilter);
+procedure ExecuteFilter{(var KF: TKalmanFilter)};
 var
   PhiPPhiT, GQGT, HT, HPapriHT, HPapriHTplusR, HPapriHTplusRinv, PapriHT, Hxapri, nu, Knu, KH, EminusKH, E: TMatrix;
 begin
-{All variable names correspond to the notation in the book:
- Salychev O. S. Applied Inertial Navigation
- 'apri' means 'a priori' and stands for 'k/k-1'}
+// All variable names correspond to the notation in the book:
+// Salychev O. S. Applied Inertial Navigation
+// 'apri' means 'a priori' and stands for 'k/k-1'
 
 // A priori state vector estimate
 Mult(KF.n, KF.n, 1, KF.Phi, KF.x, KF.xapri);
@@ -227,3 +236,5 @@ Sub(KF.n, KF.n, E, KH, EminusKH);
 Mult(KF.n, KF.n, KF.n, EminusKH, KF.Papri, KF.P);
 end;
 
+
+end.
