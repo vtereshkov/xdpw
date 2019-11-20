@@ -398,6 +398,7 @@ procedure GenPopReg(Reg: TRegister);
     begin
     RemovePrevInstr(0);                                                         // Remove: push Reg
     Result := TRUE;
+    Exit;
     end
     
                                                  
@@ -407,6 +408,7 @@ procedure GenPopReg(Reg: TRegister);
     RemovePrevInstr(0);                                                         // Remove: push eax
     GenNew($89); Gen($C1);                                                      // mov ecx, eax
     Result := TRUE;
+    Exit;
     end
     
         
@@ -416,6 +418,7 @@ procedure GenPopReg(Reg: TRegister);
     RemovePrevInstr(0);                                                         // Remove: push eax                                       
     GenNew($89); Gen($C6);                                                      // mov esi, eax
     Result := TRUE;
+    Exit;
     end
     
         
@@ -425,6 +428,7 @@ procedure GenPopReg(Reg: TRegister);
     RemovePrevInstr(0);                                                         // Remove: push esi                                       
     GenNew($89); Gen($F0);                                                      // mov eax, esi
     Result := TRUE;
+    Exit;
     end           
 
 
@@ -447,6 +451,7 @@ procedure GenPopReg(Reg: TRegister);
       GenPushReg(ESI);                                                          // push esi
     
     Result := TRUE;
+    Exit;
     end
     
     
@@ -484,6 +489,7 @@ procedure GenPopReg(Reg: TRegister);
       end;        
       
     Result := TRUE;
+    Exit;
     end
     
 
@@ -494,6 +500,22 @@ procedure GenPopReg(Reg: TRegister);
     RemovePrevInstr(0);                                                       // Remove: push Value                                       
     GenNew($BE); GenDWord(Value);                                             // mov esi, Value
     Result := TRUE;
+    Exit;
+    end
+
+
+  // Optimization: (push Value) + (mov eax, [Addr]) + (pop esi) -> (mov esi, Value) + (mov eax, [Addr])  
+  else if (Reg = ESI) and (PrevInstrByte(1, 0) = $68) and (PrevInstrByte(0, 0) = $A1) then  // Previous: push Value, mov eax, [Addr]
+    begin    
+    Value := PrevInstrDWord(1, 1);
+    Addr  := PrevInstrDWord(0, 1);   
+    RemovePrevInstr(1);                                                       // Remove: push Value, mov eax, [Addr]
+                                       
+    GenNew($BE); GenDWord(Value);                                             // mov esi, Value
+    GenNew($A1); GenDWord(Addr);                                              // mov eax, [Addr]
+    
+    Result := TRUE;
+    Exit;
     end
 
     
@@ -512,6 +534,7 @@ procedure GenPopReg(Reg: TRegister);
     GenDWord(Value);                                                          // ... Value]
 
     Result := TRUE;
+    Exit;
     end
 
   
@@ -525,8 +548,19 @@ procedure GenPopReg(Reg: TRegister);
       EAX: Gen($06);                                                          // ... eax, dword ptr [esi]
       ECX: Gen($0E);                                                          // ... ecx, dword ptr [esi]
     end;
-  
+    
+    // Further optimization: (mov esi, Value) + (mov eax, dword ptr [esi]) -> (mov eax, [Value])
+    if (PrevInstrByte(1, 0) = $BE) and                                        // Previous: mov esi, Value 
+       (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $06)            // Previous: mov eax, dword ptr [esi]
+    then
+      begin
+      Value := PrevInstrDWord(1, 1);
+      RemovePrevInstr(1);                                                     // Remove: mov esi, Value, mov eax, dword ptr [esi]
+      GenNew($A1); GenDWord(Value);                                           // mov eax, [Value]      
+      end;   
+    
     Result := TRUE;
+    Exit;
     end
     
     
@@ -538,10 +572,9 @@ procedure GenPopReg(Reg: TRegister);
     RemovePrevInstr(1);                                                       // Remove: push esi, mov eax, [ebp + Value]
     GenNew($8B); Gen($85); GenDWord(Value);                                   // mov eax, [ebp + Value]      
     Result := TRUE;
+    Exit;
     end;
-    
-    
-         
+      
   end;
 
 
