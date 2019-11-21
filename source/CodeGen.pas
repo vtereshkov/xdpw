@@ -306,6 +306,29 @@ end;
 
 
 
+function PrevInstrRelocDWordIndex(Depth, Offset: Integer): Integer;
+var
+  i: Integer;
+  Pos: LongInt;
+begin
+Result := 0;
+
+// The last generated instruction starts at Depth = 0, Offset = 0
+if Depth < NumPrevCodeSizes then
+  begin
+  Pos := PrevCodeSizes[NumPrevCodeSizes - Depth] + Offset;
+  for i := NumRelocs downto 1 do
+    if Reloc[i].Pos = Pos then
+      begin
+      Result := i;
+      Exit;
+      end;
+  end;
+end;
+
+
+
+
 procedure RemovePrevInstr(Depth: Integer);
 begin
 if Depth >= NumPrevCodeSizes then
@@ -379,8 +402,9 @@ procedure GenPopReg(Reg: TRegister);
 
   function OptimizePopReg: Boolean;
   var
-    HasPushRegPrefix, HasPushAddrPrefix, HasPushStackPrefix: Boolean;
+    HasPushRegPrefix: Boolean;
     Value, Addr: LongInt;
+    ValueRelocIndex: Integer;
     PrevOpCode: Byte;
     
   begin
@@ -415,8 +439,20 @@ procedure GenPopReg(Reg: TRegister);
   // Optimization: (push eax) + (pop esi) -> (mov esi, eax)
   else if (Reg = ESI) and (PrevOpCode = $50) then                               // Previous: push esi        
     begin
-    RemovePrevInstr(0);                                                         // Remove: push eax                                       
-    GenNew($89); Gen($C6);                                                      // mov esi, eax
+    RemovePrevInstr(0);                                                         // Remove: push eax
+
+    // Special case: (mov eax, [epb + Addr]) + (push eax) + (pop esi) -> (mov esi, [epb + Addr])
+    if (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $85) then         // Previous: mov eax, [epb + Addr]
+      begin
+      Addr := PrevInstrDWord(0, 2);
+      RemovePrevInstr(0);                                                       // Remove: mov eax, [epb + Addr]
+      GenNew($8B); Gen($B5); GenDWord(Addr);                                    // mov esi, [epb + Addr]
+      end
+    else
+      begin                                       
+      GenNew($89); Gen($C6);                                                    // mov esi, eax
+      end;
+      
     Result := TRUE;
     Exit;
     end
@@ -436,9 +472,10 @@ procedure GenPopReg(Reg: TRegister);
   else if (Reg = EAX) and (PrevOpCode = $68) then                               // Previous: push Value                                                      
     begin
     Value := PrevInstrDWord(0, 1);
+    ValueRelocIndex := PrevInstrRelocDWordIndex(0, 1);
 
     // Special case: (push esi) + (push Value) + (pop eax) -> (mov eax, Value) + (push esi)
-    HasPushRegPrefix := (PrevInstrByte(1, 0) = $56) and (Value <> Reloc[NumRelocs].Value);  // Previous: push esi 
+    HasPushRegPrefix := PrevInstrByte(1, 0) = $56;                              // Previous: push esi 
     
     RemovePrevInstr(0);                                                         // Remove: push Value                                       
         
@@ -447,8 +484,11 @@ procedure GenPopReg(Reg: TRegister);
        
     GenNew($B8); GenDWord(Value);                                               // mov eax, Value
     
-    if HasPushRegPrefix then                                                                                  
+    if HasPushRegPrefix then
+      begin
+      if ValueRelocIndex <> 0 then Dec(Reloc[ValueRelocIndex].Pos);             // Relocate Value if necessary                                                                               
       GenPushReg(ESI);                                                          // push esi
+      end;
     
     Result := TRUE;
     Exit;
@@ -459,34 +499,23 @@ procedure GenPopReg(Reg: TRegister);
   else if (Reg = ECX) and (PrevOpCode = $68) then                               // Previous: push Value
     begin
     Value := PrevInstrDWord(0, 1);
-    Addr  := PrevInstrDWord(1, 2); 
+    ValueRelocIndex := PrevInstrRelocDWordIndex(0, 1); 
 
     // Special case: (push eax) + (push Value) + (pop ecx) -> (mov ecx, Value) + (push eax)
-    HasPushRegPrefix   := (PrevInstrByte(1, 0) = $50) and (Value <> Reloc[NumRelocs].Value); // Previous: push eax
-
-    // Special case: (push [ebp + Addr]) + (push Value) + (pop ecx) -> (mov ecx, Value) + (push [ebp + Addr])                              
-    HasPushAddrPrefix  := (PrevInstrByte(1, 0) = $FF) and (PrevInstrByte(1, 1) = $B5) and (Value <> Reloc[NumRelocs].Value); // Previous: push [ebp + Addr] 
-   
-    // Special case: (push dword ptr [esi]) + (push Value) + (pop ecx) -> (mov ecx, Value) + (push dword ptr [esi])                              
-    HasPushStackPrefix := (PrevInstrByte(1, 0) = $FF) and (PrevInstrByte(1, 1) = $36) and (Value <> Reloc[NumRelocs].Value); // Previous: push dword ptr [esi]     
+    HasPushRegPrefix := PrevInstrByte(1, 0) = $50;                                          // Previous: push eax
     
     RemovePrevInstr(0);                                                         // Remove: push Value                                       
         
-    if HasPushRegPrefix or HasPushAddrPrefix or HasPushStackPrefix then                                                
+    if HasPushRegPrefix then                                                
       RemovePrevInstr(0);                                                       // Remove: push eax / push [ebp + Addr] 
     
     GenNew($B9); GenDWord(Value);                                               // mov ecx, Value
     
-    if HasPushRegPrefix then 
-      GenPushReg(EAX)                                                           // push eax
-    else if HasPushAddrPrefix then
+    if HasPushRegPrefix then
       begin
-      GenNew($FF); Gen($B5); GenDWord(Addr);                                    // push [ebp + Addr]
-      end
-    else if HasPushStackPrefix then
-      begin
-      GenNew($FF); Gen($36);                                                    // push dword ptr [esi]
-      end;        
+      if ValueRelocIndex <> 0 then Dec(Reloc[ValueRelocIndex].Pos);             // Relocate Value if necessary 
+      GenPushReg(EAX);                                                          // push eax
+      end;
       
     Result := TRUE;
     Exit;
@@ -547,17 +576,7 @@ procedure GenPopReg(Reg: TRegister);
     case Reg of
       EAX: Gen($06);                                                          // ... eax, dword ptr [esi]
       ECX: Gen($0E);                                                          // ... ecx, dword ptr [esi]
-    end;
-    
-    // Further optimization: (mov esi, Value) + (mov eax, dword ptr [esi]) -> (mov eax, [Value])
-    if (PrevInstrByte(1, 0) = $BE) and                                        // Previous: mov esi, Value 
-       (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $06)            // Previous: mov eax, dword ptr [esi]
-    then
-      begin
-      Value := PrevInstrDWord(1, 1);
-      RemovePrevInstr(1);                                                     // Remove: mov esi, Value, mov eax, dword ptr [esi]
-      GenNew($A1); GenDWord(Value);                                           // mov eax, [Value]      
-      end;   
+    end;    
     
     Result := TRUE;
     Exit;
@@ -670,60 +689,136 @@ procedure DerefPtr{(DataType: Integer)};
   function OptimizeDerefPtr: Boolean;
   var
     Addr: LongInt;
+    AddrRelocIndex: Integer;
   begin
   Result := FALSE;
   
-  // Optimization: (lea esi, [ebp + Addr]) + (push dword ptr [esi]) -> (push dword ptr [ebp + Addr])
-  if (PrevInstrByte(0, 0) = $8D) and (PrevInstrByte(0, 1) = $B5) then       // Previous: lea esi, [ebp + Addr]        
+  // Global variable loading
+  
+  // Optimization: (mov esi, Addr) + (mov... eax, ... ptr [esi]) -> (mov... eax, ... ptr [Addr])  ; relocatable
+  if PrevInstrByte(0, 0) = $BE then                                         // Previous: mov esi, Addr        
+    begin
+    Addr := PrevInstrDWord(0, 1);
+    AddrRelocIndex := PrevInstrRelocDWordIndex(0, 1);
+    RemovePrevInstr(0);                                                     // Remove: mov esi, Addr
+    
+    case TypeSize(DataType) of
+
+      1: if Types[DataType].Kind in UnsignedTypes then
+           begin
+           GenNew($0F); Gen($B6); Gen($05);                              // movzx eax, byte ptr ...
+           end
+         else  
+           begin
+           GenNew($0F); Gen($BE); Gen($05);                              // movsx eax, byte ptr ...
+           end; 
+           
+      2: if Types[DataType].Kind in UnsignedTypes then
+           begin
+           GenNew($0F); Gen($B7); Gen($05);                              // movzx eax, word ptr ...
+           end
+         else  
+           begin
+           GenNew($0F); Gen($BF); Gen($05);                              // movsx eax, word ptr ...
+           end;      
+         
+      4: begin
+         GenNew($A1);                                                    // mov eax, dword ptr ...
+         end
+
+    else
+      Error('Internal fault: Illegal designator size');
+    end;
+    
+    GenDWord(Addr);                                                      // ... [Addr]
+    
+    // Relocate Addr if necessary
+    if (AddrRelocIndex <> 0) and (TypeSize(DataType) <> 4) then
+      with Reloc[AddrRelocIndex] do Pos := Pos + 2;
+    
+    Result := TRUE;
+    Exit;
+    end
+
+      
+  // Local variable loading
+  
+  // Optimization: (lea esi, [ebp + Addr]) + (mov... eax, ... ptr [esi]) -> (mov... eax, ... ptr [ebp + Addr])
+  else if (PrevInstrByte(0, 0) = $8D) and (PrevInstrByte(0, 1) = $B5) then        // Previous: lea esi, [ebp + Addr]        
     begin
     Addr := PrevInstrDWord(0, 2);
-    RemovePrevInstr(0);                                                     // Remove: lea esi, [ebp + Addr]
-    GenNew($FF); Gen($B5); GenDWord(Addr);                                  // push dword ptr [ebp + Addr] 
-    Result := TRUE;
+    RemovePrevInstr(0);                                                           // Remove: lea esi, [ebp + Addr]
+    
+    case TypeSize(DataType) of
+
+      1: if Types[DataType].Kind in UnsignedTypes then
+           begin
+           GenNew($0F); Gen($B6); Gen($85);                              // movzx eax, byte ptr [ebp + ...
+           end
+         else  
+           begin
+           GenNew($0F); Gen($BE); Gen($85);                              // movsx eax, byte ptr [ebp + ...
+           end; 
+           
+      2: if Types[DataType].Kind in UnsignedTypes then
+           begin
+           GenNew($0F); Gen($B7); Gen($85);                              // movzx eax, word ptr [ebp + ...
+           end
+         else  
+           begin
+           GenNew($0F); Gen($BF); Gen($85);                              // movsx eax, word ptr [ebp + ...
+           end;      
+         
+      4: begin
+         GenNew($8B); Gen($85);                                          // mov eax, dword ptr [ebp + ...
+         end
+
+    else
+      Error('Internal fault: Illegal designator size');
     end;
+    
+    GenDWord(Addr);                                                      // ... + Addr]
+    
+    Result := TRUE;
+    Exit;
+    end;
+    
   end;
 
 
 begin // DerefPtr
 GenPopReg(ESI);                                                      // pop esi
 
-case TypeSize(DataType) of
+if not OptimizeDerefPtr then
+  case TypeSize(DataType) of
 
-  1: begin
-     if Types[DataType].Kind in UnsignedTypes then
-       begin
-       GenNew($0F); Gen($B6); Gen($06);                              // movzx eax, byte ptr [esi]
-       end
-     else  
-       begin
-       GenNew($0F); Gen($BE); Gen($06);                              // movsx eax, byte ptr [esi]
-       end;
-     GenPushReg(EAX);                                                // push eax 
-     end;
+    1: if Types[DataType].Kind in UnsignedTypes then
+         begin
+         GenNew($0F); Gen($B6); Gen($06);                              // movzx eax, byte ptr [esi]
+         end
+       else  
+         begin
+         GenNew($0F); Gen($BE); Gen($06);                              // movsx eax, byte ptr [esi]
+         end; 
+         
+    2: if Types[DataType].Kind in UnsignedTypes then
+         begin
+         GenNew($0F); Gen($B7); Gen($06);                              // movzx eax, word ptr [esi]
+         end
+       else  
+         begin
+         GenNew($0F); Gen($BF); Gen($06);                              // movsx eax, word ptr [esi]
+         end;      
        
-  2: begin
-     if Types[DataType].Kind in UnsignedTypes then
-       begin
-       GenNew($0F); Gen($B7); Gen($06);                              // movzx eax, word ptr [esi]
+    4: begin
+       GenNew($8B); Gen($06);                                          // mov eax, dword ptr [esi]
        end
-     else  
-       begin
-       GenNew($0F); Gen($BF); Gen($06);                              // movsx eax, word ptr [esi]
-       end;
-     GenPushReg(EAX);                                                // push eax 
-     end;       
-     
-  4: begin
-     // If DerefPtr immediately follows PushVarPtr, try to optimize it
-     if not OptimizeDerefPtr then           
-       begin
-       GenNew($FF); Gen($36);                                        // push dword ptr [esi]
-       end
-     end
-else
-  Error('Internal fault: Illegal designator size');
-end;
 
+  else
+    Error('Internal fault: Illegal designator size');
+  end;
+
+GenPushReg(EAX);                                                     // push eax
 end;
 
 
@@ -1316,6 +1411,8 @@ procedure GenerateAssignment{(DesignatorType: Integer)};
   var
     IsMov, IsMovPush: Boolean;
     Value: LongInt;
+    ValueRelocIndex: Integer;
+    
   begin
   Result := FALSE;
   
@@ -1323,31 +1420,36 @@ procedure GenerateAssignment{(DesignatorType: Integer)};
   IsMovPush := (PrevInstrByte(1, 0) = $B8) and (PrevInstrByte(0, 0) = $56);     // Previous: mov eax, Value, push esi
   
   if IsMov then
-    Value := PrevInstrDWord(0, 1)
+    begin
+    Value := PrevInstrDWord(0, 1);
+    ValueRelocIndex := PrevInstrRelocDWordIndex(0, 1);
+    end
   else
-    Value := PrevInstrDWord(1, 1);  
+    begin
+    Value := PrevInstrDWord(1, 1);
+    ValueRelocIndex := PrevInstrRelocDWordIndex(1, 1);
+    end;  
   
-  // Optimization: (mov eax, Value) + [(push esi) + (pop esi)] + (mov [esi], al/ax/eax) -> (mov byte/word/dword ptr [esi], Value)  ; non-relocatable
-  if (IsMov or IsMovPush) and (Value <> Reloc[NumRelocs].Value) then                               
+  // Optimization: (mov eax, Value) + [(push esi) + (pop esi)] + (mov [esi], al/ax/eax) -> (mov byte/word/dword ptr [esi], Value)
+  if (IsMov or IsMovPush) and (ValueRelocIndex = 0) then                  // Non-relocatable Value only                              
     begin  
     if IsMovPush then
-      GenPopReg(ESI);                                             // pop esi   ; destination address
+      GenPopReg(ESI);                                                     // pop esi   ; destination address
       
-    Value := PrevInstrDWord(0, 1);
-    RemovePrevInstr(0);                                           // Remove: mov eax, Value
+    RemovePrevInstr(0);                                                   // Remove: mov eax, Value
 
     if IsMov then
-      GenPopReg(ESI);                                             // pop esi   ; destination address     
+      GenPopReg(ESI);                                                     // pop esi   ; destination address     
                 
     case TypeSize(DesignatorType) of
       1: begin
-         GenNew($C6); Gen($06); Gen(Byte(Value));                 // mov byte ptr [esi], Value
+         GenNew($C6); Gen($06); Gen(Byte(Value));                         // mov byte ptr [esi], Value
          end;
       2: begin
-         GenNew($66); Gen($C7); Gen($06); GenWord(Word(Value));   // mov word ptr [esi], Value
+         GenNew($66); Gen($C7); Gen($06); GenWord(Word(Value));           // mov word ptr [esi], Value
          end;
       4: begin
-         GenNew($C7); Gen($06); GenDWord(Value);                  // mov dword ptr [esi], Value
+         GenNew($C7); Gen($06); GenDWord(Value);                          // mov dword ptr [esi], Value
          end
       else
         Error('Internal fault: Illegal designator size');
