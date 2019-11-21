@@ -547,42 +547,7 @@ procedure GenPopReg(Reg: TRegister);
     Exit;
     end
 
-    
-  // Optimization: (push dword ptr [ebp + Value]) + (pop Reg) -> (mov Reg, dword ptr [ebp + Value])
-  else if (Reg in [EAX, ECX, ESI]) and (PrevOpCode = $FF) and (PrevInstrByte(0, 1) = $B5) then   // Previous: push dword ptr [ebp + Value]
-    begin
-    Value := PrevInstrDWord(0, 2);
-    RemovePrevInstr(0);                                                       // Remove: push dword ptr [ebp + Value]
-                                   
-    GenNew($8B);                                                              // mov ...        
-    case Reg of
-      EAX: Gen($85);                                                          // ... eax, dword ptr [epb + ...
-      ECX: Gen($8D);                                                          // ... ecx, dword ptr [epb + ...
-      ESI: Gen($B5);                                                          // ... esi, dword ptr [epb + ...
-    end;  
-    GenDWord(Value);                                                          // ... Value]
-
-    Result := TRUE;
-    Exit;
-    end
-
-  
-  // Optimization: (push dword ptr [esi]) + (pop Reg) -> (mov Reg, dword ptr [esi])
-  else if (Reg in [EAX, ECX]) and (PrevOpCode = $FF) and (PrevInstrByte(0, 1) = $36) then
-    begin
-    RemovePrevInstr(0);                                                       // Remove: push dword ptr [esi]                                       
-    
-    GenNew($8B);                                                              // mov ... 
-    case Reg of
-      EAX: Gen($06);                                                          // ... eax, dword ptr [esi]
-      ECX: Gen($0E);                                                          // ... ecx, dword ptr [esi]
-    end;    
-    
-    Result := TRUE;
-    Exit;
-    end
-    
-    
+        
   // Optimization: (push esi) + (mov eax, [ebp + Value]) + (pop esi) -> (mov eax, [ebp + Value])
   else if (Reg = ESI) and (PrevInstrByte(1, 0) = $56)                                             // Previous: push esi
                       and (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $85) then        // Previous: mov eax, [ebp + Value]
