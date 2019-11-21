@@ -653,7 +653,7 @@ procedure DerefPtr{(DataType: Integer)};
 
   function OptimizeDerefPtr: Boolean;
   var
-    Addr: LongInt;
+    Addr, Offset: LongInt;
     AddrRelocIndex: Integer;
   begin
   Result := FALSE;
@@ -746,7 +746,52 @@ procedure DerefPtr{(DataType: Integer)};
     
     Result := TRUE;
     Exit;
+    end
+
+
+  // Record field loading
+  
+  // Optimization: (add esi, Offset) + (mov... eax, ... ptr [esi]) -> (mov... eax, ... ptr [esi + Offset])
+  else if (PrevInstrByte(0, 0) = $81) and (PrevInstrByte(0, 1) = $C6) then        // Previous: add esi, Offset        
+    begin
+    Offset := PrevInstrDWord(0, 2);
+    RemovePrevInstr(0);                                                           // Remove: add esi, Offset
+    
+    case TypeSize(DataType) of
+
+      1: if Types[DataType].Kind in UnsignedTypes then
+           begin
+           GenNew($0F); Gen($B6); Gen($86);                              // movzx eax, byte ptr [esi + ...
+           end
+         else  
+           begin
+           GenNew($0F); Gen($BE); Gen($86);                              // movsx eax, byte ptr [esi + ...
+           end; 
+           
+      2: if Types[DataType].Kind in UnsignedTypes then
+           begin
+           GenNew($0F); Gen($B7); Gen($86);                              // movzx eax, word ptr [esi + ...
+           end
+         else  
+           begin
+           GenNew($0F); Gen($BF); Gen($86);                              // movsx eax, word ptr [esi + ...
+           end;      
+         
+      4: begin
+         GenNew($8B); Gen($86);                                          // mov eax, dword ptr [esi + ...
+         end
+
+    else
+      Error('Internal fault: Illegal designator size');
     end;
+    
+    GenDWord(Offset);                                                   // ... + Offset]
+    
+    Result := TRUE;
+    Exit;
+    end;
+
+
     
   end;
 
