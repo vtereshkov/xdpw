@@ -2262,9 +2262,6 @@ procedure CompileStatement{(LoopNesting: Integer)};
   CompileExpression(ExpressionType, FALSE);
   GetCompatibleType(ExpressionType, Ident[CounterIndex].DataType);  
 
-  // Two instances of initial value: one for computing the number of iterations, another for assignment to the counter
-  DuplicateStackTop;
-
   if not (Tok.Kind in [TOTOK, DOWNTOTOK]) then
     CheckTok(TOTOK);
 
@@ -2275,11 +2272,8 @@ procedure CompileStatement{(LoopNesting: Integer)};
   CompileExpression(ExpressionType, FALSE);
   GetCompatibleType(ExpressionType, Ident[CounterIndex].DataType);
   
-  // Compute and save the total number of iterations
-  GenerateForNumberOfIterations(Down);
-  
-  // Assign initial value to the counter
-  GenerateForAssignment(Ident[CounterIndex].DataType);
+  // Assign initial value to the counter, compute and save the total number of iterations
+  GenerateForAssignmentAndNumberOfIterations(Ident[CounterIndex].DataType, Down);
   
   // Save return address used by GenerateForEpilog
   SaveCodePos;

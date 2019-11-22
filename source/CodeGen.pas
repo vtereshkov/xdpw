@@ -45,7 +45,7 @@ procedure GenerateUnaryOperator(op: TTokenKind; ResultType: Integer);
 procedure GenerateBinaryOperator(op: TTokenKind; ResultType: Integer);
 procedure GenerateRelation(rel: TTokenKind; ValType: Integer);
 procedure GenerateAssignment(DesignatorType: Integer);
-procedure GenerateForAssignment(DesignatorType: Integer);
+procedure GenerateForAssignmentAndNumberOfIterations(CounterType: Integer; Down: Boolean);
 procedure GenerateStructuredAssignment(DesignatorType: Integer);
 procedure InverseStack(Depth: Integer);
 procedure GenerateImportFuncStub(EntryPoint: LongInt);
@@ -70,7 +70,6 @@ procedure GenerateWhileEpilog;
 procedure GenerateRepeatCondition;
 procedure GenerateRepeatProlog;
 procedure GenerateRepeatEpilog;
-procedure GenerateForNumberOfIterations(Down: Boolean);
 procedure GenerateForCondition;
 procedure GenerateForProlog;
 procedure GenerateForEpilog(CounterType: Integer; Down: Boolean);
@@ -1472,7 +1471,6 @@ procedure GenerateAssignment{(DesignatorType: Integer)};
   
 
 begin
-// ECX should be preserved
 GenPopReg(EAX);                                                              // pop eax   ; source value
   
 if not OptimizeGenerateAssignment then
@@ -1499,12 +1497,42 @@ end;
 
 
 
-procedure GenerateForAssignment{(DesignatorType: Integer)};
+procedure GenerateForAssignmentAndNumberOfIterations{(CounterType: Integer; Down: Boolean)};
 begin
-GenPopReg(ECX);                                                         // pop ecx  ; save final counter value
-GenerateAssignment(DesignatorType);
-GenPushReg(ECX);                                                        // push ecx  ; restore final counter value
+GenPopReg(EAX);                                                 // pop eax       ; final value
+GenPopReg(ECX);                                                 // pop ecx       ; initial value
+GenPopReg(ESI);                                                 // pop esi       ; counter address
+                                                          
+case TypeSize(CounterType) of
+  1: begin
+     GenNew($88); Gen($0E);                                     // mov [esi], cl
+     end;
+  2: begin
+     GenNew($66); Gen($89); Gen($0E);                           // mov [esi], cx
+     end;
+  4: begin
+     GenNew($89); Gen($0E);                                     // mov [esi], ecx
+     end
+else
+  Error('Internal fault: Illegal designator size');
+end; // case
+
+// Number of iterations
+if Down then
+  begin
+  GenNew($29); Gen($C1);                                        // sub ecx, eax
+  GenNew($41);                                                  // inc ecx
+  GenPushReg(ECX);                                              // push ecx  
+  end
+else
+  begin
+  GenNew($2B); Gen($C1);                                        // sub eax, ecx
+  GenNew($40);                                                  // inc eax
+  GenPushReg(EAX);                                              // push eax  
+  end;  
+ 
 end;
+
 
 
 
@@ -1830,27 +1858,6 @@ begin
 ReturnPos := RestoreCodePos;
 CurPos := GetCodeSize;
 GenNew($E9); GenDWord(ReturnPos - (CurPos + 5));               // jmp ReturnPos
-end;
-
-
-
-
-procedure GenerateForNumberOfIterations{(Down: Boolean)};
-begin
-if Down then
-  begin
-  GenPopReg(ECX);                                                 // pop ecx       ; final value
-  GenPopReg(EAX);                                                 // pop eax       ; initial value  
-  end
-else
-  begin  
-  GenPopReg(EAX);                                                 // pop eax       ; final value
-  GenPopReg(ECX);                                                 // pop ecx       ; initial value
-  end;    
-  
-GenNew($2B); Gen($C1);                                               // sub eax, ecx
-GenNew($40);                                                         // inc eax
-GenPushReg(EAX);                                                  // push eax  
 end;
 
 
