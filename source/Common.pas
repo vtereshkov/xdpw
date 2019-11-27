@@ -213,6 +213,14 @@ type
     LNFUNC,
     SQRTFUNC
     );
+    
+  TSignature = record
+    NumParams: Integer;
+    NumDefaultParams: Integer;
+    Param: PParams;
+    ResultType: Integer;
+    IsStdCall: Boolean;
+  end;      
 
   TIdentifier = record
     Kind: TIdentKind;
@@ -224,14 +232,11 @@ type
     Scope: TScope;
     RelocType: TRelocType;
     PassMethod: TPassMethod;              // Value, CONST or VAR parameter status
-    NumParams: Integer;
-    NumDefaultParams: Integer;
-    Param: PParams;
+    Signature: TSignature;
     ResultIdentIndex: Integer;
     ProcAsBlock: Integer;
     PredefProc: TPredefProc;
     IsUnresolvedForward: Boolean;
-    IsStdCall: Boolean;
     IsExported: Boolean;
     ForLoopNesting: Integer;              // Number of nested FOR loops where the label is defined
   case DataType: Integer of
@@ -258,11 +263,7 @@ type
     RECORDTYPE:      (NumFields: Integer;
                       Field: array [1..MAXFIELDS] of ^TField);
                       
-    PROCEDURALTYPE:  (NumParams: Integer;
-                      NumDefaultParams: Integer;
-                      Param: PParams;
-                      ResultType: Integer;
-                      IsStdCall: Boolean);
+    PROCEDURALTYPE:  (Signature: TSignature);
   
     FORWARDTYPE:     (TypeIdentName: TString);   
   end;
@@ -451,15 +452,15 @@ begin
 // Dispose of dynamically allocated parameter data
 for i := 1 to NumIdent do
   if (Ident[i].Kind = PROC) or (Ident[i].Kind = FUNC) then
-    for j := 1 to Ident[i].NumParams do
-      Dispose(Ident[i].Param[j]);
+    for j := 1 to Ident[i].Signature.NumParams do
+      Dispose(Ident[i].Signature.Param[j]);
 
 // Dispose of dynamically allocated parameter and field data
 for i := 1 to NumTypes do
   begin
   if Types[i].Kind = PROCEDURALTYPE then
-    for j := 1 to Types[i].NumParams do
-      Dispose(Types[i].Param[j]);
+    for j := 1 to Types[i].Signature.NumParams do
+      Dispose(Types[i].Signature.Param[j]);
   
   if Types[i].Kind = RECORDTYPE then
     for j := 1 to Types[i].NumFields do
