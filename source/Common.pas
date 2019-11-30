@@ -131,7 +131,7 @@ type
   end;
   
   TTypeKind = (EMPTYTYPE, ANYTYPE, INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE, CHARTYPE, BOOLEANTYPE, REALTYPE,
-               POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, PROCEDURALTYPE, FORWARDTYPE);  
+               POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, PROCEDURALTYPE, METHODTYPE, FORWARDTYPE);  
 
 
 
@@ -227,8 +227,9 @@ type
     Name: TString;
     UnitIndex: Integer;
     Block: Integer;                       // Index of a block in which the identifier is defined
-    NestingLevel: Byte;    
-    RecType: Integer;                     // Parent record type code for a field
+    NestingLevel: Byte;
+    ReceiverName: TString;                // Receiver variable name for a method    
+    ReceiverType: Integer;                // Receiver type for a method
     Scope: TScope;
     RelocType: TRelocType;
     PassMethod: TPassMethod;              // Value, CONST or VAR parameter status
@@ -264,6 +265,8 @@ type
                       Field: array [1..MAXFIELDS] of ^TField);
                       
     PROCEDURALTYPE:  (Signature: TSignature);
+    
+    METHODTYPE:      (MethodIdentIndex: Integer);
   
     FORWARDTYPE:     (TypeIdentName: TString);   
   end;
@@ -327,12 +330,14 @@ function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
 procedure CheckOperator(const Tok: TToken; DataType: Integer); 
 function GetKeyword(const KeywordName: TString): TTokenKind;
 function GetUnit(const UnitName: TString): Integer;
-function GetIdentUnsafe(const IdentName: TString; AllowForwardReference: Boolean = FALSE): Integer;
-function GetIdent(const IdentName: TString; AllowForwardReference: Boolean = FALSE): Integer;
+function GetIdentUnsafe(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer;
+function GetIdent(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer;
 function GetFieldUnsafe(RecType: Integer; const FieldName: TString): Integer;
 function GetField(RecType: Integer; const FieldName: TString): Integer;
 function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer;
 function FieldInsideWithFound(const FieldName: TString): Boolean;
+function GetMethodUnsafe(RecType: Integer; const MethodName: TString): Integer;
+function GetMethod(RecType: Integer; const MethodName: TString): Integer;
 
 
 
@@ -815,7 +820,7 @@ end;
 
 
 
-function GetIdentUnsafe{(const IdentName: TString; AllowForwardReference: Boolean = FALSE): Integer};
+function GetIdentUnsafe{(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer};
 var
   IdentIndex, BlockStackIndex: Integer;
 begin
@@ -824,7 +829,8 @@ for BlockStackIndex := BlockStackTop downto 1 do
   for IdentIndex := NumIdent downto 1 do
     with Ident[IdentIndex] do
       if (Name = IdentName) and (UnitIndex = NumUnits) and (Block = BlockStack[BlockStackIndex].Index) and       
-         (AllowForwardReference or (Kind <> USERTYPE) or (Types[DataType].Kind <> FORWARDTYPE))
+         (AllowForwardReference or (Kind <> USERTYPE) or (Types[DataType].Kind <> FORWARDTYPE)) and
+         (ReceiverType = RecType)  // Receiver type for methods, 0 otherwise
       then 
         begin
         Result := IdentIndex;
@@ -834,7 +840,9 @@ for BlockStackIndex := BlockStackTop downto 1 do
 // If unsuccessful, search other used units
 for IdentIndex := NumIdent downto 1 do
   with Ident[IdentIndex] do  
-    if (Name = IdentName) and (UnitIndex <> NumUnits) and IsExported and Units[UnitIndex].IsUsed then 
+    if (Name = IdentName) and (UnitIndex <> NumUnits) and IsExported and Units[UnitIndex].IsUsed and
+       (ReceiverType = RecType)  // Receiver type for methods, 0 otherwise
+    then 
       begin
       Result := IdentIndex;
       Exit;
@@ -846,9 +854,9 @@ end;
 
 
 
-function GetIdent{(const IdentName: TString; AllowForwardReference: Boolean = FALSE): Integer};
+function GetIdent{(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer};
 begin
-Result := GetIdentUnsafe(IdentName, AllowForwardReference);
+Result := GetIdentUnsafe(IdentName, AllowForwardReference, RecType);
 if Result = 0 then
   Error('Unknown identifier ' + IdentName);
 end;
@@ -912,6 +920,22 @@ var
   RecType: Integer;        
 begin
 Result := GetFieldInsideWith(RecPointer, RecType, FieldName) <> 0;
+end;
+
+
+
+
+function GetMethodUnsafe{(RecType: Integer; const MethodName: TString): Integer};
+begin
+Result := GetIdentUnsafe(MethodName, FALSE, RecType);
+end;
+
+
+
+
+function GetMethod{(RecType: Integer; const MethodName: TString): Integer};
+begin
+Result := GetIdent(MethodName, FALSE, RecType);
 end;
 
 

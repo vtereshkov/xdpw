@@ -30,6 +30,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 #### Enhancements
 * The target operating system is Windows
 * The compiler is self-hosting
+* Methods (Go style) are supported
 * Functions can return arrays, records or sets (Delphi style)
 * Functions can be called as procedures (Delphi style)
 * Parameters can have default values (Delphi style)
@@ -86,8 +87,11 @@ TypeDeclarations = "type" Ident "=" Type ";" {Ident "=" Type ";"} .
 
 VarDeclarations = "var" IdentList ":" Type ";" {IdentList ":" Type ";"} .
 
-ProcFuncDeclarations = ("procedure" | "function") Ident [FormalParams] [":" TypeIdent] 
+ProcFuncDeclarations = ("procedure" | "function") Ident 
+                       [Receiver] [FormalParams] [":" TypeIdent] 
                        ["stdcall"] ";" [(Directive | Block) ";"] .
+
+Receiver = "for" Ident ":" TypeIdent .
 
 Directive = "forward" | ("external" StringLiteral "name" StringLiteral) .         
 
@@ -118,7 +122,9 @@ Fields = IdentList ":" Type {";" IdentList ":" Type} .
        
 TypeIdent = "string" | "file" | Ident .       
 
-Designator = Ident {"^" | ("[" Expression {"," Expression} "]") | ("." Ident)} .
+Designator = Ident {"^" | 
+                    "[" Expression {"," Expression} "]" | 
+                    "." Ident [ActualParams] | .
 
 Statement = [Label ":"] [ (Designator | Ident) ":=" Expression | 
                           (Designator | Ident) [ActualParams] |

@@ -64,6 +64,7 @@ with Ident[NumIdent] do
   UnitIndex           := NumUnits;
   Block               := BlockStack[BlockStackTop].Index;
   NestingLevel        := BlockStackTop;
+  ReceiverType        := 0;
   Signature.NumParams := 0;
   Signature.IsStdCall := FALSE;
   PassMethod          := IdentPassMethod;
@@ -1327,12 +1328,36 @@ end; // CompileCall
 
 
 
+procedure CompileMethodCall(ProcVarType: Integer; FunctionOnly: Boolean);
+var
+  MethodIndex: Integer;
+begin
+if Types[ProcVarType].Kind <> METHODTYPE then 
+  Error('Method expected');
+  
+MethodIndex := Types[ProcVarType].MethodIdentIndex;  
+
+if FunctionOnly and (Ident[MethodIndex].Signature.ResultType = 0) then
+  Error('Function method expected');
+ 
+// Self pointer has already been passed as the first (hidden) argument
+CompileActualParameters(Ident[MethodIndex].Signature);
+
+GenerateCall(Ident[MethodIndex].Value, BlockStackTop - 1, Ident[MethodIndex].NestingLevel);
+end; // CompileMethodCall
+
+
+
+
 procedure CompileIndirectCall(ProcVarType: Integer; FunctionOnly: Boolean);
 var
   TotalNumParams: Integer;
 begin
-if (Types[ProcVarType].Kind <> PROCEDURALTYPE) or (FunctionOnly and (Types[ProcVarType].Signature.ResultType = 0)) then 
-  Error('Appropriate procedural variable expected'); 
+if Types[ProcVarType].Kind <> PROCEDURALTYPE then 
+  Error('Procedural variable expected');
+
+if FunctionOnly and (Types[ProcVarType].Signature.ResultType = 0) then
+  Error('Functional variable expected'); 
 
 DerefPtr(ProcVarType);
 
@@ -1397,7 +1422,7 @@ end; // ConvertCharToString
 
 procedure CompileDesignator{(var ValType: Integer; ForceCharToString: Boolean)};
 var
-  IdentIndex, FieldIndex: Integer;
+  IdentIndex, FieldIndex, MethodIndex: Integer;
   ArrayIndexType: Integer;  
   IsRefParam: Boolean;
   
@@ -1464,16 +1489,49 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK] do
       EatTok(CBRACKETTOK);
       end;
       
-    PERIODTOK:                                        // Record field access
+    PERIODTOK:                                        // Method call or record field access
       begin
-      if Types[ValType].Kind <> RECORDTYPE then
-        Error('Record expected');
       NextTok;
       AssertIdent;
-      FieldIndex := GetField(ValType, Tok.Name);
-      GetFieldPtr(ValType, FieldIndex);
-      ValType := Types[ValType].Field[FieldIndex]^.DataType;
-      NextTok;   
+      
+      // First search for a method
+      MethodIndex := GetMethodUnsafe(ValType, Tok.Name); 
+      if MethodIndex <> 0 then
+        begin
+        // Add new anonymous 'method' type
+        Inc(NumTypes);
+        if NumTypes > MAXTYPES then
+          Error('Maximum number of types exceeded');    
+        
+        Types[NumTypes].Kind := METHODTYPE;
+        Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
+        Types[NumTypes].MethodIdentIndex := MethodIndex;
+       
+        ValType := NumTypes;
+        NextTok;
+        
+        // Try chaining method calls
+        if Types[Ident[MethodIndex].Signature.ResultType].Kind in StructuredTypes then
+          begin
+          CompileMethodCall(ValType, TRUE);
+          RestoreStackTopFromEAX;
+          ValType := Ident[MethodIndex].Signature.ResultType;
+          end
+        end  
+      // If unsuccessful, search for a record field  
+      else
+        begin          
+        if Types[ValType].Kind <> RECORDTYPE then
+          Error('Record expected');
+        
+        FieldIndex := GetField(ValType, Tok.Name);
+        GetFieldPtr(ValType, FieldIndex);
+        
+        ValType := Types[ValType].Field[FieldIndex]^.DataType;
+        
+        NextTok;
+        end;
+         
       end;
     
   end; // case
@@ -1559,12 +1617,20 @@ procedure CompileFactor(var ValType: Integer; ForceCharToString: Boolean);
 
   procedure CompileDereferenceOrCall(var ValType: Integer);
   begin
-  if Tok.Kind = OPARTOK then                     // Procedural variable call - parentheses required even for empty parameter list
+  if Types[ValType].Kind = METHODTYPE then       // Method call
+    begin
+    CompileMethodCall(ValType, TRUE);
+    RestoreStackTopFromEAX;
+    ValType := Ident[Types[ValType].MethodIdentIndex].Signature.ResultType;
+    end
+ 
+  else if Tok.Kind = OPARTOK then                // Procedural variable call - parentheses required even for empty parameter list
     begin
     CompileIndirectCall(ValType, TRUE);
-    RestoreStackTopFromEAX;
-    ValType := Types[ValType].Signature.ResultType;
-    end       
+    RestoreStackTopFromEAX;    
+    ValType := Types[ValType].Signature.ResultType;          
+    end
+       
   else                                           // Usual variable
     if not (Types[ValType].Kind in StructuredTypes) then // Factors of type 'array', 'record', 'set' should contain a pointer to them
       DerefPtr(ValType);
@@ -2075,9 +2141,13 @@ procedure CompileStatement{(LoopNesting: Integer)};
   
   
   procedure CompileAssignmentOrCall(DesignatorType: Integer);
-  begin 
-  if Tok.Kind = ASSIGNTOK then                                    // Assignment
+  begin
+  if Types[DesignatorType].Kind = METHODTYPE then                 // Method call
+    CompileMethodCall(DesignatorType, FALSE)
+ 
+  else if Tok.Kind = ASSIGNTOK then                               // Assignment
     CompileAssignment(DesignatorType)
+    
   else                                                            // Procedural variable call                                                              
     begin
     CheckTok(OPARTOK);                                            // Parentheses required even for empty parameter list         
@@ -2848,6 +2918,7 @@ procedure CompileType{(var DataType: Integer)};
   
   Types[NumTypes].Kind := PROCEDURALTYPE;
   Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
+  Types[NumTypes].MethodIdentIndex := 0;
   DataType := NumTypes;
   
   NextTok;
@@ -3283,14 +3354,45 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     
   
   var
-    ForwardIdentIndex: Integer;
-
+    ForwardIdentIndex, FieldIndex, MethodIndex: Integer;
+    ReceiverType: Integer;
+    ProcName, ReceiverName: TString;
+    
     
   begin // CompileProcFuncDeclarations   
   AssertIdent;
+  ProcName := Tok.Name;
+  NextTok;
+  
+  // Check for method declaration
+  ReceiverType := 0;
+  if Tok.Kind = FORTOK then
+    begin
+    NextTok;
+    AssertIdent;
+    ReceiverName := Tok.Name;
+
+    NextTok;
+    EatTok(COLONTOK);
+    CompileTypeIdent(ReceiverType, FALSE);
+    
+    if BlockStack[BlockStackTop].Index <> 1 then
+      Error('Methods cannot be nested');
+
+    if Types[ReceiverType].Kind = RECORDTYPE then
+      begin
+      FieldIndex := GetFieldUnsafe(ReceiverType, ProcName);
+      if FieldIndex <> 0 then
+        Error('Duplicate field');
+      end;  
+
+    MethodIndex := GetMethodUnsafe(ReceiverType, ProcName);
+    if MethodIndex <> 0 then
+      Error('Duplicate method');    
+    end;  
 
   // Check for forward declaration resolution
-  ForwardIdentIndex := GetIdentUnsafe(Tok.Name);
+  ForwardIdentIndex := GetIdentUnsafe(ProcName);
   if ForwardIdentIndex <> 0 then
     if not Ident[ForwardIdentIndex].IsUnresolvedForward or
        (Ident[ForwardIdentIndex].Block <> BlockStack[BlockStackTop].Index) or
@@ -3302,20 +3404,25 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     begin
     
     if IsFunction then
-      DeclareIdent(Tok.Name, FUNC, 0, 0, VALPASSING, 0, 0.0, EMPTYPROC)
+      DeclareIdent(ProcName, FUNC, 0, 0, VALPASSING, 0, 0.0, EMPTYPROC)
     else
-      DeclareIdent(Tok.Name, PROC, 0, 0, VALPASSING, 0, 0.0, EMPTYPROC);
+      DeclareIdent(ProcName, PROC, 0, 0, VALPASSING, 0, 0.0, EMPTYPROC);
+      
+    // Specify method receiver name and type
+    if ReceiverType <> 0 then
+      begin
+      Ident[NumIdent].ReceiverName := ReceiverName;
+      Ident[NumIdent].ReceiverType := ReceiverType;
+      end;  
 
-    NextTok;
+    CompileFormalParametersAndResult(IsFunction, Ident[NumIdent].Signature);
 
-    CompileFormalParametersAndResult(IsFunction, Ident[NumIdent].Signature); 
-    end// if ForwardIdentIndex = 0
-  else
-    NextTok;
-    
+    if (ReceiverType <> 0) and Ident[NumIdent].Signature.IsStdCall then
+      Error('STDCALL is not allowed for methods');
+ 
+    end; // if ForwardIdentIndex = 0  
 
-  EatTok(SEMICOLONTOK);
-  
+  EatTok(SEMICOLONTOK);  
   
   // Procedure/function body, if any
   if ForwardIdentIndex <> 0 then                                      // Forward declaration resolution
@@ -3359,9 +3466,19 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     begin
     // Declare parameters like local variables
     TotalNumParams := Ident[BlockIdentIndex].Signature.NumParams;
-    if (Ident[BlockIdentIndex].Kind = FUNC) and (Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes) then
-      Inc(TotalNumParams);                          // Allocate space for structured Result as a hidden VAR parameter
     
+    // Allocate space for structured Result as a hidden VAR parameter  
+    if (Ident[BlockIdentIndex].Kind = FUNC) and (Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes) then
+      Inc(TotalNumParams);    
+    
+    // Allocate Self as a first (hidden) VAR parameter if the current block is a method
+    if Ident[BlockIdentIndex].ReceiverType <> 0 then
+      begin
+      Inc(TotalNumParams);
+      DeclareIdent(Ident[BlockIdentIndex].ReceiverName, VARIABLE, TotalNumParams, Ident[BlockIdentIndex].ReceiverType, VARPASSING, 0, 0.0, EMPTYPROC);
+      end;
+    
+    // Allocate other parameters
     for ParamIndex := 1 to Ident[BlockIdentIndex].Signature.NumParams do
       begin
       if Ident[BlockIdentIndex].Signature.IsStdCall then
@@ -3593,6 +3710,10 @@ else
   if BlockStack[BlockStackTop].Index <> 1 then         
     begin
     TotalNumParams := Ident[BlockIdentIndex].Signature.NumParams;
+    
+    if Ident[BlockIdentIndex].ReceiverType <> 0 then
+      Inc(TotalNumParams);                            // Deallocate space allocated for Self as a hidden VAR parameter
+    
     if (Ident[BlockIdentIndex].Kind = FUNC) and (Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes) then
       Inc(TotalNumParams);                            // Deallocate space allocated for structured Result as a hidden VAR parameter
       
