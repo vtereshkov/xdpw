@@ -1357,13 +1357,24 @@ if Types[ProcVarType].Kind <> PROCEDURALTYPE then
   Error('Procedural variable expected');
 
 if FunctionOnly and (Types[ProcVarType].Signature.ResultType = 0) then
-  Error('Functional variable expected'); 
+  Error('Functional variable expected');
 
-DerefPtr(ProcVarType);
+TotalNumParams := Types[ProcVarType].Signature.NumParams;
+
+if Types[ProcVarType].SelfPointerOffset <> 0 then   // Interface method found
+  begin
+  if Types[ProcVarType].Signature.IsStdCall then
+    Error('STDCALL is not allowed for methods');
+  
+  // Push Self pointer as a first (hidden) VAR parameter
+  Inc(TotalNumParams);
+  DuplicateStackTop;
+  GetFieldPtr(Types[ProcVarType].SelfPointerOffset);
+  DerefPtr(POINTERTYPEINDEX);
+  end;   
 
 CompileActualParameters(Types[ProcVarType].Signature);
 
-TotalNumParams := Types[ProcVarType].Signature.NumParams;
 if Types[Types[ProcVarType].Signature.ResultType].Kind in StructuredTypes then
   Inc(TotalNumParams);  //   Allocate space for structured Result as a hidden VAR parameter
 
@@ -1391,7 +1402,7 @@ if FieldIndex <> 0 then
   PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
   DerefPtr(POINTERTYPEINDEX);
   
-  GetFieldPtr(RecType, FieldIndex);
+  GetFieldPtr(Types[RecType].Field[FieldIndex]^.Offset);
   ValType := Types[RecType].Field[FieldIndex]^.DataType;    
   end;
 end; // CompileFieldInsideWith
@@ -1423,7 +1434,8 @@ end; // ConvertCharToString
 procedure CompileDesignator{(var ValType: Integer; ForceCharToString: Boolean)};
 var
   IdentIndex, FieldIndex, MethodIndex: Integer;
-  ArrayIndexType: Integer;  
+  ArrayIndexType: Integer;
+  Field: PField;  
   IsRefParam: Boolean;
   
 begin
@@ -1521,13 +1533,20 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK] do
       // If unsuccessful, search for a record field  
       else
         begin          
-        if Types[ValType].Kind <> RECORDTYPE then
-          Error('Record expected');
+        if not (Types[ValType].Kind in [RECORDTYPE, INTERFACETYPE]) then
+          Error('Record or interface expected');
         
         FieldIndex := GetField(ValType, Tok.Name);
-        GetFieldPtr(ValType, FieldIndex);
+        Field := Types[ValType].Field[FieldIndex];        
+        GetFieldPtr(Field^.Offset);
         
-        ValType := Types[ValType].Field[FieldIndex]^.DataType;
+        // For interfaces, save Self pointer offset from the procedural variable
+        if (Types[ValType].Kind = INTERFACETYPE) and (Types[Field^.DataType].Kind = PROCEDURALTYPE) then
+          Types[Field^.DataType].SelfPointerOffset := -Types[ValType].Field[FieldIndex]^.Offset
+        else
+          Types[Field^.DataType].SelfPointerOffset := 0;  
+        
+        ValType := Field^.DataType;
         
         NextTok;
         end;
@@ -1612,6 +1631,30 @@ end; // CompileSetConstructor
 
 
 
+procedure CompileConcreteTypeToInterfaceTypeConversion(ConcreteType, InterfType: Integer);
+var
+  TempStorageAddr: LongInt;
+  FieldIndex, MethodIndex: Integer;
+begin
+// Allocate new interface variable
+TempStorageAddr := AllocateTempStorage(TypeSize(InterfType));
+
+// Set interface's Self pointer (offset 0) to the concrete data
+GenerateInterfaceFieldAssignment(TempStorageAddr, TRUE, 0, UNINITDATARELOC);
+
+// Set interface's procedure pointers to the concrete methods
+for FieldIndex := 2 to Types[InterfType].NumFields do
+  begin
+  MethodIndex := GetMethod(ConcreteType, Types[InterfType].Field[FieldIndex]^.Name);
+  GenerateInterfaceFieldAssignment(TempStorageAddr + (FieldIndex - 1) * SizeOf(Pointer), FALSE, Ident[MethodIndex].Value, CODERELOC);
+  end; // for  
+
+PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+end; // CompileConcreteTypeToInterfaceTypeConversion
+
+
+
+
 procedure CompileFactor(var ValType: Integer; ForceCharToString: Boolean);
 
 
@@ -1690,15 +1733,27 @@ case Tok.Kind of
         USERTYPE:                                                                       // Type cast
           begin                                                                      
           NextTok;
-          EatTok(OPARTOK);
-          CompileExpression(ValType, FALSE);
-          EatTok(CPARTOK);
+          
+          if Types[Ident[IdentIndex].DataType].Kind = INTERFACETYPE then    // Special case: concrete type to interface type
+            begin
+            EatTok(OPARTOK);
+            CompileDesignator(ValType, ForceCharToString);
+            EatTok(CPARTOK);
+            
+            CompileConcreteTypeToInterfaceTypeConversion(ValType, Ident[IdentIndex].DataType);                        
+            end
+          else                                                              // General rule
+            begin  
+            EatTok(OPARTOK);
+            CompileExpression(ValType, FALSE);
+            EatTok(CPARTOK);
 
-          if not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and 
-                  (Types[ValType].Kind in CastableTypes)) then
-            Error('Invalid typecast');
-
-          ValType := Ident[IdentIndex].DataType;
+            if not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and 
+                    (Types[ValType].Kind in CastableTypes)) then
+              Error('Invalid typecast');            
+            end;
+          
+          ValType := Ident[IdentIndex].DataType;  
           end
           
       else
@@ -2675,7 +2730,7 @@ procedure CompileType{(var DataType: Integer)};
   
   
   
-  procedure CompileRecordType(var DataType: Integer);
+  procedure CompileRecordOrInterfaceType(var DataType: Integer; IsInterfaceType: Boolean);
   
 
     procedure DeclareField(const FieldName: TString; RecType, FieldType: Integer; var NextFieldOffset: Integer);
@@ -2709,6 +2764,11 @@ procedure CompileType{(var DataType: Integer)};
       FieldType: Integer;
       
     begin
+    // Declare hidden Self pointer for interfaces
+    if IsInterfaceType then
+      DeclareField('SELF', DataType, POINTERTYPEINDEX, NextFieldOffset);
+      
+    // Declare other fields
     while not (Tok.Kind in [CASETOK, ENDTOK, CPARTOK]) do
       begin
       NumFieldsInList := 0;
@@ -2728,6 +2788,9 @@ procedure CompileType{(var DataType: Integer)};
       EatTok(COLONTOK);
 
       CompileType(FieldType);
+      
+      if IsInterfaceType and (Types[FieldType].Kind <> PROCEDURALTYPE) then
+        Error('Non-procedural fields are not allowed in interfaces');      
 
       for FieldInListIndex := 1 to NumFieldsInList do
         DeclareField(FieldInListName[FieldInListIndex], DataType, FieldType, NextFieldOffset);
@@ -2747,7 +2810,7 @@ procedure CompileType{(var DataType: Integer)};
     NextFieldOffset, VariantStartOffset: Integer;
     
   
-  begin // CompileRecordType
+  begin // CompileRecordOrInterfaceType
   NextFieldOffset := 0;
   
   // Add new anonymous type
@@ -2755,7 +2818,11 @@ procedure CompileType{(var DataType: Integer)};
   if NumTypes > MAXTYPES then
     Error('Maximum number of types exceeded');  
   
-  Types[NumTypes].Kind := RECORDTYPE;
+  if IsInterfaceType then
+    Types[NumTypes].Kind := INTERFACETYPE
+  else
+    Types[NumTypes].Kind := RECORDTYPE;
+  
   Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
   Types[NumTypes].NumFields := 0;
   DataType := NumTypes;
@@ -2766,7 +2833,7 @@ procedure CompileType{(var DataType: Integer)};
   CompileFields(DataType, NextFieldOffset);
   
   // Variant fields
-  if Tok.Kind = CASETOK then
+  if (Tok.Kind = CASETOK) and not IsInterfaceType then
     begin   
     NextTok;
     
@@ -2808,7 +2875,7 @@ procedure CompileType{(var DataType: Integer)};
     end; // if
     
   EatTok(ENDTOK);
-  end; // CompileRecordType
+  end; // CompileRecordOrInterfaceType
 
 
 
@@ -2953,8 +3020,8 @@ case Tok.Kind of
   ARRAYTOK:       
     CompileArrayType(DataType); 
  
-  RECORDTOK:      
-    CompileRecordType(DataType);
+  RECORDTOK, INTERFACETOK:      
+    CompileRecordOrInterfaceType(DataType, Tok.Kind = INTERFACETOK);
     
   SETTOK:      
     CompileSetType(DataType); 
@@ -3609,7 +3676,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
         Dispose(Types[NumTypes].Signature.Param[ParamIndex]); 
     
     // If record, delete fields first
-    if Types[NumTypes].Kind = RECORDTYPE then
+    if Types[NumTypes].Kind in [RECORDTYPE, INTERFACETYPE] then
       for FieldIndex := 1 to Types[NumTypes].NumFields do
         Dispose(Types[NumTypes].Field[FieldIndex]);
 

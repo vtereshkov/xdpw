@@ -30,7 +30,7 @@ procedure Relocate(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr, Import
 procedure PushVarPtr(Addr: Integer; Scope: TScope; DeltaNesting: Byte; RelocType: TRelocType);
 procedure DerefPtr(DataType: Integer);
 procedure GetArrayElementPtr(ArrType: Integer);
-procedure GetFieldPtr(RecType: Integer; FieldIndex: Integer);
+procedure GetFieldPtr(Offset: Integer);
 procedure GetCharAsTempString;
 procedure SaveStackTopToEAX;
 procedure RestoreStackTopFromEAX;
@@ -47,6 +47,7 @@ procedure GenerateRelation(rel: TTokenKind; ValType: Integer);
 procedure GenerateAssignment(DesignatorType: Integer);
 procedure GenerateForAssignmentAndNumberOfIterations(CounterType: Integer; Down: Boolean);
 procedure GenerateStructuredAssignment(DesignatorType: Integer);
+procedure GenerateInterfaceFieldAssignment(Offset: Integer; PopValueFromStack: Boolean; Value: LongInt; RelocType: TRelocType);
 procedure InverseStack(Depth: Integer);
 procedure GenerateImportFuncStub(EntryPoint: LongInt);
 procedure GenerateCall(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer);
@@ -939,9 +940,7 @@ end;
 
 
 
-procedure GetFieldPtr{(RecType: Integer; FieldIndex: Integer)};
-var
-  Offset: Integer;
+procedure GetFieldPtr{(Offset: Integer)};
   
 
   function OptimizeGetFieldPtr: Boolean;
@@ -973,9 +972,7 @@ var
 
 
 begin // GetFieldPtr
-Offset := Types[RecType].Field[FieldIndex]^.Offset;
-
-if Offset > 0 then
+if Offset <> 0 then
   begin
   GenPopReg(ESI);                                                 // pop esi
   
@@ -1551,6 +1548,22 @@ end;
 
 
 
+procedure GenerateInterfaceFieldAssignment{(Offset: Integer; PopValueFromStack: Boolean; Value: LongInt; RelocType: TRelocType)};
+begin
+if PopValueFromStack then
+  begin
+  GenPopReg(ESI);                                                               // pop esi
+  GenNew($89); Gen($B5); GenDWord(Offset);                                      // mov dword ptr [ebp + Offset], esi
+  end
+else
+  begin
+  GenNew($C7); Gen($85); GenDWord(Offset); GenRelocDWord(Value, RelocType);     // mov dword ptr [ebp + Offset], Value
+  end;  
+end;
+
+
+
+
 procedure InverseStack{(Depth: Integer)};
 var
   i: Integer;
@@ -1610,7 +1623,8 @@ end;
 
 procedure GenerateIndirectCall{(NumParam: Integer)};
 begin
-GenNew($FF); Gen($94); Gen($24); GenDWord(SizeOf(LongInt) * NumParam);       // call dword ptr [esp + 4 * NumParam]
+GenNew($8B); Gen($B4); Gen($24); GenDWord(SizeOf(LongInt) * NumParam);       // mov esi, dword ptr [esp + 4 * NumParam]
+GenNew($FF); Gen($16);                                                       // call [esi]
 GenPopReg(ECX);                                                              // pop ecx  ; pop and discard call address
 end;
 

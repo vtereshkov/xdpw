@@ -131,7 +131,8 @@ type
   end;
   
   TTypeKind = (EMPTYTYPE, ANYTYPE, INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE, CHARTYPE, BOOLEANTYPE, REALTYPE,
-               POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, PROCEDURALTYPE, METHODTYPE, FORWARDTYPE);  
+               POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, INTERFACETYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, 
+               PROCEDURALTYPE, METHODTYPE, FORWARDTYPE);  
 
 
 
@@ -249,26 +250,29 @@ type
     Name: TString;
     DataType: Integer;
     Offset: Integer;
-  end;    
+  end;
+
+  PField = ^TField;    
 
   TType = record    
     Block: Integer;
     BaseType: Integer;
     
   case Kind: TTypeKind of     
-    SUBRANGETYPE:    (Low, High: Integer);
+    SUBRANGETYPE:              (Low, High: Integer);
   
-    ARRAYTYPE:       (IndexType: Integer;
-                      IsOpenArray: Boolean);
+    ARRAYTYPE:                 (IndexType: Integer;
+                                IsOpenArray: Boolean);
                       
-    RECORDTYPE:      (NumFields: Integer;
-                      Field: array [1..MAXFIELDS] of ^TField);
+    RECORDTYPE, INTERFACETYPE: (NumFields: Integer;
+                                Field: array [1..MAXFIELDS] of PField);
                       
-    PROCEDURALTYPE:  (Signature: TSignature);
+    PROCEDURALTYPE:            (Signature: TSignature;
+                                SelfPointerOffset: LongInt);  // For interface method variables as temporary results
     
-    METHODTYPE:      (MethodIdentIndex: Integer);
+    METHODTYPE:                (MethodIdentIndex: Integer);   // For static methods as temporary results
   
-    FORWARDTYPE:     (TypeIdentName: TString);   
+    FORWARDTYPE:               (TypeIdentName: TString);   
   end;
   
   TBlock = record
@@ -416,7 +420,7 @@ IntegerTypes     := [INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE
 OrdinalTypes     := IntegerTypes + [CHARTYPE, BOOLEANTYPE, SUBRANGETYPE, ENUMERATEDTYPE];
 UnsignedTypes    := [WORDTYPE, BYTETYPE, CHARTYPE];
 NumericTypes     := IntegerTypes + [REALTYPE];
-StructuredTypes  := [ARRAYTYPE, RECORDTYPE, SETTYPE, FILETYPE];
+StructuredTypes  := [ARRAYTYPE, RECORDTYPE, INTERFACETYPE, SETTYPE, FILETYPE];
 CastableTypes    := OrdinalTypes + [POINTERTYPE, PROCEDURALTYPE];
 end; 
 
@@ -467,7 +471,7 @@ for i := 1 to NumTypes do
     for j := 1 to Types[i].Signature.NumParams do
       Dispose(Types[i].Signature.Param[j]);
   
-  if Types[i].Kind = RECORDTYPE then
+  if Types[i].Kind in [RECORDTYPE, INTERFACETYPE] then
     for j := 1 to Types[i].NumFields do
       Dispose(Types[i].Field[j]);
   end;
@@ -610,29 +614,29 @@ var
 begin
 Result := 0;
 case Types[DataType].Kind of
-  INTEGERTYPE:    Result := SizeOf(Integer);
-  SMALLINTTYPE:   Result := SizeOf(SmallInt);
-  SHORTINTTYPE:   Result := SizeOf(ShortInt);
-  WORDTYPE:       Result := SizeOf(Word);
-  BYTETYPE:       Result := SizeOf(Byte);  
-  CHARTYPE:       Result := SizeOf(Char);
-  BOOLEANTYPE:    Result := SizeOf(Boolean);
-  REALTYPE:       Result := SizeOf(Single);
-  POINTERTYPE:    Result := SizeOf(Pointer);
-  FILETYPE:       Result := SizeOf(TString) + SizeOf(Integer);  // Name + Handle
-  SUBRANGETYPE:   Result := SizeOf(Integer);
-  ARRAYTYPE:      if Types[DataType].IsOpenArray then
-                    Error('Illegal type')
-                  else  
-                    Result := (HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1) * TypeSize(Types[DataType].BaseType);
-  RECORDTYPE:     for i := 1 to Types[DataType].NumFields do
-                    begin
-                    CurSize := Types[DataType].Field[i]^.Offset + TypeSize(Types[DataType].Field[i]^.DataType);
-                    if CurSize > Result then Result := CurSize;
-                    end;  
-  SETTYPE:        Result := MAXSETELEMENTS;
-  ENUMERATEDTYPE: Result := SizeOf(Byte);                
-  PROCEDURALTYPE: Result := SizeOf(Pointer)               
+  INTEGERTYPE:              Result := SizeOf(Integer);
+  SMALLINTTYPE:             Result := SizeOf(SmallInt);
+  SHORTINTTYPE:             Result := SizeOf(ShortInt);
+  WORDTYPE:                 Result := SizeOf(Word);
+  BYTETYPE:                 Result := SizeOf(Byte);  
+  CHARTYPE:                 Result := SizeOf(Char);
+  BOOLEANTYPE:              Result := SizeOf(Boolean);
+  REALTYPE:                 Result := SizeOf(Single);
+  POINTERTYPE:              Result := SizeOf(Pointer);
+  FILETYPE:                 Result := SizeOf(TString) + SizeOf(Integer);  // Name + Handle
+  SUBRANGETYPE:             Result := SizeOf(Integer);
+  ARRAYTYPE:                if Types[DataType].IsOpenArray then
+                              Error('Illegal type')
+                            else  
+                              Result := (HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1) * TypeSize(Types[DataType].BaseType);
+  RECORDTYPE, INTERFACETYPE:for i := 1 to Types[DataType].NumFields do
+                              begin
+                              CurSize := Types[DataType].Field[i]^.Offset + TypeSize(Types[DataType].Field[i]^.DataType);
+                              if CurSize > Result then Result := CurSize;
+                              end;  
+  SETTYPE:                  Result := MAXSETELEMENTS;
+  ENUMERATEDTYPE:           Result := SizeOf(Byte);                
+  PROCEDURALTYPE:           Result := SizeOf(Pointer)               
 else
   Error('Illegal type')
 end;// case
