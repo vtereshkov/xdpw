@@ -287,6 +287,8 @@ function UpCase(ch: Char): Char;
 * `gui.pas`      - GUI application demo. Uses `windows.pas` unit
 * `raytracer.pas`- Raytracer demo. Demonstrates XD Pascal methods and interfaces
 
+<img src="scene.png">
+
 ### Known issues
 
 The Windows Defender is known to give false positive results on some programs compiled with XD Pascal.
