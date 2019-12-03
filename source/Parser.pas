@@ -1633,6 +1633,7 @@ end; // CompileSetConstructor
 
 procedure CompileConcreteTypeToInterfaceTypeConversion(ConcreteType, InterfType: Integer);
 var
+  Field: PField;
   TempStorageAddr: LongInt;
   FieldIndex, MethodIndex: Integer;
 begin
@@ -1645,7 +1646,9 @@ GenerateInterfaceFieldAssignment(TempStorageAddr, TRUE, 0, UNINITDATARELOC);
 // Set interface's procedure pointers to the concrete methods
 for FieldIndex := 2 to Types[InterfType].NumFields do
   begin
-  MethodIndex := GetMethod(ConcreteType, Types[InterfType].Field[FieldIndex]^.Name);
+  Field := Types[InterfType].Field[FieldIndex];
+  MethodIndex := GetMethod(ConcreteType, Field^.Name);
+  CheckSignatures(Ident[MethodIndex].Signature, Types[Field^.DataType].Signature, Ident[MethodIndex].Name);
   GenerateInterfaceFieldAssignment(TempStorageAddr + (FieldIndex - 1) * SizeOf(Pointer), FALSE, Ident[MethodIndex].Value, CODERELOC);
   end; // for  
 
@@ -3148,7 +3151,15 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       // Numbers
       if Types[ConstType].Kind in OrdinalTypes + [REALTYPE] then
         begin
-        CompileConstExpression(ConstVal, ConstValType);          
+        CompileConstExpression(ConstVal, ConstValType);
+
+        // Try to convert integer to real
+        if ConversionToRealIsPossible(ConstValType, ConstType) then
+          begin
+          ConstVal.FracValue := ConstVal.Value;
+          ConstValType := REALTYPEINDEX;
+          end;
+          
         GetCompatibleType(ConstType, ConstValType); 
           
         if Types[ConstType].Kind = REALTYPE then

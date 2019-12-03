@@ -331,7 +331,8 @@ function TypeSize(DataType: Integer): Integer;
 function GetCompatibleType(LeftType, RightType: Integer): Integer;
 function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
 function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
-procedure CheckOperator(const Tok: TToken; DataType: Integer); 
+procedure CheckOperator(const Tok: TToken; DataType: Integer);
+procedure CheckSignatures(var Signature1, Signature2: TSignature; const Name: TString); 
 function GetKeyword(const KeywordName: TString): TTokenKind;
 function GetUnit(const UnitName: TString): Integer;
 function GetIdentUnsafe(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer;
@@ -775,6 +776,41 @@ with Types[DataType] do
     then
       Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
     end;  
+end;
+
+
+
+
+procedure CheckSignatures{(var Signature1, Signature2: TSignature; const Name: TString)};
+var
+  i: Integer;
+begin
+if Signature1.NumParams <> Signature2.NumParams then
+  Error('Incompatible number of parameters in ' + Name);
+  
+if Signature1.NumDefaultParams <> Signature2.NumDefaultParams then
+  Error('Incompatible number of default parameters in ' + Name);
+  
+for i := 1 to Signature1.NumParams do
+  begin
+  if Signature1.Param[i]^.DataType <> Signature2.Param[i]^.DataType then
+    Error('Incompatible types in ' + Name);
+    
+  if Signature1.Param[i]^.PassMethod <> Signature2.Param[i]^.PassMethod then
+    Error('Incompatible CONST/VAR modifiers in ' + Name);
+
+  if (Signature1.Param[i]^.Default.Kind <> Signature2.Param[i]^.Default.Kind) or
+     (Signature1.Param[i]^.Default.Value <> Signature2.Param[i]^.Default.Value) 
+  then
+    Error('Incompatible default values in ' + Name);   
+  end; // if
+
+if Signature1.ResultType <> Signature2.ResultType then
+  Error('Incompatible result type in ' + Name);
+  
+if Signature1.IsStdCall <> Signature2.IsStdCall then
+  Error('STDCALL is incompatible with non-STDCALL in ' + Name);
+
 end;  
 
 
@@ -940,6 +976,8 @@ end;
 function GetMethod{(RecType: Integer; const MethodName: TString): Integer};
 begin
 Result := GetIdent(MethodName, FALSE, RecType);
+if (Ident[Result].Kind <> PROC) and (Ident[Result].Kind <> FUNC) then
+  Error('Method expected');
 end;
 
 

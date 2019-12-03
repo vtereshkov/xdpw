@@ -44,7 +44,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Calls via procedural variables require parentheses even for empty parameter lists
 
 #### Limitations
-* No classical object-oriented programming
+* No "classical" object-oriented programming
 * Units cannot be compiled separately
 * No `Double` and `Extended` types
 * Arrays, records and sets cannot serve as untyped constants. Typed constants should be used instead
