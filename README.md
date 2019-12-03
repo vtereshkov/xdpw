@@ -1,6 +1,7 @@
 <img src="logo.png">
 
-# XD Pascal for Windows with Go-style methods and interfaces
+# XD Pascal for Windows 
+### with Go-style methods and interfaces
 
 _Dedicated to my father Mikhail Tereshkov, who instilled in me a taste for engineering_ 
 
