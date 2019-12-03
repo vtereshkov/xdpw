@@ -1,6 +1,7 @@
 <img src="logo.png">
 
-# XD Pascal Compiler for Windows
+# XD Pascal for Windows
+## with Go-style methods and interfaces
 
 _Dedicated to my father Mikhail Tereshkov, who instilled in me a taste for engineering_ 
 
@@ -8,6 +9,7 @@ _Dedicated to my father Mikhail Tereshkov, who instilled in me a taste for engin
 XD Pascal is a small educational self-hosting compiler for a Pascal language dialect. Any comments, suggestions, or bug reports are appreciated. Feel free to contact the author on GitHub or by e-mail VTereshkov@mail.ru. Enjoy.
 
 ### Features
+* Methods and interfaces
 * Native x86 code generation (32 bit Windows executables)
 * Support for both console and GUI applications
 * No external assembler or linker needed
@@ -30,7 +32,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 #### Enhancements
 * The target operating system is Windows
 * The compiler is self-hosting
-* Methods (Go style) are supported
+* Methods and interfaces (Go style) are supported
 * Functions can return arrays, records or sets (Delphi style)
 * Functions can be called as procedures (Delphi style)
 * Parameters can have default values (Delphi style)
@@ -43,7 +45,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Calls via procedural variables require parentheses even for empty parameter lists
 
 #### Limitations
-* No object-oriented programming
+* No classical object-oriented programming
 * Units cannot be compiled separately
 * No `Double` and `Extended` types
 * Arrays, records and sets cannot serve as untyped constants. Typed constants should be used instead
@@ -111,7 +113,8 @@ Type = "(" Ident {"," Ident} ")" |
        ["packed"] "record" Fields 
           ["case" Ident ":" Type "of" 
                ConstExpression {"," ConstExpression} ":" "(" Fields ")"
-          {";" ConstExpression {"," ConstExpression} ":" "(" Fields ")"} [";"] "end" |
+          {";" ConstExpression {"," ConstExpression} ":" "(" Fields ")"}] [";"] "end" |
+       ["packed"] "interface" Fields [";"] "end" |
        ["packed"] "set" "of" Type |
        ["packed"] "file" ["of" Type] |
        ConstExpression ".." ConstExpression |
@@ -283,7 +286,8 @@ function UpCase(ch: Char): Char;
 * `inserr.pas`   - Inertial navigation system error estimation demo. Uses `kalman.pas` unit
 * `list.pas`     - Linked list operations demo
 * `gui.pas`      - GUI application demo. Uses `windows.pas` unit
+* `raytracer.pas`- Raytracer demo. Demonstrates XD Pascal methods and interfaces
 
 ### Known issues
 
-The AVG antivirus and the Windows Defender are known to give false positive results on some programs compiled with XD Pascal.
+The Windows Defender is known to give false positive results on some programs compiled with XD Pascal.

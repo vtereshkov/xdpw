@@ -9,6 +9,7 @@ xdpw kalman.pas inserr.pas
 xdpw life.pas
 xdpw gauss.pas lineq.pas
 xdpw list.pas
+xdpw raytracer.pas
 xdpw sort.pas
 del xdpw.exe, system.pas, windows.pas
 cd ..
