@@ -1,6 +1,6 @@
 <img src="logo.png">
 
-# XD Pascal with Go-style methods and interfaces
+# XD Pascal for Windows
 
 _Dedicated to my father Mikhail Tereshkov, who instilled in me a taste for engineering_ 
 
@@ -8,7 +8,7 @@ _Dedicated to my father Mikhail Tereshkov, who instilled in me a taste for engin
 XD Pascal is a small educational self-hosting compiler for a Pascal language dialect. Any comments, suggestions, or bug reports are appreciated. Feel free to contact the author on GitHub or by e-mail VTereshkov@mail.ru. Enjoy.
 
 ### Features
-* Methods and interfaces
+__* Go-style methods and interfaces__
 * Native x86 code generation (32 bit Windows executables)
 * Support for both console and GUI applications
 * No external assembler or linker needed
