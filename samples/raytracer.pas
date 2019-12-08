@@ -236,7 +236,7 @@ type
 function Trace for sc: TScene (var Ray: TRay; Depth: Integer): TColor;
 var
   BestBody: PGenericBody;
-  Point, Normal, BestPoint, BestNormal, SpecularDir, DiffuseDir, RandomVec: TVec;
+  Point, Normal, BestPoint, BestNormal, SpecularDir, DiffuseDir: TVec;
   DiffuseRay: TRay;
   Dist, BestDist, Lambert: Real;
   BestIndex, i: Integer;
@@ -278,9 +278,8 @@ if BestIndex > 0 then
     Exit;
     end;
 
-  RandomVec := rand;
   SpecularDir := Ray.Dir.sub(BestNormal.mul(2.0 * (Ray.Dir.dot(BestNormal))));
-  DiffuseDir := normalize(SpecularDir.add(RandomVec.mul(2.0 * BestBody^.Diffuseness)));
+  DiffuseDir := normalize(SpecularDir.add(rand.mul(2.0 * BestBody^.Diffuseness)));
 
   Lambert := DiffuseDir.dot(BestNormal);
   if Lambert < 0 then
@@ -379,7 +378,7 @@ const
   
 var
   Scene: TScene;
-  Dir, RotDir, RandomDir, RandomVec: TVec;
+  Dir, RotDir, RandomDir: TVec;
   Color: TColor;
   Ray: TRay;
   sinAz, cosAz: Real;
@@ -398,11 +397,11 @@ Randomize;
 with Scene do
   begin 
   AmbientColor := AmbientLightColor;
-  Body[1] := IBody(Box1);
-  Body[2] := IBody(Box2);
-  Body[3] := IBody(Sphere1);
-  Body[4] := IBody(Sphere2);
-  Body[5] := IBody(Lamp1);
+  Body[1] := Box1;
+  Body[2] := Box2;
+  Body[3] := Sphere1;
+  Body[4] := Sphere2;
+  Body[5] := Lamp1;
   NumBodies := 5;
   end;
   
@@ -441,8 +440,7 @@ for i := 0 to Height - 1 do
   
     for r := 1 to Rays do
       begin
-      RandomVec := rand();
-      RandomDir := RotDir.add(RandomVec.mul(Antialiasing));
+      RandomDir := RotDir.add(rand.mul(Antialiasing));
       Ray.Origin := Pos;
       Ray.Dir := normalize(RandomDir);
       Color := Color.add(Scene.Trace(Ray, 0));

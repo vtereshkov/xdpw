@@ -124,12 +124,15 @@ Fields = IdentList ":" Type {";" IdentList ":" Type} .
        
 TypeIdent = "string" | "file" | Ident .       
 
-Designator = Ident {"^" | 
-                    "[" Expression {"," Expression} "]" | 
-                    "." Ident [ActualParams] | .
+Designator = Ident {Selector} .
+
+Selector = "^" | 
+           "[" Expression {"," Expression} "]" | 
+           "." Ident | 
+           "(" ActualParams ")".
 
 Statement = [Label ":"] [ (Designator | Ident) ":=" Expression | 
-                          (Designator | Ident) [ActualParams] |
+                          (Designator | Ident) [ActualParams] {Selector} |
                           CompoundStatement |
                           IfStatement |
                           CaseStatement |
@@ -172,7 +175,7 @@ SimpleExpression = ["+"|"-"] Term {("+"|"-"|"or"|"xor") Term}.
 
 Term = Factor {("*"|"/"|"div"|"mod"|"shl"|"shr"|"and") Factor}.
 
-Factor = (Designator | Ident) [ActualParams] |
+Factor = (Designator | Ident) [ActualParams] {Selector} |
          Designator |
          "@" Designator | 
          Number | 
