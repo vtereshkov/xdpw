@@ -30,7 +30,7 @@ procedure Relocate(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr, Import
 procedure PushVarPtr(Addr: Integer; Scope: TScope; DeltaNesting: Byte; RelocType: TRelocType);
 procedure DerefPtr(DataType: Integer);
 procedure GetArrayElementPtr(ArrType: Integer);
-procedure GetFieldPtr(RecType: Integer; FieldIndex: Integer);
+procedure GetFieldPtr(Offset: Integer);
 procedure GetCharAsTempString;
 procedure SaveStackTopToEAX;
 procedure RestoreStackTopFromEAX;
@@ -45,8 +45,9 @@ procedure GenerateUnaryOperator(op: TTokenKind; ResultType: Integer);
 procedure GenerateBinaryOperator(op: TTokenKind; ResultType: Integer);
 procedure GenerateRelation(rel: TTokenKind; ValType: Integer);
 procedure GenerateAssignment(DesignatorType: Integer);
-procedure GenerateForAssignment(DesignatorType: Integer);
+procedure GenerateForAssignmentAndNumberOfIterations(CounterType: Integer; Down: Boolean);
 procedure GenerateStructuredAssignment(DesignatorType: Integer);
+procedure GenerateInterfaceFieldAssignment(Offset: Integer; PopValueFromStack: Boolean; Value: LongInt; RelocType: TRelocType);
 procedure InverseStack(Depth: Integer);
 procedure GenerateImportFuncStub(EntryPoint: LongInt);
 procedure GenerateCall(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer);
@@ -70,7 +71,6 @@ procedure GenerateWhileEpilog;
 procedure GenerateRepeatCondition;
 procedure GenerateRepeatProlog;
 procedure GenerateRepeatEpilog;
-procedure GenerateForNumberOfIterations(Down: Boolean);
 procedure GenerateForCondition;
 procedure GenerateForProlog;
 procedure GenerateForEpilog(CounterType: Integer; Down: Boolean);
@@ -547,42 +547,7 @@ procedure GenPopReg(Reg: TRegister);
     Exit;
     end
 
-    
-  // Optimization: (push dword ptr [ebp + Value]) + (pop Reg) -> (mov Reg, dword ptr [ebp + Value])
-  else if (Reg in [EAX, ECX, ESI]) and (PrevOpCode = $FF) and (PrevInstrByte(0, 1) = $B5) then   // Previous: push dword ptr [ebp + Value]
-    begin
-    Value := PrevInstrDWord(0, 2);
-    RemovePrevInstr(0);                                                       // Remove: push dword ptr [ebp + Value]
-                                   
-    GenNew($8B);                                                              // mov ...        
-    case Reg of
-      EAX: Gen($85);                                                          // ... eax, dword ptr [epb + ...
-      ECX: Gen($8D);                                                          // ... ecx, dword ptr [epb + ...
-      ESI: Gen($B5);                                                          // ... esi, dword ptr [epb + ...
-    end;  
-    GenDWord(Value);                                                          // ... Value]
-
-    Result := TRUE;
-    Exit;
-    end
-
-  
-  // Optimization: (push dword ptr [esi]) + (pop Reg) -> (mov Reg, dword ptr [esi])
-  else if (Reg in [EAX, ECX]) and (PrevOpCode = $FF) and (PrevInstrByte(0, 1) = $36) then
-    begin
-    RemovePrevInstr(0);                                                       // Remove: push dword ptr [esi]                                       
-    
-    GenNew($8B);                                                              // mov ... 
-    case Reg of
-      EAX: Gen($06);                                                          // ... eax, dword ptr [esi]
-      ECX: Gen($0E);                                                          // ... ecx, dword ptr [esi]
-    end;    
-    
-    Result := TRUE;
-    Exit;
-    end
-    
-    
+        
   // Optimization: (push esi) + (mov eax, [ebp + Value]) + (pop esi) -> (mov eax, [ebp + Value])
   else if (Reg = ESI) and (PrevInstrByte(1, 0) = $56)                                             // Previous: push esi
                       and (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $85) then        // Previous: mov eax, [ebp + Value]
@@ -688,7 +653,7 @@ procedure DerefPtr{(DataType: Integer)};
 
   function OptimizeDerefPtr: Boolean;
   var
-    Addr: LongInt;
+    Addr, Offset: LongInt;
     AddrRelocIndex: Integer;
   begin
   Result := FALSE;
@@ -781,7 +746,52 @@ procedure DerefPtr{(DataType: Integer)};
     
     Result := TRUE;
     Exit;
+    end
+
+
+  // Record field loading
+  
+  // Optimization: (add esi, Offset) + (mov... eax, ... ptr [esi]) -> (mov... eax, ... ptr [esi + Offset])
+  else if (PrevInstrByte(0, 0) = $81) and (PrevInstrByte(0, 1) = $C6) then        // Previous: add esi, Offset        
+    begin
+    Offset := PrevInstrDWord(0, 2);
+    RemovePrevInstr(0);                                                           // Remove: add esi, Offset
+    
+    case TypeSize(DataType) of
+
+      1: if Types[DataType].Kind in UnsignedTypes then
+           begin
+           GenNew($0F); Gen($B6); Gen($86);                              // movzx eax, byte ptr [esi + ...
+           end
+         else  
+           begin
+           GenNew($0F); Gen($BE); Gen($86);                              // movsx eax, byte ptr [esi + ...
+           end; 
+           
+      2: if Types[DataType].Kind in UnsignedTypes then
+           begin
+           GenNew($0F); Gen($B7); Gen($86);                              // movzx eax, word ptr [esi + ...
+           end
+         else  
+           begin
+           GenNew($0F); Gen($BF); Gen($86);                              // movsx eax, word ptr [esi + ...
+           end;      
+         
+      4: begin
+         GenNew($8B); Gen($86);                                          // mov eax, dword ptr [esi + ...
+         end
+
+    else
+      Error('Internal fault: Illegal designator size');
     end;
+    
+    GenDWord(Offset);                                                   // ... + Offset]
+    
+    Result := TRUE;
+    Exit;
+    end;
+
+
     
   end;
 
@@ -930,9 +940,7 @@ end;
 
 
 
-procedure GetFieldPtr{(RecType: Integer; FieldIndex: Integer)};
-var
-  Offset: Integer;
+procedure GetFieldPtr{(Offset: Integer)};
   
 
   function OptimizeGetFieldPtr: Boolean;
@@ -964,9 +972,7 @@ var
 
 
 begin // GetFieldPtr
-Offset := Types[RecType].Field[FieldIndex]^.Offset;
-
-if Offset > 0 then
+if Offset <> 0 then
   begin
   GenPopReg(ESI);                                                 // pop esi
   
@@ -1462,7 +1468,6 @@ procedure GenerateAssignment{(DesignatorType: Integer)};
   
 
 begin
-// ECX should be preserved
 GenPopReg(EAX);                                                              // pop eax   ; source value
   
 if not OptimizeGenerateAssignment then
@@ -1489,12 +1494,42 @@ end;
 
 
 
-procedure GenerateForAssignment{(DesignatorType: Integer)};
+procedure GenerateForAssignmentAndNumberOfIterations{(CounterType: Integer; Down: Boolean)};
 begin
-GenPopReg(ECX);                                                         // pop ecx  ; save final counter value
-GenerateAssignment(DesignatorType);
-GenPushReg(ECX);                                                        // push ecx  ; restore final counter value
+GenPopReg(EAX);                                                 // pop eax       ; final value
+GenPopReg(ECX);                                                 // pop ecx       ; initial value
+GenPopReg(ESI);                                                 // pop esi       ; counter address
+                                                          
+case TypeSize(CounterType) of
+  1: begin
+     GenNew($88); Gen($0E);                                     // mov [esi], cl
+     end;
+  2: begin
+     GenNew($66); Gen($89); Gen($0E);                           // mov [esi], cx
+     end;
+  4: begin
+     GenNew($89); Gen($0E);                                     // mov [esi], ecx
+     end
+else
+  Error('Internal fault: Illegal designator size');
+end; // case
+
+// Number of iterations
+if Down then
+  begin
+  GenNew($29); Gen($C1);                                        // sub ecx, eax
+  GenNew($41);                                                  // inc ecx
+  GenPushReg(ECX);                                              // push ecx  
+  end
+else
+  begin
+  GenNew($2B); Gen($C1);                                        // sub eax, ecx
+  GenNew($40);                                                  // inc eax
+  GenPushReg(EAX);                                              // push eax  
+  end;  
+ 
 end;
+
 
 
 
@@ -1508,6 +1543,22 @@ GenPopReg(EDI);                                                            // po
 GenNew($B9); GenDWord(TypeSize(DesignatorType));                           // mov ecx, TypeSize(DesignatorType)
 GenNew($FC);                                                               // cld          ; increment esi, edi after each step
 GenNew($F3); Gen($A4);                                                     // rep movsb
+end;
+
+
+
+
+procedure GenerateInterfaceFieldAssignment{(Offset: Integer; PopValueFromStack: Boolean; Value: LongInt; RelocType: TRelocType)};
+begin
+if PopValueFromStack then
+  begin
+  GenPopReg(ESI);                                                               // pop esi
+  GenNew($89); Gen($B5); GenDWord(Offset);                                      // mov dword ptr [ebp + Offset], esi
+  end
+else
+  begin
+  GenNew($C7); Gen($85); GenDWord(Offset); GenRelocDWord(Value, RelocType);     // mov dword ptr [ebp + Offset], Value
+  end;  
 end;
 
 
@@ -1572,7 +1623,8 @@ end;
 
 procedure GenerateIndirectCall{(NumParam: Integer)};
 begin
-GenNew($FF); Gen($94); Gen($24); GenDWord(SizeOf(LongInt) * NumParam);       // call dword ptr [esp + 4 * NumParam]
+GenNew($8B); Gen($B4); Gen($24); GenDWord(SizeOf(LongInt) * NumParam);       // mov esi, dword ptr [esp + 4 * NumParam]
+GenNew($FF); Gen($16);                                                       // call [esi]
 GenPopReg(ECX);                                                              // pop ecx  ; pop and discard call address
 end;
 
@@ -1820,27 +1872,6 @@ begin
 ReturnPos := RestoreCodePos;
 CurPos := GetCodeSize;
 GenNew($E9); GenDWord(ReturnPos - (CurPos + 5));               // jmp ReturnPos
-end;
-
-
-
-
-procedure GenerateForNumberOfIterations{(Down: Boolean)};
-begin
-if Down then
-  begin
-  GenPopReg(ECX);                                                 // pop ecx       ; final value
-  GenPopReg(EAX);                                                 // pop eax       ; initial value  
-  end
-else
-  begin  
-  GenPopReg(EAX);                                                 // pop eax       ; final value
-  GenPopReg(ECX);                                                 // pop ecx       ; initial value
-  end;    
-  
-GenNew($2B); Gen($C1);                                               // sub eax, ecx
-GenNew($40);                                                         // inc eax
-GenPushReg(EAX);                                                  // push eax  
 end;
 
 
