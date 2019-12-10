@@ -1465,13 +1465,17 @@ end; // ConvertCharToString
 
 
 
-procedure CompileSelector(var ValType: Integer; ForceCharToString: Boolean);
+procedure CompileSelectors(var ValType: Integer; ForceCharToString: Boolean);
 var
   FieldIndex, MethodIndex: Integer;
   ArrayIndexType, ResultType: Integer;
   Field: PField;   
 
 begin
+// A selector is only applicable to a memory location
+// A function call can be part of a selector only if it returns an address (i.e. a structured result), not an immediate value
+// All other calls are part of a factor or a statement
+
 while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
   begin
   case Tok.Kind of
@@ -1548,30 +1552,26 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
     
     OPARTOK:                                          // Call of a method or procedural variable that returns a designator
       begin
-      if Types[ValType].Kind = METHODTYPE then              // Method call
+      if Types[ValType].Kind = METHODTYPE then                                              // Method call
         begin
         ResultType := Ident[Types[ValType].MethodIdentIndex].Signature.ResultType;
-        if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) then
-          begin
-          CompileMethodCall(ValType, TRUE);
-          RestoreStackTopFromEAX;
-          ValType := ResultType;
-          end
-        else
-          Break; // Not a designator   
+        if (ResultType = 0) or not (Types[ResultType].Kind in StructuredTypes) then 
+          Break;  // Not a designator
+          
+        CompileMethodCall(ValType, TRUE);
+        RestoreStackTopFromEAX;
+        ValType := ResultType;  
         end
         
-      else if Types[ValType].Kind = PROCEDURALTYPE then     // Procedural variable call
+      else if Types[ValType].Kind = PROCEDURALTYPE then                                     // Procedural variable call
         begin
         ResultType := Types[ValType].Signature.ResultType;
-        if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) then
-          begin        
-          CompileIndirectCall(ValType, TRUE);
-          RestoreStackTopFromEAX;    
-          ValType := ResultType;
-          end
-        else
-          Break; // Not a designator  
+        if (ResultType = 0) or not (Types[ResultType].Kind in StructuredTypes) then
+          Break;  // Not a designator
+       
+        CompileIndirectCall(ValType, TRUE);
+        RestoreStackTopFromEAX;    
+        ValType := ResultType;
         end;
        
       end;
@@ -1582,7 +1582,7 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
     ConvertCharToString(ValType, TRUE);
   end; // while
  
-end; // CompileSelector
+end; // CompileSelectors
 
 
 
@@ -1593,6 +1593,10 @@ var
   IsRefParam: Boolean;
   
 begin
+// A designator always designates a memory location
+// A function call can be part of a designator only if it returns an address (i.e. a structured result), not an immediate value
+// All other calls are part of a factor or a statement
+   
 AssertIdent;
 
 // First search among records in WITH blocks
@@ -1641,7 +1645,7 @@ if ValType = 0 then
 else
   NextTok;
 
-CompileSelector(ValType, ForceCharToString);  
+CompileSelectors(ValType, ForceCharToString);  
 end; // CompileDesignator
 
 
@@ -1782,7 +1786,7 @@ case Tok.Kind of
             
             if Types[ValType].Kind in StructuredTypes then
               begin
-              CompileSelector(ValType, ForceCharToString);
+              CompileSelectors(ValType, ForceCharToString);
               CompileDereferenceOrCall(ValType);
               end;
             end;
@@ -2674,7 +2678,7 @@ case Tok.Kind of
               then
                 begin
                 RestoreStackTopFromEAX;
-                CompileSelector(DesignatorType, FALSE);
+                CompileSelectors(DesignatorType, FALSE);
                 CompileAssignmentOrCall(DesignatorType); 
                 end;
               end;              
