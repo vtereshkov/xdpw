@@ -799,9 +799,7 @@ for i := 1 to Signature1.NumParams do
   if Signature1.Param[i]^.PassMethod <> Signature2.Param[i]^.PassMethod then
     Error('Incompatible CONST/VAR modifiers in ' + Name);
 
-  if (Signature1.Param[i]^.Default.Kind <> Signature2.Param[i]^.Default.Kind) or
-     (Signature1.Param[i]^.Default.Value <> Signature2.Param[i]^.Default.Value) 
-  then
+  if Signature1.Param[i]^.Default.Value <> Signature2.Param[i]^.Default.Value then
     Error('Incompatible default values in ' + Name);   
   end; // if
 

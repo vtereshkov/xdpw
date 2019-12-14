@@ -1210,9 +1210,10 @@ if Tok.Kind = OPARTOK then
 
       with Signature, Param[NumParams]^ do
         begin
-        DataType   := ParamType;
-        PassMethod := ListPassMethod;
-        Name       := IdentInListName[IdentInListIndex];
+        Name          := IdentInListName[IdentInListIndex];
+        DataType      := ParamType;
+        PassMethod    := ListPassMethod;
+        Default.Value := 0;
         end;
       
       // Default parameter value
