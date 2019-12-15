@@ -13,7 +13,7 @@ interface
 
 const
   VERSIONMAJOR              = 0;
-  VERSIONMINOR              = 91;
+  VERSIONMINOR              = 10;
   
   NUMKEYWORDS               = 43;          
   MAXSTRLENGTH              = 255;
