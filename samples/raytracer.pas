@@ -6,38 +6,42 @@ program Raytracer;
 
 
 type 
-  TVec = record 
-    x, y, z: Real;
-  end;
+  TVec = array [1..3] of Real;
   
 
 function add for u: TVec (var v: TVec): TVec; 
+var i: Integer;
 begin 
-with Result do begin x := u.x + v.x;  y := u.y + v.y;  z := u.z + v.z; end; 
+for i := 1 to 3 do Result[i] := u[i] + v[i]; 
 end;
 
 
 function sub for u: TVec (var v: TVec): TVec; 
+var i: Integer;
 begin 
-with Result do begin x := u.x - v.x;  y := u.y - v.y;  z := u.z - v.z; end; 
+for i := 1 to 3 do Result[i] := u[i] - v[i]; 
 end;
 
 
 function mul for v: TVec (a: Real): TVec; 
+var i: Integer;
 begin 
-with Result do begin x := v.x * a;  y := v.y * a;  z := v.z * a; end; 
+for i := 1 to 3 do Result[i] := a * v[i]; 
 end;
 
 
 function dot for u: TVec (var v: TVec): Real; 
-begin 
-Result := u.x * v.x + u.y * v.y + u.z * v.z; 
+var i: Integer;
+begin
+Result := 0; 
+for i := 1 to 3 do Result := Result + u[i] * v[i]; 
 end;
 
 
 function elementwise for u: TVec (var v: TVec): TVec; 
+var i: Integer;
 begin 
-with Result do begin x := u.x * v.x;  y := u.y * v.y;  z := u.z * v.z; end; 
+for i := 1 to 3 do Result[i] := u[i] * v[i]; 
 end;
 
 
@@ -54,8 +58,9 @@ end;
 
 
 function rand: TVec;
-begin
-with Result do begin x := Random;  y := Random;  z := Random; end; 
+var i: Integer;
+begin 
+for i := 1 to 3 do Result[i] := Random; 
 end;
 
 
@@ -96,84 +101,45 @@ end;
 
 
 function Intersect for b: TBox (var Ray: TRay; var Point, Normal: TVec): Boolean; 
-
-  function Within(x, y, xmin, ymin, xmax, ymax: Real): Boolean;
-  begin
-  Result := (x > xmin) and (x < xmax) and (y > ymin) and (y < ymax);
-  end;
   
-var
-  Side, Factor: Real;  
+  function IntersectFace(i, j, k: Integer): Boolean;
   
-begin
-if abs(Ray.Dir.z) > 1e-9 then // xy
-  begin 
-  Side := 1.0;
-  if Ray.Dir.z > 0.0 then Side := -1.0;
-  
-  Factor := (b.GenericBody.Center.z + Side * b.HalfSize.z - Ray.Origin.z) / Ray.Dir.z;  
-  if Factor > 0.1 then
+    function Within(x, y, xmin, ymin, xmax, ymax: Real): Boolean;
     begin
-    Point := Ray.Origin.add(Ray.Dir.mul(Factor));
+    Result := (x > xmin) and (x < xmax) and (y > ymin) and (y < ymax);
+    end;
+  
+  var
+    Side, Factor: Real;  
     
-    if Within(Point.x, Point.y,
-              b.GenericBody.Center.x - b.HalfSize.x, b.GenericBody.Center.y - b.HalfSize.y,
-              b.GenericBody.Center.x + b.HalfSize.x, b.GenericBody.Center.y + b.HalfSize.y)
-    then
+  begin // IntersectFace
+  Result := FALSE;
+  
+  if abs(Ray.Dir[k]) > 1e-9 then
+    begin 
+    Side := 1.0;
+    if Ray.Dir[k] > 0.0 then Side := -1.0;
+    
+    Factor := (b.GenericBody.Center[k] + Side * b.HalfSize[k] - Ray.Origin[k]) / Ray.Dir[k];  
+    if Factor > 0.1 then
       begin
-      with Normal do begin x := 0; y := 0; z := Side; end;
-      Result := TRUE;
-      Exit;
+      Point := Ray.Origin.add(Ray.Dir.mul(Factor));
+      
+      if Within(Point[i], Point[j],
+                b.GenericBody.Center[i] - b.HalfSize[i], b.GenericBody.Center[j] - b.HalfSize[j],
+                b.GenericBody.Center[i] + b.HalfSize[i], b.GenericBody.Center[j] + b.HalfSize[j])
+      then
+        begin
+        Normal[i] := 0; Normal[j] := 0; Normal[k] := Side;
+        Result := TRUE;
+        end;
       end;
     end;
   end;
-
-if abs(Ray.Dir.x) > 1e-9 then // yz
-  begin 
-  Side := 1.0;
-  if Ray.Dir.x > 0.0 then Side := -1.0;
-  
-  Factor := (b.GenericBody.Center.x + Side * b.HalfSize.x - Ray.Origin.x) / Ray.Dir.x;  
-  if Factor > 0.1 then
-    begin
-    Point := Ray.Origin.add(Ray.Dir.mul(Factor));
     
-    if Within(Point.y, Point.z,
-              b.GenericBody.Center.y - b.HalfSize.y, b.GenericBody.Center.z - b.HalfSize.z,
-              b.GenericBody.Center.y + b.HalfSize.y, b.GenericBody.Center.z + b.HalfSize.z) 
-    then
-      begin
-      with Normal do begin x := Side; y := 0; z := 0; end;
-      Result := TRUE;
-      Exit;
-      end;
-    end;
-  end;
-
-if abs(Ray.Dir.y) > 1e-9 then // zx
-  begin 
-  Side := 1.0;
-  if Ray.Dir.y > 0.0 then Side := -1.0;
-  
-  Factor := (b.GenericBody.Center.y + Side * b.HalfSize.y - Ray.Origin.y) / Ray.Dir.y;  
-  if Factor > 0.1 then
-    begin
-    Point := Ray.Origin.add(Ray.Dir.mul(Factor));
-    
-    if Within(Point.z, Point.x,
-              b.GenericBody.Center.z - b.HalfSize.z, b.GenericBody.Center.x - b.HalfSize.x,
-              b.GenericBody.Center.z + b.HalfSize.z, b.GenericBody.Center.x + b.HalfSize.x) 
-    then
-      begin
-      with Normal do begin x := 0; y := Side; z := 0; end;
-      Result := TRUE;
-      Exit;
-      end;
-    end;
-  end;
-
-Result := FALSE;
-end;
+begin // Intersect
+Result := IntersectFace(1, 2, 3) or IntersectFace(3, 1, 2) or IntersectFace(2, 3, 1);
+end;          
 
 
 type 
@@ -307,32 +273,32 @@ const
     (
     GenericBody: 
       (
-      Center: (x: 500; y: -100; z: 1200);
-      Color: (x: 0.4; y: 0.7; z: 1.0);
+      Center: (500, -100, 1200);
+      Color: (0.4, 0.7, 1.0);
       Diffuseness: 0.1;
       IsLamp: FALSE
       );      
-    HalfSize: (x: 400 / 2; y: 600 / 2; z: 300 / 2)
+    HalfSize: (400 / 2, 600 / 2, 300 / 2)
     );
 
   Box2: TBox = 
     (
     GenericBody:
       (
-      Center: (x: 550; y: 210; z: 1100);
-      Color: (x: 0.9; y: 1.0; z: 0.6);
+      Center: (550, 210, 1100);
+      Color: (0.9, 1.0, 0.6);
       Diffuseness: 0.3;
       IsLamp: FALSE
       );      
-    HalfSize: (x: 1000 / 2; y: 20 / 2; z: 1000 / 2)
+    HalfSize: (1000 / 2, 20 / 2, 1000 / 2)
     );
 
   Sphere1: TSphere = 
     (
     GenericBody:
       (
-      Center: (x: 600; y: 0; z: 700);
-      Color: (x: 1.0; y: 0.4; z: 0.6);
+      Center: (600, 0, 700);
+      Color: (1.0, 0.4, 0.6);
       Diffuseness: 0.2;
       IsLamp: FALSE
       );      
@@ -343,8 +309,8 @@ const
     (
     GenericBody:
       (
-      Center: (x: 330; y: 150; z: 700);
-      Color: (x: 1.0; y: 1.0; z: 0.3);
+      Center: (330, 150, 700);
+      Color: (1.0, 1.0, 0.3);
       Diffuseness: 0.15;
       IsLamp: FALSE
       );      
@@ -356,19 +322,19 @@ const
     (
     GenericBody:
       (
-      Center: (x: 500; y: -1000; z: -700);
-      Color: (x: 1.0; y: 1.0; z: 1.0);
+      Center: (500, -1000, -700);
+      Color: (1.0, 1.0, 1.0);
       Diffuseness: 1.0;
       IsLamp: TRUE
       );
     Radius: 800
     );
     
-  AmbientLightColor: TColor = (x: 0.2; y: 0.2; z: 0.2);  
+  AmbientLightColor: TColor = (0.2, 0.2, 0.2);  
 
 
   // Define eye
-  Pos: TVec = (x: 0; y: 0; z: 0);
+  Pos: TVec = (0, 0, 0);
   Azimuth = 30.0 * pi / 180.0;
   Width = 640;
   Height = 480;
@@ -383,7 +349,8 @@ var
   Ray: TRay;
   sinAz, cosAz: Real;
   F: Text;
-  Rays, i, j, r: Integer; 
+  Rays, i, j, r: Integer;
+  StartTime, StopTime: LongInt; 
   
 
 begin
@@ -413,30 +380,23 @@ WriteLn(F, 'P3');
 WriteLn(F, Width, ' ', Height);
 WriteLn(F, 255);
 
+StartTime := GetTickCount;
+
 for i := 0 to Height - 1 do
   begin
   for j := 0 to Width - 1 do
     begin
-    with Color do 
-      begin 
-      x := 0; 
-      y := 0; 
-      z := 0; 
-      end;
-    
-    with Dir do 
-      begin 
-      x := j - Width / 2;  
-      y := i - Height / 2;  
-      z := Focal; 
-      end;
+    Color[1] := 0; 
+    Color[2] := 0; 
+    Color[3] := 0; 
 
-    with RotDir do
-      begin
-      x :=  Dir.x * cosAz + Dir.z * sinAz;
-      y :=  Dir.y;
-      z := -Dir.x * sinAz + Dir.z * cosAz;
-      end;
+    Dir[1] := j - Width / 2;  
+    Dir[2] := i - Height / 2;  
+    Dir[3] := Focal; 
+
+    RotDir[1] :=  Dir[1] * cosAz + Dir[3] * sinAz;
+    RotDir[2] :=  Dir[2];
+    RotDir[3] := -Dir[1] * sinAz + Dir[3] * cosAz;
   
     for r := 1 to Rays do
       begin
@@ -447,16 +407,19 @@ for i := 0 to Height - 1 do
       end;
       
     Color := Color.mul(255.0 / Rays);
-    Write(F, Round(Color.x), ' ', Round(Color.y), ' ', Round(Color.z), ' ');
+    Write(F, Round(Color[1]), ' ', Round(Color[2]), ' ', Round(Color[3]), ' ');
     end;
     
   WriteLn(F);
   WriteLn(i + 1, '/', Height);
   end;
-
+  
+StopTime := GetTickCount;
+  
 Close(F);
 
 WriteLn;
+WriteLn('Rendering time: ', (StopTime - StartTime) / 1000 :5:1, ' s');
 WriteLn('Done. See scene.ppm');
 ReadLn;  
 end.
