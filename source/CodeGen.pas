@@ -844,6 +844,8 @@ procedure GetArrayElementPtr{(ArrType: Integer)};
   begin
   Result := FALSE;
   
+  // Global arrays
+  
   // Optimization: (push BaseAddr) + (mov eax, [ebp + IndexAddr]) + (pop esi) -> (mov esi, BaseAddr) + (mov eax, [ebp + IndexAddr]) 
   if (PrevInstrByte(1, 0) = $68) and (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $85) then    // Previous: push BaseAddr, mov eax, [ebp + IndexAddr]
     begin
@@ -866,13 +868,47 @@ procedure GetArrayElementPtr{(ArrType: Integer)};
     
     RemovePrevInstr(1);                             // Remove: push BaseAddr, mov eax, Index
     
-    GenNew($BE); GenDWord(BaseAddr);                // mov esi, BaseAddr         ; suilable for relocatable addresses (instruction length is the same as for push BaseAddr)
+    GenNew($BE); GenDWord(BaseAddr);                // mov esi, BaseAddr         ; suitable for relocatable addresses (instruction length is the same as for push BaseAddr)
     GenNew($B8); GenDWord(Index);                   // mov eax, Index 
             
     Result := TRUE;
-    end;
+    end 
     
+  // Local arrays  
     
+  // Optimization: (mov eax, [ebp + BaseAddr]) + (push eax) + (mov eax, [ebp + IndexAddr]) + (pop esi) -> (mov esi, [ebp + BaseAddr]) + (mov eax, [ebp + IndexAddr]) 
+  else if (PrevInstrByte(2, 0) = $8B) and (PrevInstrByte(2, 1) = $85) and     // Previous: mov eax, [ebp + BaseAddr]
+          (PrevInstrByte(1, 0) = $50) and                                     // Previous: push eax
+          (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $85)         // Previous: mov eax, [ebp + IndexAddr]
+  then   
+    begin
+    BaseAddr  := PrevInstrDWord(2, 2);
+    IndexAddr := PrevInstrDWord(0, 2);
+    
+    RemovePrevInstr(2);                             // Remove: mov eax, [ebp + BaseAddr], push eax, mov eax, [ebp + IndexAddr]
+    
+    GenNew($8B); Gen($B5); GenDWord(BaseAddr);      // mov esi, [ebp + BaseAddr] 
+    GenNew($8B); Gen($85); GenDWord(IndexAddr);     // mov eax, [ebp + IndexAddr] 
+            
+    Result := TRUE;
+    end
+    
+  // Optimization: (mov eax, [ebp + BaseAddr]) + (push eax) + (mov eax, Index) + (pop esi) -> (mov esi, [ebp + BaseAddr]) + (mov eax, Index) 
+  else if (PrevInstrByte(2, 0) = $8B) and (PrevInstrByte(2, 1) = $85) and     // Previous: mov eax, [ebp + BaseAddr]
+          (PrevInstrByte(1, 0) = $50) and                                     // Previous: push eax
+          (PrevInstrByte(0, 0) = $B8)                                         // Previous: mov eax, Index
+  then   
+    begin
+    BaseAddr  := PrevInstrDWord(2, 2);
+    Index     := PrevInstrDWord(0, 1);
+    
+    RemovePrevInstr(2);                             // Remove: mov eax, [ebp + BaseAddr], push eax, mov eax, Index
+    
+    GenNew($8B); Gen($B5); GenDWord(BaseAddr);      // mov esi, [ebp + BaseAddr] 
+    GenNew($B8); GenDWord(Index);                   // mov eax, Index 
+            
+    Result := TRUE;
+    end
     
   end; 
 
