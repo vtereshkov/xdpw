@@ -550,14 +550,43 @@ procedure GenPopReg(Reg: TRegister);
         
   // Optimization: (push esi) + (mov eax, [ebp + Value]) + (pop esi) -> (mov eax, [ebp + Value])
   else if (Reg = ESI) and (PrevInstrByte(1, 0) = $56)                                             // Previous: push esi
-                      and (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $85) then        // Previous: mov eax, [ebp + Value]
+                      and (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $85)             // Previous: mov eax, [ebp + Value]
+  then        
     begin
     Value := PrevInstrDWord(0, 2);    
     RemovePrevInstr(1);                                                       // Remove: push esi, mov eax, [ebp + Value]
     GenNew($8B); Gen($85); GenDWord(Value);                                   // mov eax, [ebp + Value]      
     Result := TRUE;
     Exit;
+    end
+    
+    
+  // Optimization: (mov eax, [ebp + Value]) + (push eax) + (fld dword ptr [esp]) + (pop eax) -> (fld dword ptr [ebp + Value])
+  else if (Reg = EAX) and (PrevInstrByte(2, 0) = $8B) and (PrevInstrByte(2, 1) = $85)                                 // Previous: mov eax, [ebp + Value]
+                      and (PrevInstrByte(1, 0) = $50)                                                                 // Previous: push eax
+                      and (PrevInstrByte(0, 0) = $D9) and (PrevInstrByte(0, 1) = $04) and (PrevInstrByte(0, 2) = $24) // Previous: fld dword ptr [esp] 
+  then        
+    begin 
+    Value := PrevInstrDWord(2, 2);  
+    RemovePrevInstr(2);                                                       // Remove: mov eax, [ebp + Value], push eax, fld dword ptr [esp]
+    GenNew($D9); Gen($85); GenDWord(Value);                                   // fld dword ptr [ebp + Value]      
+    Result := TRUE;
+    Exit;
+    end    
+    
+    
+  // Optimization: (mov eax, [esi]) + (push eax) + (fld dword ptr [esp]) + (pop eax) -> (fld dword ptr [esi])
+  else if (Reg = EAX) and (PrevInstrByte(2, 0) = $8B) and (PrevInstrByte(2, 1) = $06)                                 // Previous: mov eax, [esi]
+                      and (PrevInstrByte(1, 0) = $50)                                                                 // Previous: push eax
+                      and (PrevInstrByte(0, 0) = $D9) and (PrevInstrByte(0, 1) = $04) and (PrevInstrByte(0, 2) = $24) // Previous: fld dword ptr [esp] 
+  then        
+    begin   
+    RemovePrevInstr(2);                                                       // Remove: mov eax, [esi], push eax, fld dword ptr [esp]
+    GenNew($D9); Gen($06);                                                    // fld dword ptr [esi]      
+    Result := TRUE;
+    Exit;
     end;
+    
       
   end;
 
