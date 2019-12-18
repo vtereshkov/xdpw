@@ -1282,7 +1282,6 @@ if Types[ResultType].Kind = REALTYPE then     // Real type
   GenPushToFPU;                                                            // fld dword ptr [esp]  ;  st = operand2
   GenPopReg(EAX);                                                          // pop eax
   GenPushToFPU;                                                            // fld dword ptr [esp]  ;  st(1) = operand2;  st = operand1
-  GenNew($D9); Gen($C9);                                                   // fxch                 ;  st = operand2;  st(1) = operand1
 
   case op of
     PLUSTOK:
@@ -1291,7 +1290,7 @@ if Types[ResultType].Kind = REALTYPE then     // Real type
       end;
     MINUSTOK:
       begin
-      GenNew($DE); Gen($E9);                                               // fsub  ;  st(1) := st(1) - st;  pop
+      GenNew($DE); Gen($E1);                                               // fsubr  ;  st(1) := st - st(1);  pop
       end;
     MULTOK:
       begin
@@ -1299,7 +1298,7 @@ if Types[ResultType].Kind = REALTYPE then     // Real type
       end;
     DIVTOK:
       begin
-      GenNew($DE); Gen($F9);                                               // fdiv  ;  st(1) := st(1) / st;  pop
+      GenNew($DE); Gen($F1);                                               // fdivr  ;  st(1) := st / st(1);  pop
       end;
   end;// case
 
