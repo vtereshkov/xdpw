@@ -1559,39 +1559,91 @@ end;
 
 
 procedure GenerateForAssignmentAndNumberOfIterations{(CounterType: Integer; Down: Boolean)};
-begin
-GenPopReg(EAX);                                                 // pop eax       ; final value
-GenPopReg(ECX);                                                 // pop ecx       ; initial value
-GenPopReg(ESI);                                                 // pop esi       ; counter address
-                                                          
-case TypeSize(CounterType) of
-  1: begin
-     GenNew($88); Gen($0E);                                     // mov [esi], cl
-     end;
-  2: begin
-     GenNew($66); Gen($89); Gen($0E);                           // mov [esi], cx
-     end;
-  4: begin
-     GenNew($89); Gen($0E);                                     // mov [esi], ecx
-     end
-else
-  Error('Internal fault: Illegal designator size');
-end; // case
 
-// Number of iterations
-if Down then
+
+  function OptimizeGenerateForAssignmentAndNumberOfIterations: Boolean;
+  var
+    InitialValue, FinalValue: LongInt;
+    InitialValueRelocIndex, FinalValueRelocIndex: LongInt;
   begin
-  GenNew($29); Gen($C1);                                        // sub ecx, eax
-  GenNew($41);                                                  // inc ecx
-  GenPushReg(ECX);                                              // push ecx  
-  end
-else
+  Result := FALSE;
+
+  // Optimization: (push InitialValue) + (push FinalValue) + ... -> ... (constant initial and final values)
+  if (PrevInstrByte(1, 0) = $68) and (PrevInstrByte(0, 0) = $68) then       // Previous: push InitialValue, push FinalValue
+    begin
+    InitialValue := PrevInstrDWord(1, 1);
+    InitialValueRelocIndex := PrevInstrRelocDWordIndex(1, 1);
+
+    FinalValue := PrevInstrDWord(0, 1);
+    FinalValueRelocIndex := PrevInstrRelocDWordIndex(0, 1);
+    
+    if (InitialValueRelocIndex = 0) and (FinalValueRelocIndex = 0) then     // Non-relocatable values only
+      begin
+      RemovePrevInstr(1);                                                   // Remove: push InitialValue, push FinalValue
+      
+      GenPopReg(ESI);                                                       // pop esi       ; counter address
+
+      case TypeSize(CounterType) of
+        1: begin
+           GenNew($C6); Gen($06); Gen(Byte(InitialValue));                  // mov byte ptr [esi], InitialValue
+           end;
+        2: begin
+           GenNew($66); Gen($C7); Gen($06); GenWord(Word(InitialValue));    // mov word ptr [esi], InitialValue
+           end;
+        4: begin
+           GenNew($C7); Gen($06); GenDWord(InitialValue);                   // mov dword ptr [esi], InitialValue
+           end
+        else
+          Error('Internal fault: Illegal designator size');
+        end; // case
+      
+      // Number of iterations
+      if Down then
+        PushConst(InitialValue - FinalValue + 1)
+      else
+        PushConst(FinalValue - InitialValue + 1);
+
+      Result := TRUE;        
+      end;
+    end;    
+  end;
+  
+
+begin
+if not OptimizeGenerateForAssignmentAndNumberOfIterations then
   begin
-  GenNew($2B); Gen($C1);                                        // sub eax, ecx
-  GenNew($40);                                                  // inc eax
-  GenPushReg(EAX);                                              // push eax  
-  end;  
- 
+  GenPopReg(EAX);                                                 // pop eax       ; final value
+  GenPopReg(ECX);                                                 // pop ecx       ; initial value
+  GenPopReg(ESI);                                                 // pop esi       ; counter address
+                                                            
+  case TypeSize(CounterType) of
+    1: begin
+       GenNew($88); Gen($0E);                                     // mov [esi], cl
+       end;
+    2: begin
+       GenNew($66); Gen($89); Gen($0E);                           // mov [esi], cx
+       end;
+    4: begin
+       GenNew($89); Gen($0E);                                     // mov [esi], ecx
+       end
+  else
+    Error('Internal fault: Illegal designator size');
+  end; // case
+
+  // Number of iterations
+  if Down then
+    begin
+    GenNew($29); Gen($C1);                                        // sub ecx, eax
+    GenNew($41);                                                  // inc ecx
+    GenPushReg(ECX);                                              // push ecx  
+    end
+  else
+    begin
+    GenNew($2B); Gen($C1);                                        // sub eax, ecx
+    GenNew($40);                                                  // inc eax
+    GenPushReg(EAX);                                              // push eax  
+    end;  
+  end;
 end;
 
 

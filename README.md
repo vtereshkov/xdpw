@@ -211,7 +211,7 @@ The compiler is based on a recursive descent parser. It directly builds a Window
 Some simple peephole optimizations are performed:
 * Push/pop elimination
 * FPU push/pop elimination
-* Local variable loading optimizations (32-bit variables only)
+* Local variable loading optimizations
 * Array element access optimizations
 * Record field access optimizations
 * Assignment optimizations
