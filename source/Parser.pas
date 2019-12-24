@@ -14,16 +14,24 @@ interface
 uses Common, Scanner, CodeGen, Linker;
 
 
-procedure CompileProgramOrUnit;
+function CompileProgramOrUnit(const Name: TString): Integer;
 
 
 
 implementation
 
 
+
+type
+  TParserState = record
+    IsUnit, IsInterfaceSection: Boolean;
+    UnitStatus: TUnitStatus;
+  end;  
+
+
+
 var
-  IsUnit: Boolean;
-  IsInterfaceSection: Boolean;
+  ParserState: TParserState;
 
 
 
@@ -48,7 +56,7 @@ if BlockStack[BlockStackTop].Index = 1 then IdentScope := GLOBAL else IdentScope
 
 i := GetIdentUnsafe(IdentName, FALSE, IdentReceiverType);
 
-if (i > 0) and (Ident[i].UnitIndex = NumUnits) and (Ident[i].Block = BlockStack[BlockStackTop].Index) then
+if (i > 0) and (Ident[i].UnitIndex = ParserState.UnitStatus.Index) and (Ident[i].Block = BlockStack[BlockStackTop].Index) then
   Error('Duplicate identifier ' + IdentName);
 
 Inc(NumIdent);
@@ -62,7 +70,7 @@ with Ident[NumIdent] do
   Scope               := IdentScope;
   RelocType           := UNINITDATARELOC;
   DataType            := IdentDataType;
-  UnitIndex           := NumUnits;
+  UnitIndex           := ParserState.UnitStatus.Index;
   Block               := BlockStack[BlockStackTop].Index;
   NestingLevel        := BlockStackTop;
   ReceiverName        := IdentReceiverName;
@@ -71,7 +79,7 @@ with Ident[NumIdent] do
   Signature.IsStdCall := FALSE;
   PassMethod          := IdentPassMethod;
   IsUnresolvedForward := FALSE;
-  IsExported          := IsInterfaceSection and (IdentScope = GLOBAL);
+  IsExported          := ParserState.IsInterfaceSection and (IdentScope = GLOBAL);
   ForLoopNesting      := 0;
   end;
 
@@ -3513,7 +3521,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     Result := FALSE;
     
     // Procedure interface in the interface section of a unit is an implicit forward declaration
-    if IsInterfaceSection and (BlockStack[BlockStackTop].Index = 1) then
+    if ParserState.IsInterfaceSection and (BlockStack[BlockStackTop].Index = 1) then
       begin 
       Inc(NumBlocks);
       if NumBlocks > MAXBLOCKS then
@@ -3724,10 +3732,10 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       end;// while
       
       
-    if IsUnit and IsInterfaceSection and (BlockStack[BlockStackTop].Index = 1) then
+    if ParserState.IsUnit and ParserState.IsInterfaceSection and (BlockStack[BlockStackTop].Index = 1) then
       begin
       EatTok(IMPLEMENTATIONTOK);
-      IsInterfaceSection := FALSE;
+      ParserState.IsInterfaceSection := FALSE;
       end
     else
       Break;    
@@ -3816,7 +3824,7 @@ with BlockStack[BlockStackTop] do
   TempDataSize := 0;
   end;
   
-if (NumUnits = 1) and (BlockStack[BlockStackTop].Index = 1) then
+if (ParserState.UnitStatus.Index = 1) and (BlockStack[BlockStackTop].Index = 1) then
   begin
   DeclarePredefinedTypes;
   DeclarePredefinedIdents;
@@ -3824,7 +3832,7 @@ if (NumUnits = 1) and (BlockStack[BlockStackTop].Index = 1) then
   
 CompileDeclarations;
 
-if IsUnit and (BlockStack[BlockStackTop].Index = 1) then
+if ParserState.IsUnit and (BlockStack[BlockStackTop].Index = 1) then
   begin
   // Main block of a unit (may contain the implementation part, but not statements) 
     
@@ -3910,14 +3918,32 @@ end;// CompileBlock
 
 procedure CompileUsesClause;
 var
+  SavedParserState: TParserState;
   UnitIndex: Integer;
 begin
 NextTok;  
 
 repeat 
   AssertIdent;
-  UnitIndex := GetUnit(Tok.Name);
-  Units[UnitIndex].IsUsed := TRUE;
+  
+  UnitIndex := GetUnitUnsafe(Tok.Name);
+  
+  // If unit is not found, compile it now
+  if UnitIndex = 0 then
+    begin
+    SavedParserState := ParserState;    
+    if not SaveScanner then
+      Error('Unit nesting is too deep');
+ 
+    UnitIndex := CompileProgramOrUnit(Tok.Name + '.pas');
+
+    ParserState := SavedParserState;    
+    if not RestoreScanner then
+      Error('Internal fault: Scanner state cannot be restored'); 
+    end;
+    
+  ParserState.UnitStatus.UsedUnits := ParserState.UnitStatus.UsedUnits + [UnitIndex]; 
+  SetUnitStatus(ParserState.UnitStatus);
   
   NextTok;
   
@@ -3932,51 +3958,57 @@ end; // CompileUsesClause
 
 
 
-procedure CompileProgramOrUnit;
-var
-  UnitIndex: Integer;
-  
+function CompileProgramOrUnit{(const Name: TString): Integer}; 
 begin
+InitializeScanner(Name);
+
 Inc(NumUnits);
 if NumUnits > MAXUNITS then
   Error('Maximum number of units exceeded');
+ParserState.UnitStatus.Index := NumUnits;
 
 NextTok;
 
-IsUnit := FALSE;
+ParserState.IsUnit := FALSE;
 if Tok.Kind = UNITTOK then
-  IsUnit := TRUE
+  ParserState.IsUnit := TRUE
 else
   CheckTok(PROGRAMTOK);
   
 NextTok; 
 AssertIdent;
-Units[NumUnits].Name := Tok.Name;
+Units[ParserState.UnitStatus.Index].Name := Tok.Name;
 
 NextTok;
 EatTok(SEMICOLONTOK);
 
-IsInterfaceSection := FALSE;
-if IsUnit then
+ParserState.IsInterfaceSection := FALSE;
+if ParserState.IsUnit then
   begin
   EatTok(INTERFACETOK);
-  IsInterfaceSection := TRUE;
+  ParserState.IsInterfaceSection := TRUE;
   end;
   
-for UnitIndex := 1 to NumUnits do
-  Units[UnitIndex].IsUsed := FALSE;
-  
 // Always use System unit, except when compiling System unit itself
-if NumUnits > 1 then
-  Units[1].IsUsed := TRUE; 
+if NumUnits > 1 then    
+  ParserState.UnitStatus.UsedUnits := [1]
+else  
+  ParserState.UnitStatus.UsedUnits := []; 
+  
+SetUnitStatus(ParserState.UnitStatus);  
 
 if Tok.Kind = USESTOK then
-  CompileUsesClause;   
+  CompileUsesClause;
+
+WriteLn('Compiling ', Name);
 
 NumBlocks := 1;  
 CompileBlock(0);
 
 CheckTok(PERIODTOK);
+
+Result := ParserState.UnitStatus.Index;
+FinalizeScanner;
 end;// CompileProgram
 
 

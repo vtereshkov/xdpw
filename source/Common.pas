@@ -282,19 +282,19 @@ type
   
   TUnit = record
     Name: TString;
-    IsUsed: Boolean;
-  end;  
+  end;
 
-  TUnitFile = record
-    FileName: TString;
-    Buffer: PChar;
-    Size, Pos, Line: Integer;
-  end;    
+  TUnitStatus = record
+    Index: Integer;
+    UsedUnits: set of Byte;
+  end;      
   
   TWithDesignator = record
     TempPointer: Integer;
     DataType: Integer;
   end;
+  
+  TErrorProc = procedure (const Msg: TString);
   
   
 
@@ -305,8 +305,6 @@ var
   Units: array [1..MAXUNITS] of TUnit;
   BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
   WithStack: array [1..MAXWITHNESTING] of TWithDesignator;
-
-  UnitFile: TUnitFile;
   
   MultiplicativeOperators, AdditiveOperators, UnaryOperators, RelationOperators,
   OperatorsForIntegers, OperatorsForReals, OperatorsForBooleans: set of TTokenKind;
@@ -318,11 +316,14 @@ var
   
   IsConsoleProgram: Boolean;
   
+  SourceFolder, UnitsFolder: TString;
+  
 
 
 procedure InitializeCommon;
 procedure FinalizeCommon;
 function GetTokSpelling(TokKind: TTokenKind): TString;
+procedure SetErrorProc(Err: TErrorProc);
 procedure Error(const Msg: TString);
 procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
 function LowBound(DataType: Integer): Integer;
@@ -333,8 +334,10 @@ function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
 function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
 procedure CheckOperator(const Tok: TToken; DataType: Integer);
 procedure CheckSignatures(var Signature1, Signature2: TSignature; const Name: TString); 
-function GetKeyword(const KeywordName: TString): TTokenKind;
+procedure SetUnitStatus(var NewUnitStatus: TUnitStatus);
+function GetUnitUnsafe(const UnitName: TString): Integer;
 function GetUnit(const UnitName: TString): Integer;
+function GetKeyword(const KeywordName: TString): TTokenKind;
 function GetIdentUnsafe(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer;
 function GetIdent(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer;
 function GetFieldUnsafe(RecType: Integer; const FieldName: TString): Integer;
@@ -398,6 +401,11 @@ const
     );
 
 
+var
+  ErrorProc: TErrorProc;
+  UnitStatus: TUnitStatus;
+  
+  
 
 
 procedure FillOperatorSets;
@@ -445,7 +453,10 @@ WithNesting                 := 0;
 InitializedGlobalDataSize   := 0;
 UninitializedGlobalDataSize := 0;
 
-IsConsoleProgram            := TRUE;  // Console program by default 
+IsConsoleProgram            := TRUE;  // Console program by default
+
+SourceFolder                := '';
+UnitsFolder                 := ''; 
 
 FillOperatorSets;
 FillTypeSets;
@@ -476,14 +487,6 @@ for i := 1 to NumTypes do
     for j := 1 to Types[i].NumFields do
       Dispose(Types[i].Field[j]);
   end;
-
-// Dispose of unit input buffer
-with UnitFile do
-  if Buffer <> nil then
-    begin
-    FreeMem(Buffer, Size);
-    Buffer := nil;
-    end;
 end;
 
 
@@ -528,16 +531,17 @@ end;
 
 
 
+procedure SetErrorProc{(Err: TErrorProc)};
+begin
+ErrorProc := Err;
+end;
+
+
+
   
 procedure Error{(const Msg: TString)};
 begin
-if NumUnits >= 1 then
-  WriteLn('Error ', UnitFile.FileName, ' ', UnitFile.Line, ': ', Msg)
-else
-  WriteLn('Error: ', Msg);  
-
-FinalizeCommon;
-Halt(1);
+ErrorProc(Msg);
 end;
 
 
@@ -809,7 +813,42 @@ if Signature1.ResultType <> Signature2.ResultType then
 if Signature1.IsStdCall <> Signature2.IsStdCall then
   Error('STDCALL is incompatible with non-STDCALL in ' + Name);
 
-end;  
+end;
+
+
+
+
+procedure SetUnitStatus{(var NewUnitStatus: TUnitStatus)};
+begin 
+UnitStatus := NewUnitStatus;
+end;
+
+
+
+
+function GetUnitUnsafe{(const UnitName: TString): Integer};
+var
+  UnitIndex: Integer;
+begin
+for UnitIndex := 1 to NumUnits do
+  if Units[UnitIndex].Name = UnitName then 
+    begin
+    Result := UnitIndex;
+    Exit;
+    end;
+      
+Result := 0;
+end;
+
+
+
+
+function GetUnit{(const UnitName: TString): Integer};
+begin
+Result := GetUnitUnsafe(UnitName);
+if Result = 0 then
+  Error('Unknown unit ' + UnitName);
+end;
 
 
 
@@ -840,24 +879,6 @@ end;
 
 
 
-function GetUnit{(const UnitName: TString): Integer};
-var
-  UnitIndex: Integer;
-begin
-for UnitIndex := 1 to NumUnits do
-  if Units[UnitIndex].Name = UnitName then 
-    begin
-    Result := UnitIndex;
-    Exit;
-    end;
-      
-Result := 0;
-Error('Unknown unit ' + UnitName);
-end;
-
-
-
-
 function GetIdentUnsafe{(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer};
 var
   IdentIndex, BlockStackIndex: Integer;
@@ -866,7 +887,7 @@ begin
 for BlockStackIndex := BlockStackTop downto 1 do
   for IdentIndex := NumIdent downto 1 do
     with Ident[IdentIndex] do
-      if (Name = IdentName) and (UnitIndex = NumUnits) and (Block = BlockStack[BlockStackIndex].Index) and       
+      if (Name = IdentName) and (UnitIndex = UnitStatus.Index) and (Block = BlockStack[BlockStackIndex].Index) and       
          (AllowForwardReference or (Kind <> USERTYPE) or (Types[DataType].Kind <> FORWARDTYPE)) and
          (ReceiverType = RecType)  // Receiver type for methods, 0 otherwise
       then 
@@ -878,7 +899,7 @@ for BlockStackIndex := BlockStackTop downto 1 do
 // If unsuccessful, search other used units
 for IdentIndex := NumIdent downto 1 do
   with Ident[IdentIndex] do  
-    if (Name = IdentName) and (UnitIndex <> NumUnits) and IsExported and Units[UnitIndex].IsUsed and
+    if (Name = IdentName) and (UnitIndex <> UnitStatus.Index) and IsExported and (UnitIndex in UnitStatus.UsedUnits) and
        (ReceiverType = RecType)  // Receiver type for methods, 0 otherwise
     then 
       begin

@@ -13,31 +13,59 @@ uses Common, Scanner, Parser, CodeGen, Linker;
 
 
 
-procedure ChangeExt(const InStr, Ext: TString; var OutStr: TString);
+
+procedure SplitPath(const Path: TString; var Folder, Name, Ext: TString);
 var
-  i, DotPos: Integer;
+  DotPos, SlashPos, i: Integer;
 begin
-DotPos := 0;
+Folder := '';  
+Name := Path;  
+Ext := '';
 
-for i := Length(InStr) downto 1 do
-  if InStr[i] = '.' then
-    begin
-    DotPos := i;
-    Break;
-    end;
+DotPos := 0;  
+SlashPos := 0;
 
-OutStr := InStr;
-if DotPos > 0 then SetLength(OutStr, DotPos);  
-OutStr := OutStr + Ext;
+for i := Length(Path) downto 1 do
+  if (Path[i] = '.') and (DotPos = 0) then 
+    DotPos := i
+  else if (Path[i] = '\') and (SlashPos = 0) then
+    SlashPos := i; 
+
+if DotPos > 0 then
+  begin
+  Name := Copy(Path, 1, DotPos - 1);
+  Ext  := Copy(Path, DotPos, Length(Path) - DotPos + 1);
+  end;
+  
+if SlashPos > 0 then
+  begin
+  Folder := Copy(Path, 1, SlashPos);
+  Name   := Copy(Path, SlashPos + 1, Length(Name) - SlashPos);
+  end;  
+
+end;
+
+
+
+
+procedure ErrorProc(const Msg: TString);
+begin
+if NumUnits >= 1 then
+  WriteLn('Error ', ScannerFileName, ' ', ScannerLine, ': ', Msg)
+else
+  WriteLn('Error: ', Msg);  
+
+repeat FinalizeScanner until not RestoreScanner;
+FinalizeCommon;
+Halt(1);
 end;
 
 
 
 
 var
-  UnitName, ExeName: TString;
-  ParamIndex: Integer;
-
+  PasPath, PasFolder, PasName, PasExt, ExePath: TString;
+  
 
 
 begin
@@ -47,34 +75,31 @@ WriteLn('Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov');
 
 if ParamCount < 1 then
   begin
-  WriteLn('Usage: xdpw <unit1.pas> <unit2.pas> ... <prog.pas>');
+  WriteLn('Usage: xdpw <file.pas>');
   Halt(1);
   end;
+
+PasPath := ParamStr(1);
+SplitPath(PasPath, PasFolder, PasName, PasExt);
+
+SetErrorProc(@ErrorProc);
 
 InitializeCommon;
 InitializeLinker;
 InitializeCodeGen;
+
+SourceFolder := PasFolder;
+UnitsFolder  := 'units\';
    
-for ParamIndex := 0 to ParamCount do
-  begin 
-  if ParamIndex = 0 then
-    UnitName := 'System.pas'
-  else
-    begin
-    UnitName := ParamStr(ParamIndex); 
-    WriteLn('Compiling ', UnitName);
-    end;
+CompileProgramOrUnit('system.pas');
+CompileProgramOrUnit(PasName + PasExt);
 
-  // Compile
-  InitializeScanner(UnitName);
-  CompileProgramOrUnit;
-  FinalizeScanner;
-  end;
-
-ChangeExt(UnitName, 'exe', ExeName);
-LinkAndWriteProgram(ExeName);
+ExePath := PasFolder + PasName + '.exe';
+LinkAndWriteProgram(ExePath);
 
 WriteLn('Compilation complete. Code size: ', GetCodeSize, ' bytes. Data size: ', InitializedGlobalDataSize + UninitializedGlobalDataSize, ' bytes.');
+
+repeat FinalizeScanner until not RestoreScanner;
 FinalizeCommon;
 end.
 

@@ -20,7 +20,7 @@ XD Pascal is a small educational self-hosting compiler for a Pascal language dia
 ### Usage
 Type in the command prompt:
 ```
-xdpw <unit1.pas> <unit2.pas> ... <prog.pas>
+xdpw <file.pas>
 ```
 The source file should be specified with its extension (.pas).
  
