@@ -20,7 +20,7 @@ XD Pascal is a small educational self-hosting compiler for a Pascal language dia
 ### Usage
 Type in the command prompt:
 ```
-xdpw <unit1.pas> <unit2.pas> ... <prog.pas>
+xdpw <file.pas>
 ```
 The source file should be specified with its extension (.pas).
  
@@ -211,7 +211,7 @@ The compiler is based on a recursive descent parser. It directly builds a Window
 Some simple peephole optimizations are performed:
 * Push/pop elimination
 * FPU push/pop elimination
-* Local variable loading optimizations (32-bit variables only)
+* Local variable loading optimizations
 * Array element access optimizations
 * Record field access optimizations
 * Assignment optimizations

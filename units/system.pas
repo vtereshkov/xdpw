@@ -139,6 +139,7 @@ procedure AppendStr(var Dest: string; const Source: string);
 procedure ConcatStr(const s1, s2: string; var s: string);
 function CompareStr(const s1, s2: string): Integer;
 procedure Move(const Source; var Dest; Count: Integer);
+function Copy(const S: string; Index, Count: Integer): string;
 procedure FillChar(var Data; Count: Integer; Value: Char);
 function ParseCmdLine(Index: Integer; var Str: string): Integer;
 function ParamCount: Integer;
@@ -355,6 +356,17 @@ end;
 
 
 
+function Copy{(const S: string; Index, Count: Integer): string};
+var
+  i: Integer;
+begin
+Move(S[Index], Result, Count);
+Result[Count + 1] := #0;  
+end;
+
+
+
+
 procedure FillChar{(var Data; Count: Integer; Value: Char)};
 var
   D: ^string;
@@ -378,8 +390,8 @@ var
 
 begin
 CmdLinePtr := GetCommandLineA;
-CmdLine := CmdLinePtr^;
-CmdLineLen := Length(CmdLine);
+CmdLineLen := Length(CmdLinePtr^);
+Move(CmdLinePtr^, CmdLine, CmdLineLen + 1);
 
 NumParam := 1;
 ParamPtr[NumParam - 1] := @CmdLine;

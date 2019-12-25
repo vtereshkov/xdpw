@@ -550,14 +550,43 @@ procedure GenPopReg(Reg: TRegister);
         
   // Optimization: (push esi) + (mov eax, [ebp + Value]) + (pop esi) -> (mov eax, [ebp + Value])
   else if (Reg = ESI) and (PrevInstrByte(1, 0) = $56)                                             // Previous: push esi
-                      and (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $85) then        // Previous: mov eax, [ebp + Value]
+                      and (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $85)             // Previous: mov eax, [ebp + Value]
+  then        
     begin
     Value := PrevInstrDWord(0, 2);    
     RemovePrevInstr(1);                                                       // Remove: push esi, mov eax, [ebp + Value]
     GenNew($8B); Gen($85); GenDWord(Value);                                   // mov eax, [ebp + Value]      
     Result := TRUE;
     Exit;
+    end
+    
+    
+  // Optimization: (mov eax, [ebp + Value]) + (push eax) + (fld dword ptr [esp]) + (pop eax) -> (fld dword ptr [ebp + Value])
+  else if (Reg = EAX) and (PrevInstrByte(2, 0) = $8B) and (PrevInstrByte(2, 1) = $85)                                 // Previous: mov eax, [ebp + Value]
+                      and (PrevInstrByte(1, 0) = $50)                                                                 // Previous: push eax
+                      and (PrevInstrByte(0, 0) = $D9) and (PrevInstrByte(0, 1) = $04) and (PrevInstrByte(0, 2) = $24) // Previous: fld dword ptr [esp] 
+  then        
+    begin 
+    Value := PrevInstrDWord(2, 2);  
+    RemovePrevInstr(2);                                                       // Remove: mov eax, [ebp + Value], push eax, fld dword ptr [esp]
+    GenNew($D9); Gen($85); GenDWord(Value);                                   // fld dword ptr [ebp + Value]      
+    Result := TRUE;
+    Exit;
+    end    
+    
+    
+  // Optimization: (mov eax, [esi]) + (push eax) + (fld dword ptr [esp]) + (pop eax) -> (fld dword ptr [esi])
+  else if (Reg = EAX) and (PrevInstrByte(2, 0) = $8B) and (PrevInstrByte(2, 1) = $06)                                 // Previous: mov eax, [esi]
+                      and (PrevInstrByte(1, 0) = $50)                                                                 // Previous: push eax
+                      and (PrevInstrByte(0, 0) = $D9) and (PrevInstrByte(0, 1) = $04) and (PrevInstrByte(0, 2) = $24) // Previous: fld dword ptr [esp] 
+  then        
+    begin   
+    RemovePrevInstr(2);                                                       // Remove: mov eax, [esi], push eax, fld dword ptr [esp]
+    GenNew($D9); Gen($06);                                                    // fld dword ptr [esi]      
+    Result := TRUE;
+    Exit;
     end;
+    
       
   end;
 
@@ -844,6 +873,8 @@ procedure GetArrayElementPtr{(ArrType: Integer)};
   begin
   Result := FALSE;
   
+  // Global arrays
+  
   // Optimization: (push BaseAddr) + (mov eax, [ebp + IndexAddr]) + (pop esi) -> (mov esi, BaseAddr) + (mov eax, [ebp + IndexAddr]) 
   if (PrevInstrByte(1, 0) = $68) and (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $85) then    // Previous: push BaseAddr, mov eax, [ebp + IndexAddr]
     begin
@@ -866,13 +897,47 @@ procedure GetArrayElementPtr{(ArrType: Integer)};
     
     RemovePrevInstr(1);                             // Remove: push BaseAddr, mov eax, Index
     
-    GenNew($BE); GenDWord(BaseAddr);                // mov esi, BaseAddr         ; suilable for relocatable addresses (instruction length is the same as for push BaseAddr)
+    GenNew($BE); GenDWord(BaseAddr);                // mov esi, BaseAddr         ; suitable for relocatable addresses (instruction length is the same as for push BaseAddr)
     GenNew($B8); GenDWord(Index);                   // mov eax, Index 
             
     Result := TRUE;
-    end;
+    end 
     
+  // Local arrays  
     
+  // Optimization: (mov eax, [ebp + BaseAddr]) + (push eax) + (mov eax, [ebp + IndexAddr]) + (pop esi) -> (mov esi, [ebp + BaseAddr]) + (mov eax, [ebp + IndexAddr]) 
+  else if (PrevInstrByte(2, 0) = $8B) and (PrevInstrByte(2, 1) = $85) and     // Previous: mov eax, [ebp + BaseAddr]
+          (PrevInstrByte(1, 0) = $50) and                                     // Previous: push eax
+          (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $85)         // Previous: mov eax, [ebp + IndexAddr]
+  then   
+    begin
+    BaseAddr  := PrevInstrDWord(2, 2);
+    IndexAddr := PrevInstrDWord(0, 2);
+    
+    RemovePrevInstr(2);                             // Remove: mov eax, [ebp + BaseAddr], push eax, mov eax, [ebp + IndexAddr]
+    
+    GenNew($8B); Gen($B5); GenDWord(BaseAddr);      // mov esi, [ebp + BaseAddr] 
+    GenNew($8B); Gen($85); GenDWord(IndexAddr);     // mov eax, [ebp + IndexAddr] 
+            
+    Result := TRUE;
+    end
+    
+  // Optimization: (mov eax, [ebp + BaseAddr]) + (push eax) + (mov eax, Index) + (pop esi) -> (mov esi, [ebp + BaseAddr]) + (mov eax, Index) 
+  else if (PrevInstrByte(2, 0) = $8B) and (PrevInstrByte(2, 1) = $85) and     // Previous: mov eax, [ebp + BaseAddr]
+          (PrevInstrByte(1, 0) = $50) and                                     // Previous: push eax
+          (PrevInstrByte(0, 0) = $B8)                                         // Previous: mov eax, Index
+  then   
+    begin
+    BaseAddr  := PrevInstrDWord(2, 2);
+    Index     := PrevInstrDWord(0, 1);
+    
+    RemovePrevInstr(2);                             // Remove: mov eax, [ebp + BaseAddr], push eax, mov eax, Index
+    
+    GenNew($8B); Gen($B5); GenDWord(BaseAddr);      // mov esi, [ebp + BaseAddr] 
+    GenNew($B8); GenDWord(Index);                   // mov eax, Index 
+            
+    Result := TRUE;
+    end
     
   end; 
 
@@ -1246,7 +1311,6 @@ if Types[ResultType].Kind = REALTYPE then     // Real type
   GenPushToFPU;                                                            // fld dword ptr [esp]  ;  st = operand2
   GenPopReg(EAX);                                                          // pop eax
   GenPushToFPU;                                                            // fld dword ptr [esp]  ;  st(1) = operand2;  st = operand1
-  GenNew($D9); Gen($C9);                                                   // fxch                 ;  st = operand2;  st(1) = operand1
 
   case op of
     PLUSTOK:
@@ -1255,7 +1319,7 @@ if Types[ResultType].Kind = REALTYPE then     // Real type
       end;
     MINUSTOK:
       begin
-      GenNew($DE); Gen($E9);                                               // fsub  ;  st(1) := st(1) - st;  pop
+      GenNew($DE); Gen($E1);                                               // fsubr  ;  st(1) := st - st(1);  pop
       end;
     MULTOK:
       begin
@@ -1263,7 +1327,7 @@ if Types[ResultType].Kind = REALTYPE then     // Real type
       end;
     DIVTOK:
       begin
-      GenNew($DE); Gen($F9);                                               // fdiv  ;  st(1) := st(1) / st;  pop
+      GenNew($DE); Gen($F1);                                               // fdivr  ;  st(1) := st / st(1);  pop
       end;
   end;// case
 
@@ -1495,39 +1559,91 @@ end;
 
 
 procedure GenerateForAssignmentAndNumberOfIterations{(CounterType: Integer; Down: Boolean)};
-begin
-GenPopReg(EAX);                                                 // pop eax       ; final value
-GenPopReg(ECX);                                                 // pop ecx       ; initial value
-GenPopReg(ESI);                                                 // pop esi       ; counter address
-                                                          
-case TypeSize(CounterType) of
-  1: begin
-     GenNew($88); Gen($0E);                                     // mov [esi], cl
-     end;
-  2: begin
-     GenNew($66); Gen($89); Gen($0E);                           // mov [esi], cx
-     end;
-  4: begin
-     GenNew($89); Gen($0E);                                     // mov [esi], ecx
-     end
-else
-  Error('Internal fault: Illegal designator size');
-end; // case
 
-// Number of iterations
-if Down then
+
+  function OptimizeGenerateForAssignmentAndNumberOfIterations: Boolean;
+  var
+    InitialValue, FinalValue: LongInt;
+    InitialValueRelocIndex, FinalValueRelocIndex: LongInt;
   begin
-  GenNew($29); Gen($C1);                                        // sub ecx, eax
-  GenNew($41);                                                  // inc ecx
-  GenPushReg(ECX);                                              // push ecx  
-  end
-else
+  Result := FALSE;
+
+  // Optimization: (push InitialValue) + (push FinalValue) + ... -> ... (constant initial and final values)
+  if (PrevInstrByte(1, 0) = $68) and (PrevInstrByte(0, 0) = $68) then       // Previous: push InitialValue, push FinalValue
+    begin
+    InitialValue := PrevInstrDWord(1, 1);
+    InitialValueRelocIndex := PrevInstrRelocDWordIndex(1, 1);
+
+    FinalValue := PrevInstrDWord(0, 1);
+    FinalValueRelocIndex := PrevInstrRelocDWordIndex(0, 1);
+    
+    if (InitialValueRelocIndex = 0) and (FinalValueRelocIndex = 0) then     // Non-relocatable values only
+      begin
+      RemovePrevInstr(1);                                                   // Remove: push InitialValue, push FinalValue
+      
+      GenPopReg(ESI);                                                       // pop esi       ; counter address
+
+      case TypeSize(CounterType) of
+        1: begin
+           GenNew($C6); Gen($06); Gen(Byte(InitialValue));                  // mov byte ptr [esi], InitialValue
+           end;
+        2: begin
+           GenNew($66); Gen($C7); Gen($06); GenWord(Word(InitialValue));    // mov word ptr [esi], InitialValue
+           end;
+        4: begin
+           GenNew($C7); Gen($06); GenDWord(InitialValue);                   // mov dword ptr [esi], InitialValue
+           end
+        else
+          Error('Internal fault: Illegal designator size');
+        end; // case
+      
+      // Number of iterations
+      if Down then
+        PushConst(InitialValue - FinalValue + 1)
+      else
+        PushConst(FinalValue - InitialValue + 1);
+
+      Result := TRUE;        
+      end;
+    end;    
+  end;
+  
+
+begin
+if not OptimizeGenerateForAssignmentAndNumberOfIterations then
   begin
-  GenNew($2B); Gen($C1);                                        // sub eax, ecx
-  GenNew($40);                                                  // inc eax
-  GenPushReg(EAX);                                              // push eax  
-  end;  
- 
+  GenPopReg(EAX);                                                 // pop eax       ; final value
+  GenPopReg(ECX);                                                 // pop ecx       ; initial value
+  GenPopReg(ESI);                                                 // pop esi       ; counter address
+                                                            
+  case TypeSize(CounterType) of
+    1: begin
+       GenNew($88); Gen($0E);                                     // mov [esi], cl
+       end;
+    2: begin
+       GenNew($66); Gen($89); Gen($0E);                           // mov [esi], cx
+       end;
+    4: begin
+       GenNew($89); Gen($0E);                                     // mov [esi], ecx
+       end
+  else
+    Error('Internal fault: Illegal designator size');
+  end; // case
+
+  // Number of iterations
+  if Down then
+    begin
+    GenNew($29); Gen($C1);                                        // sub ecx, eax
+    GenNew($41);                                                  // inc ecx
+    GenPushReg(ECX);                                              // push ecx  
+    end
+  else
+    begin
+    GenNew($2B); Gen($C1);                                        // sub eax, ecx
+    GenNew($40);                                                  // inc eax
+    GenPushReg(EAX);                                              // push eax  
+    end;  
+  end;
 end;
 
 
