@@ -1172,17 +1172,43 @@ end;// GenerateRound
 
 
 procedure GenerateFloat{(Depth: Byte)};
-begin
-if Depth = 0 then
+
+
+  function OptimizeGenerateFloat: Boolean;
+  var
+    ConstVal: TConst;
+    ValueRelocIndex: LongInt;
   begin
-  GenNew($DB); Gen($04); Gen($24);                                         // fild dword ptr [esp]  ;  st := float(operand)
-  GenPopFromFPU;                                                           // fstp dword ptr [esp]  ;  [esp] := st;  pop
-  end
-else
-  begin  
-  GenNew($DB); Gen($44); Gen($24); Gen(Depth);                             // fild dword ptr [esp + Depth]  ;  st := float(operand)
-  GenNew($D9); Gen($5C); Gen($24); Gen(Depth);                             // fstp dword ptr [esp + Depth]  ;  [esp] := st;  pop
-  end;
+  Result := FALSE;
+
+  // Optimization: (push Value) + (fild dword ptr [esp]) + (fstp dword ptr [esp]) -> (push FracValue)
+  if (Depth = 0) and (PrevInstrByte(0, 0) = $68) then       // Previous: push IntValue
+    begin
+    ConstVal.FracValue := PrevInstrDWord(0, 1);
+    ValueRelocIndex := PrevInstrRelocDWordIndex(0, 1);
+    
+    if ValueRelocIndex = 0 then                             // Non-relocatable values only
+      begin
+      RemovePrevInstr(0);                                   // Remove: push IntValue
+      GenNew($68); GenDWord(ConstVal.Value);                // push FracValue
+      Result := TRUE;
+      end;
+    end;
+  end;  
+
+
+begin
+if not OptimizeGenerateFloat then
+  if Depth = 0 then
+    begin
+    GenNew($DB); Gen($04); Gen($24);                                         // fild dword ptr [esp]  ;  st := float(operand)
+    GenPopFromFPU;                                                           // fstp dword ptr [esp]  ;  [esp] := st;  pop
+    end
+  else
+    begin  
+    GenNew($DB); Gen($44); Gen($24); Gen(Depth);                             // fild dword ptr [esp + Depth]  ;  st := float(operand)
+    GenNew($D9); Gen($5C); Gen($24); Gen(Depth);                             // fstp dword ptr [esp + Depth]  ;  [esp] := st;  pop
+    end;
 end;// GenerateFloat
 
 
