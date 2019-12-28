@@ -639,7 +639,7 @@ case Types[DataType].Kind of
                               CurSize := Types[DataType].Field[i]^.Offset + TypeSize(Types[DataType].Field[i]^.DataType);
                               if CurSize > Result then Result := CurSize;
                               end;  
-  SETTYPE:                  Result := MAXSETELEMENTS;
+  SETTYPE:                  Result := MAXSETELEMENTS div 8;
   ENUMERATEDTYPE:           Result := SizeOf(Byte);                
   PROCEDURALTYPE:           Result := SizeOf(Pointer)               
 else

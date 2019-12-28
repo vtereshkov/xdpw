@@ -3246,13 +3246,11 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     
     
       procedure CompileTypedConstConstructor(InitializedDataOffset: LongInt; ConstType: Integer);
-      const
-        TrueVal: Boolean = True;
-      
       var
         ConstVal, ElementVal, ElementVal2: TConst;
         ConstValType, ElementValType: Integer;
         NumElements, ElementIndex, FieldIndex: Integer;
+        ElementPtr: ^Byte;
         
       begin
       // Numbers
@@ -3347,7 +3345,10 @@ procedure CompileBlock(BlockIdentIndex: Integer);
               ElementVal2 := ElementVal;
               
             for ElementIndex := ElementVal.Value to ElementVal2.Value do
-              Move(TrueVal, InitializedGlobalData[InitializedDataOffset + ElementIndex], TypeSize(BOOLEANTYPEINDEX));
+              begin
+              ElementPtr := @InitializedGlobalData[InitializedDataOffset + ElementIndex div 8];
+              ElementPtr^ := ElementPtr^ or (1 shl (ElementIndex mod 8));
+              end;
   
             if Tok.Kind <> COMMATOK then Break;
             NextTok;
