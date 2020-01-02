@@ -30,7 +30,11 @@ const
   
   // Other constants
   
-  pi = 3.1415927;  
+  pi                    = 3.1415927;
+
+  MaxSetElements        = 256;
+  MaxSetIndex           = MaxSetElements div 32 - 1;
+  
 
 
 
@@ -54,7 +58,7 @@ type
 
   PStream = ^TStream;
 
-  TSetStorage = array [0..255] of Boolean; 
+  TSetStorage = array [0..MaxSetIndex] of Integer; 
 
 
 
@@ -179,7 +183,7 @@ procedure ReadString(var F: file; P: PStream; const s: string);
 procedure ReadNewLine(var F: file; P: PStream);
 function UpCase(ch: Char): Char;
 procedure InitSet(var SetStorage: TSetStorage);
-procedure AddToSet(var SetStorage: TSetStorage; FromVal, ToVal: Integer);
+procedure AddToSet(var SetStorage: TSetStorage; FromElement, ToElement: Integer);
 function InSet(Element: Integer; var SetStorage: TSetStorage): Boolean;
 procedure SetUnion(const SetStorage1, SetStorage2: TSetStorage; var SetStorage: TSetStorage);
 procedure SetDifference(const SetStorage1, SetStorage2: TSetStorage; var SetStorage: TSetStorage);
@@ -1169,24 +1173,28 @@ end;
 
 
 
-procedure AddToSet{(var SetStorage: TSetStorage; FromVal, ToVal: Integer)};
+procedure AddToSet{(var SetStorage: TSetStorage; FromElement, ToElement: Integer)};
 var
-  i: Integer;
+  Element: Integer;
+  ElementPtr: ^Integer;
 begin
-SetStorage[FromVal] := TRUE;
-if ToVal > FromVal then
-  for i := FromVal + 1 to ToVal do
-    SetStorage[i] := TRUE;
+ElementPtr := @SetStorage[FromElement div 32];
+ElementPtr^ := ElementPtr^ or (1 shl (FromElement mod 32));
+
+if ToElement > FromElement then
+  for Element := FromElement + 1 to ToElement do
+    begin
+    ElementPtr := @SetStorage[Element div 32];
+    ElementPtr^ := ElementPtr^ or (1 shl (Element mod 32));
+    end;
 end;
 
 
 
 
 function InSet{(Element: Integer; var SetStorage: TSetStorage): Boolean};
-var
-  i: Integer;
 begin
-Result := SetStorage[Element];  
+Result := SetStorage[Element div 32] and (1 shl (Element mod 32)) <> 0;  
 end;
 
 
@@ -1196,7 +1204,7 @@ procedure SetUnion{(const SetStorage1, SetStorage2: TSetStorage; var SetStorage:
 var
   i: Integer;
 begin
-for i := 0 to SizeOf(SetStorage) - 1 do
+for i := 0 to MaxSetIndex do
   SetStorage[i] := SetStorage1[i] or SetStorage2[i];
 end;
 
@@ -1207,7 +1215,7 @@ procedure SetDifference{(const SetStorage1, SetStorage2: TSetStorage; var SetSto
 var
   i: Integer;
 begin
-for i := 0 to SizeOf(SetStorage) - 1 do
+for i := 0 to MaxSetIndex do
   SetStorage[i] := SetStorage1[i] and not SetStorage2[i];
 end; 
 
@@ -1218,7 +1226,7 @@ procedure SetIntersection{(const SetStorage1, SetStorage2: TSetStorage; var SetS
 var
   i: Integer;
 begin
-for i := 0 to SizeOf(SetStorage) - 1 do
+for i := 0 to MaxSetIndex do
   SetStorage[i] := SetStorage1[i] and SetStorage2[i];
 end; 
 
@@ -1230,7 +1238,7 @@ var
   i: Integer;
 begin
 Result := 0;
-for i := 0 to SizeOf(SetStorage1) - 1 do
+for i := 0 to MaxSetIndex do
   if SetStorage1[i] <> SetStorage2[i] then
     begin
     Result := 1;
