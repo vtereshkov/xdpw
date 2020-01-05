@@ -1,5 +1,5 @@
 // XD Pascal - a 32-bit compiler for Windows
-// Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov
+// Copyright (c) 2009-2010, 2019-2020, Vasiliy Tereshkov
 
 {$APPTYPE CONSOLE}
 {$I-}
@@ -71,7 +71,7 @@ var
 begin
 WriteLn;
 WriteLn('XD Pascal for Windows ', VERSIONMAJOR, '.', VERSIONMINOR);
-WriteLn('Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov');
+WriteLn('Copyright (c) 2009-2010, 2019-2020, Vasiliy Tereshkov');
 
 if ParamCount < 1 then
   begin

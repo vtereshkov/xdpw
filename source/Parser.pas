@@ -1,5 +1,5 @@
 // XD Pascal - a 32-bit compiler for Windows
-// Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov
+// Copyright (c) 2009-2010, 2019-2020, Vasiliy Tereshkov
 
 {$I-}
 {$H-}
@@ -3779,9 +3779,10 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   while (NumIdent > 0) and (Ident[NumIdent].Block = BlockStack[BlockStackTop].Index) do
     begin 
     // If procedure or function, delete parameters first
-    if Ident[NumIdent].Kind in [PROC, FUNC] then
-      for ParamIndex := 1 to Ident[NumIdent].Signature.NumParams do
-        Dispose(Ident[NumIdent].Signature.Param[ParamIndex]);
+    with Ident[NumIdent] do
+      if Kind in [PROC, FUNC] then
+        for ParamIndex := 1 to Signature.NumParams do
+          Dispose(Signature.Param[ParamIndex]);
 
     // Delete identifier itself
     Dec(NumIdent);
@@ -3790,15 +3791,16 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   // Delete local types
   while (NumTypes > 0) and (Types[NumTypes].Block = BlockStack[BlockStackTop].Index) do
     begin
-    // If procedural type, delete parameters first
-    if Types[NumTypes].Kind = PROCEDURALTYPE then
-      for ParamIndex := 1 to Types[NumTypes].Signature.NumParams do
-        Dispose(Types[NumTypes].Signature.Param[ParamIndex]); 
-    
-    // If record, delete fields first
-    if Types[NumTypes].Kind in [RECORDTYPE, INTERFACETYPE] then
-      for FieldIndex := 1 to Types[NumTypes].NumFields do
-        Dispose(Types[NumTypes].Field[FieldIndex]);
+    with Types[NumTypes] do
+      // If procedural type, delete parameters first
+      if Kind = PROCEDURALTYPE then
+        for ParamIndex := 1 to Signature.NumParams do
+          Dispose(Signature.Param[ParamIndex]) 
+      
+      // If record or interface, delete fields first
+      else if Kind in [RECORDTYPE, INTERFACETYPE] then
+        for FieldIndex := 1 to NumFields do
+          Dispose(Field[FieldIndex]);    
 
     // Delete type itself
     Dec(NumTypes);

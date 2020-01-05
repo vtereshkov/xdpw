@@ -1,5 +1,5 @@
 // XD Pascal - a 32-bit compiler for Windows
-// Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov
+// Copyright (c) 2009-2010, 2019-2020, Vasiliy Tereshkov
 
 {$I-}
 {$H-}
@@ -881,31 +881,19 @@ end;
 
 function GetIdentUnsafe{(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer};
 var
-  IdentIndex, BlockStackIndex: Integer;
+  IdentIndex: Integer;
 begin
-// First search the current unit 
-for BlockStackIndex := BlockStackTop downto 1 do
-  for IdentIndex := NumIdent downto 1 do
-    with Ident[IdentIndex] do
-      if (Name = IdentName) and (UnitIndex = UnitStatus.Index) and (Block = BlockStack[BlockStackIndex].Index) and       
-         (AllowForwardReference or (Kind <> USERTYPE) or (Types[DataType].Kind <> FORWARDTYPE)) and
-         (ReceiverType = RecType)  // Receiver type for methods, 0 otherwise
-      then 
-        begin
-        Result := IdentIndex;
-        Exit;
-        end;          
-
-// If unsuccessful, search other used units
 for IdentIndex := NumIdent downto 1 do
-  with Ident[IdentIndex] do  
-    if (Name = IdentName) and (UnitIndex <> UnitStatus.Index) and IsExported and (UnitIndex in UnitStatus.UsedUnits) and
-       (ReceiverType = RecType)  // Receiver type for methods, 0 otherwise
+  with Ident[IdentIndex] do
+    if ((UnitIndex = UnitStatus.Index) or (IsExported and (UnitIndex in UnitStatus.UsedUnits))) and       
+       (AllowForwardReference or (Kind <> USERTYPE) or (Types[DataType].Kind <> FORWARDTYPE)) and
+       (ReceiverType = RecType) and  // Receiver type for methods, 0 otherwise
+       (Name = IdentName)
     then 
       begin
       Result := IdentIndex;
       Exit;
-      end; 
+      end;          
      
 Result := 0;
 end;
