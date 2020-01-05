@@ -3346,8 +3346,8 @@ procedure CompileBlock(BlockIdentIndex: Integer);
               
             for ElementIndex := ElementVal.Value to ElementVal2.Value do
               begin
-              ElementPtr := @InitializedGlobalData[InitializedDataOffset + ElementIndex div 8];
-              ElementPtr^ := ElementPtr^ or (1 shl (ElementIndex mod 8));
+              ElementPtr := @InitializedGlobalData[InitializedDataOffset + ElementIndex shr 3];
+              ElementPtr^ := ElementPtr^ or (1 shl (ElementIndex and 7));
               end;
   
             if Tok.Kind <> COMMATOK then Break;

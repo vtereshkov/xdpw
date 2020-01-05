@@ -14,12 +14,14 @@ interface
 uses Common;
 
 
+var
+  Tok: TToken;
+
 
 procedure InitializeScanner(const Name: TString);
 function SaveScanner: Boolean;
 function RestoreScanner: Boolean;
 procedure FinalizeScanner;
-function Tok: TToken;
 procedure NextTok;
 procedure CheckTok(ExpectedTokKind: TTokenKind);
 procedure EatTok(ExpectedTokKind: TTokenKind);
@@ -137,6 +139,7 @@ if ScannerStackTop > 0 then
   begin  
   ScannerState := ScannerStack[ScannerStackTop];
   Dec(ScannerStackTop);
+  Tok := ScannerState.Token;
   Result := TRUE;
   end;
 end;
@@ -511,14 +514,6 @@ end;
 
 
 
-function Tok{: TToken};
-begin
-Result := ScannerState.Token;
-end;
-
-
-
-
 procedure NextTok;
 begin
 with ScannerState do
@@ -624,6 +619,8 @@ with ScannerState do
     ReadValidChar(ch);
   end; // case
   end;
+  
+Tok := ScannerState.Token;  
 end; // NextTok
 
 

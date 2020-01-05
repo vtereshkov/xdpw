@@ -1178,14 +1178,14 @@ var
   Element: Integer;
   ElementPtr: ^Integer;
 begin
-ElementPtr := @SetStorage[FromElement div 32];
-ElementPtr^ := ElementPtr^ or (1 shl (FromElement mod 32));
+ElementPtr := @SetStorage[FromElement shr 5];
+ElementPtr^ := ElementPtr^ or (1 shl (FromElement and 31));
 
 if ToElement > FromElement then
   for Element := FromElement + 1 to ToElement do
     begin
-    ElementPtr := @SetStorage[Element div 32];
-    ElementPtr^ := ElementPtr^ or (1 shl (Element mod 32));
+    ElementPtr := @SetStorage[Element shr 5];
+    ElementPtr^ := ElementPtr^ or (1 shl (Element and 31));
     end;
 end;
 
@@ -1194,7 +1194,7 @@ end;
 
 function InSet{(Element: Integer; var SetStorage: TSetStorage): Boolean};
 begin
-Result := SetStorage[Element div 32] and (1 shl (Element mod 32)) <> 0;  
+Result := SetStorage[Element shr 5] and (1 shl (Element and 31)) <> 0;  
 end;
 
 
