@@ -173,6 +173,22 @@ end; // DeclareIdent
 
 
 
+procedure DeclareType(TypeKind: TTypeKind);
+begin
+Inc(NumTypes);
+if NumTypes > MAXTYPES then
+  Error('Maximum number of types exceeded');
+
+with Types[NumTypes] do
+  begin
+  Kind := TypeKind;
+  Block := BlockStack[BlockStackTop].Index;
+  end;
+end; // DeclareType  
+
+
+
+
 procedure DeclarePredefinedIdents;
 begin
 // Constants
@@ -246,15 +262,11 @@ Types[POINTERTYPEINDEX].BaseType := ANYTYPEINDEX;
 Types[FILETYPEINDEX].BaseType    := ANYTYPEINDEX;
 
 // Add new anonymous type: 1 .. MAXSTRLENGTH + 1
-Inc(NumTypes);
-if NumTypes > MAXTYPES then
-  Error('Maximum number of types exceeded');
+DeclareType(SUBRANGETYPE);
 
-Types[NumTypes].Kind     := SUBRANGETYPE;
 Types[NumTypes].BaseType := INTEGERTYPEINDEX;
 Types[NumTypes].Low      := 1;
 Types[NumTypes].High     := MAXSTRLENGTH + 1;
-Types[NumTypes].Block    := BlockStack[BlockStackTop].Index;
 
 Types[STRINGTYPEINDEX].BaseType    := CHARTYPEINDEX;
 Types[STRINGTYPEINDEX].IndexType   := NumTypes;
@@ -1063,13 +1075,8 @@ else
   if AllowForwardReference and ((IdentIndex = 0) or (Ident[IdentIndex].Block <> BlockStack[BlockStackTop].Index)) then
     begin
     // Add new forward-referenced type
-    Inc(NumTypes);
-    if NumTypes > MAXTYPES then
-      Error('Maximum number of types exceeded');    
-    
-    Types[NumTypes].Kind := FORWARDTYPE;
+    DeclareType(FORWARDTYPE);
     Types[NumTypes].TypeIdentName := Tok.Name;
-    Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
     DataType := NumTypes;
     end
   else
@@ -1154,23 +1161,15 @@ if Tok.Kind = OPARTOK then
       if IsOpenArrayList then
         begin
         // Add new anonymous type 0..0 for array index
-        Inc(NumTypes);
-        if NumTypes > MAXTYPES then
-          Error('Maximum number of types exceeded');
+        DeclareType(SUBRANGETYPE);
         
-        Types[NumTypes].Kind        := SUBRANGETYPE;
-        Types[NumTypes].Block       := BlockStack[BlockStackTop].Index;
         Types[NumTypes].BaseType    := INTEGERTYPEINDEX;
         Types[NumTypes].Low         := 0;
         Types[NumTypes].High        := 0;
         
         // Add new anonymous type for array itself
-        Inc(NumTypes);
-        if NumTypes > MAXTYPES then
-          Error('Maximum number of types exceeded');
+        DeclareType(ARRAYTYPE);
         
-        Types[NumTypes].Kind        := ARRAYTYPE;
-        Types[NumTypes].Block       := BlockStack[BlockStackTop].Index;
         Types[NumTypes].BaseType    := ParamType;
         Types[NumTypes].IndexType   := NumTypes - 1;
         Types[NumTypes].IsOpenArray := TRUE;
@@ -1460,14 +1459,8 @@ if MethodIndex <> 0 then
   DerefPtr(POINTERTYPEINDEX);
   
   // Add new anonymous 'method' type
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');    
-  
-  Types[NumTypes].Kind := METHODTYPE;
-  Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
-  Types[NumTypes].MethodIdentIndex := MethodIndex;
- 
+  DeclareType(METHODTYPE);
+  Types[NumTypes].MethodIdentIndex := MethodIndex; 
   ValType := NumTypes;
 
   Exit;   
@@ -1508,12 +1501,7 @@ var
   
 begin
 // Add new anonymous type
-Inc(NumTypes);
-if NumTypes > MAXTYPES then
-  Error('Maximum number of types exceeded');
-
-Types[NumTypes].Kind := SETTYPE;
-Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
+DeclareType(SETTYPE);
 Types[NumTypes].BaseType := ANYTYPEINDEX;
 ValType := NumTypes;
 
@@ -1617,12 +1605,7 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
       if MethodIndex <> 0 then
         begin
         // Add new anonymous 'method' type
-        Inc(NumTypes);
-        if NumTypes > MAXTYPES then
-          Error('Maximum number of types exceeded');    
-        
-        Types[NumTypes].Kind := METHODTYPE;
-        Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
+        DeclareType(METHODTYPE);
         Types[NumTypes].MethodIdentIndex := MethodIndex;
        
         ValType := NumTypes;
@@ -2768,11 +2751,7 @@ procedure CompileType{(var DataType: Integer)};
     ConstIndex: Integer;
   begin
   // Add new anonymous type
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');
-    
-  Types[NumTypes].Kind := ENUMERATEDTYPE;
+  DeclareType(ENUMERATEDTYPE);
   DataType := NumTypes;
 
   // Compile enumeration constants
@@ -2795,8 +2774,7 @@ procedure CompileType{(var DataType: Integer)};
   
   EatTok(CPARTOK);
   
-  Types[DataType].Block := BlockStack[BlockStackTop].Index;
-  Types[DataType].Low := 0;
+  Types[DataType].Low  := 0;
   Types[DataType].High := ConstIndex - 1;
   end; // CompileEnumeratedType
 
@@ -2808,11 +2786,7 @@ procedure CompileType{(var DataType: Integer)};
     NestedDataType: Integer;
   begin
   // Add new anonymous type
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');
-    
-  Types[NumTypes].Kind := POINTERTYPE;
+  DeclareType(POINTERTYPE);
   DataType := NumTypes;
 
   // Compile pointer base type
@@ -2820,7 +2794,6 @@ procedure CompileType{(var DataType: Integer)};
   CompileTypeIdent(NestedDataType, TRUE);
     
   Types[DataType].BaseType := NestedDataType;
-  Types[DataType].Block := BlockStack[BlockStackTop].Index;
   end; // CompileTypedPointerType
   
   
@@ -2837,12 +2810,7 @@ procedure CompileType{(var DataType: Integer)};
 
   repeat
     // Add new anonymous type
-    Inc(NumTypes);
-    if NumTypes > MAXTYPES then
-      Error('Maximum number of types exceeded');
-    
-    Types[NumTypes].Kind := ARRAYTYPE;
-    Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
+    DeclareType(ARRAYTYPE);
     Types[NumTypes].IsOpenArray := FALSE;
     ArrType := NumTypes;
 
@@ -2950,17 +2918,12 @@ procedure CompileType{(var DataType: Integer)};
   begin // CompileRecordOrInterfaceType
   NextFieldOffset := 0;
   
-  // Add new anonymous type
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');  
-  
+  // Add new anonymous type  
   if IsInterfaceType then
-    Types[NumTypes].Kind := INTERFACETYPE
+    DeclareType(INTERFACETYPE)
   else
-    Types[NumTypes].Kind := RECORDTYPE;
+    DeclareType(RECORDTYPE);
   
-  Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
   Types[NumTypes].NumFields := 0;
   DataType := NumTypes;
 
@@ -3022,12 +2985,7 @@ procedure CompileType{(var DataType: Integer)};
     NestedDataType: Integer;
   begin
   // Add new anonymous type
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');
-  
-  Types[NumTypes].Kind := SETTYPE;
-  Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
+  DeclareType(SETTYPE);
   DataType := NumTypes;
   
   NextTok;
@@ -3059,12 +3017,7 @@ procedure CompileType{(var DataType: Integer)};
       Error('Incompatible types'); 
    
     // Add new anonymous type
-    Inc(NumTypes);
-    if NumTypes > MAXTYPES then
-      Error('Maximum number of types exceeded');
-  
-    Types[NumTypes].Kind := FILETYPE;
-    Types[NumTypes].Block := BlockStack[BlockStackTop].Index;    
+    DeclareType(FILETYPE);    
     Types[NumTypes].BaseType := NestedDataType;
     
     DataType := NumTypes;
@@ -3083,11 +3036,7 @@ procedure CompileType{(var DataType: Integer)};
     LowBoundType, HighBoundType: Integer;
   begin
   // Add new anonymous type
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');    
-  
-  Types[NumTypes].Kind := SUBRANGETYPE;
+  DeclareType(SUBRANGETYPE);
   DataType := NumTypes;
 
   CompileConstExpression(ConstVal, LowBoundType);                               // Subrange lower bound
@@ -3107,8 +3056,7 @@ procedure CompileType{(var DataType: Integer)};
   if Types[DataType].High < Types[DataType].Low then
     Error('Illegal subrange bounds');
 
-  Types[DataType].BaseType := LowBoundType;
-  Types[DataType].Block := BlockStack[BlockStackTop].Index;  
+  Types[DataType].BaseType := LowBoundType;  
   end; // CompileSubrangeType
   
   
@@ -3116,12 +3064,7 @@ procedure CompileType{(var DataType: Integer)};
   
   procedure CompileProceduralType(var DataType: Integer; IsFunction: Boolean);
   begin
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');    
-  
-  Types[NumTypes].Kind := PROCEDURALTYPE;
-  Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
+  DeclareType(PROCEDURALTYPE);
   Types[NumTypes].MethodIdentIndex := 0;
   DataType := NumTypes;
   
