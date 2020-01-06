@@ -910,7 +910,7 @@ case func of
   SIZEOFFUNC:
     begin
     AssertIdent;
-    if FieldInsideWithFound(Tok.Name) then                // Record field inside a WITH block
+    if FieldOrMethodInsideWithFound(Tok.Name) then        // Record field inside a WITH block
       begin
       CompileDesignator(ValType, FALSE);
       DiscardStackTop(1);
@@ -1432,14 +1432,13 @@ end; // CompileIndirectCall
 
 
 
-procedure CompileFieldInsideWith(var ValType: Integer);
+procedure CompileFieldOrMethodInsideWith(var ValType: Integer);
 var
-  FieldIndex: Integer;
+  FieldIndex, MethodIndex: Integer;
   RecType: Integer;
   TempStorageAddr: Integer;
+  
 begin 
-ValType := 0;
-
 FieldIndex := GetFieldInsideWith(TempStorageAddr, RecType, Tok.Name);
   
 if FieldIndex <> 0 then
@@ -1449,8 +1448,33 @@ if FieldIndex <> 0 then
   
   GetFieldPtr(Types[RecType].Field[FieldIndex]^.Offset);
   ValType := Types[RecType].Field[FieldIndex]^.DataType;    
+  
+  Exit;
   end;
-end; // CompileFieldInsideWith
+  
+MethodIndex := GetMethodInsideWith(TempStorageAddr, RecType, Tok.Name);
+  
+if MethodIndex <> 0 then
+  begin
+  PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+  DerefPtr(POINTERTYPEINDEX);
+  
+  // Add new anonymous 'method' type
+  Inc(NumTypes);
+  if NumTypes > MAXTYPES then
+    Error('Maximum number of types exceeded');    
+  
+  Types[NumTypes].Kind := METHODTYPE;
+  Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
+  Types[NumTypes].MethodIdentIndex := MethodIndex;
+ 
+  ValType := NumTypes;
+
+  Exit;   
+  end;  
+
+ValType := 0;  
+end; // CompileFieldOrMethodInsideWith
 
 
 
@@ -1472,6 +1496,73 @@ if (Types[ValType].Kind = CHARTYPE) or ((Types[ValType].Kind = SUBRANGETYPE) and
   ValType := STRINGTYPEINDEX;
   end;
 end; // ConvertCharToString
+
+
+
+
+procedure CompileSetConstructor(var ValType: Integer);
+var
+  ElementType: Integer;
+  LibProcIdentIndex: Integer;
+  TempStorageAddr: Integer;
+  
+begin
+// Add new anonymous type
+Inc(NumTypes);
+if NumTypes > MAXTYPES then
+  Error('Maximum number of types exceeded');
+
+Types[NumTypes].Kind := SETTYPE;
+Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
+Types[NumTypes].BaseType := ANYTYPEINDEX;
+ValType := NumTypes;
+
+// Allocate temporary storage
+TempStorageAddr := AllocateTempStorage(TypeSize(ValType));
+PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+
+// Initialize set
+LibProcIdentIndex := GetIdent('INITSET');
+GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel); 
+
+// Compile constructor
+LibProcIdentIndex := GetIdent('ADDTOSET');
+NextTok;
+
+if Tok.Kind <> CBRACKETTOK then
+  repeat
+    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    
+    CompileExpression(ElementType, FALSE);
+    
+    if Types[ValType].BaseType = ANYTYPEINDEX then
+      begin
+      if not (Types[ElementType].Kind in OrdinalTypes) then
+        Error('Ordinal type expected');        
+      Types[ValType].BaseType := ElementType;
+      end  
+    else  
+      GetCompatibleType(ElementType, Types[ValType].BaseType);
+
+    if Tok.Kind = RANGETOK then
+      begin
+      NextTok;
+      CompileExpression(ElementType, FALSE);    
+      GetCompatibleType(ElementType, Types[ValType].BaseType);
+      end
+    else
+      PushConst(-1);
+      
+    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);        
+      
+    if Tok.Kind <> COMMATOK then Break;
+    NextTok;
+  until FALSE;
+  
+EatTok(CBRACKETTOK);
+
+PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+end; // CompileSetConstructor
 
 
 
@@ -1583,7 +1674,10 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
         CompileIndirectCall(ValType, TRUE);
         RestoreStackTopFromEAX;    
         ValType := ResultType;
-        end;
+        end
+        
+      else
+        Error('Method expected');  
        
       end;
       
@@ -1611,7 +1705,7 @@ begin
 AssertIdent;
 
 // First search among records in WITH blocks
-CompileFieldInsideWith(ValType);
+CompileFieldOrMethodInsideWith(ValType);
 
 // If unsuccessful, search among ordinary variables
 if ValType = 0 then
@@ -1662,73 +1756,6 @@ end; // CompileDesignator
 
 
 
-procedure CompileSetConstructor(var ValType: Integer);
-var
-  ElementType: Integer;
-  LibProcIdentIndex: Integer;
-  TempStorageAddr: Integer;
-  
-begin
-// Add new anonymous type
-Inc(NumTypes);
-if NumTypes > MAXTYPES then
-  Error('Maximum number of types exceeded');
-
-Types[NumTypes].Kind := SETTYPE;
-Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
-Types[NumTypes].BaseType := ANYTYPEINDEX;
-ValType := NumTypes;
-
-// Allocate temporary storage
-TempStorageAddr := AllocateTempStorage(TypeSize(ValType));
-PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
-
-// Initialize set
-LibProcIdentIndex := GetIdent('INITSET');
-GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel); 
-
-// Compile constructor
-LibProcIdentIndex := GetIdent('ADDTOSET');
-NextTok;
-
-if Tok.Kind <> CBRACKETTOK then
-  repeat
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
-    
-    CompileExpression(ElementType, FALSE);
-    
-    if Types[ValType].BaseType = ANYTYPEINDEX then
-      begin
-      if not (Types[ElementType].Kind in OrdinalTypes) then
-        Error('Ordinal type expected');        
-      Types[ValType].BaseType := ElementType;
-      end  
-    else  
-      GetCompatibleType(ElementType, Types[ValType].BaseType);
-
-    if Tok.Kind = RANGETOK then
-      begin
-      NextTok;
-      CompileExpression(ElementType, FALSE);    
-      GetCompatibleType(ElementType, Types[ValType].BaseType);
-      end
-    else
-      PushConst(-1);
-      
-    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);        
-      
-    if Tok.Kind <> COMMATOK then Break;
-    NextTok;
-  until FALSE;
-  
-EatTok(CBRACKETTOK);
-
-PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
-end; // CompileSetConstructor
-
-
-
-
 procedure CompileFactor(var ValType: Integer; ForceCharToString: Boolean);
 
 
@@ -1768,7 +1795,7 @@ begin // CompileFactor
 case Tok.Kind of
 
   IDENTTOK:
-    if FieldInsideWithFound(Tok.Name) then                                              // Record field inside a WITH block
+    if FieldOrMethodInsideWithFound(Tok.Name) then                                      // Record field or method inside a WITH block
       begin
       CompileDesignator(ValType, ForceCharToString);
       CompileDereferenceOrCall(ValType);
@@ -1851,7 +1878,7 @@ case Tok.Kind of
     begin
     NextTok;
     
-    if FieldInsideWithFound(Tok.Name) then                  // Record field inside a WITH block
+    if FieldOrMethodInsideWithFound(Tok.Name) then         // Record field inside a WITH block
       CompileDesignator(ValType, FALSE)
     else                                                    // Ordinary identifier
       begin  
@@ -2633,7 +2660,7 @@ case Tok.Kind of
 
   IDENTTOK:
     begin   
-    if FieldInsideWithFound(Tok.Name) then                              // Record field inside a WITH block
+    if FieldOrMethodInsideWithFound(Tok.Name) then                      // Record field or method inside a WITH block
       begin
       CompileDesignator(DesignatorType, FALSE);
       CompileAssignmentOrCall(DesignatorType);

@@ -343,9 +343,10 @@ function GetIdent(const IdentName: TString; AllowForwardReference: Boolean = FAL
 function GetFieldUnsafe(RecType: Integer; const FieldName: TString): Integer;
 function GetField(RecType: Integer; const FieldName: TString): Integer;
 function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer;
-function FieldInsideWithFound(const FieldName: TString): Boolean;
 function GetMethodUnsafe(RecType: Integer; const MethodName: TString): Integer;
 function GetMethod(RecType: Integer; const MethodName: TString): Integer;
+function GetMethodInsideWith(var RecPointer: Integer; var RecType: Integer; const MethodName: TString): Integer;
+function FieldOrMethodInsideWithFound(const Name: TString): Boolean;
 
 
 
@@ -961,17 +962,6 @@ end;
 
 
 
-function FieldInsideWithFound{(const FieldName: TString): Boolean};
-var
-  RecPointer: Integer; 
-  RecType: Integer;        
-begin
-Result := GetFieldInsideWith(RecPointer, RecType, FieldName) <> 0;
-end;
-
-
-
-
 function GetMethodUnsafe{(RecType: Integer; const MethodName: TString): Integer};
 begin
 Result := GetIdentUnsafe(MethodName, FALSE, RecType);
@@ -986,6 +976,41 @@ Result := GetIdent(MethodName, FALSE, RecType);
 if (Ident[Result].Kind <> PROC) and (Ident[Result].Kind <> FUNC) then
   Error('Method expected');
 end;
+
+
+
+
+function GetMethodInsideWith{(var RecPointer: Integer; var RecType: Integer; const MethodName: TString): Integer};
+var
+  MethodIndex, WithIndex: Integer;
+begin 
+for WithIndex := WithNesting downto 1 do
+  begin
+  RecType := WithStack[WithIndex].DataType;
+  MethodIndex := GetMethodUnsafe(RecType, MethodName);
+  
+  if MethodIndex <> 0 then
+    begin
+    RecPointer := WithStack[WithIndex].TempPointer;
+    Result := MethodIndex;
+    Exit;
+    end;
+  end;
+
+Result := 0;  
+end;
+
+
+
+
+function FieldOrMethodInsideWithFound{(const Name: TString): Boolean};
+var
+  RecPointer: Integer; 
+  RecType: Integer;        
+begin
+Result := (GetFieldInsideWith(RecPointer, RecType, Name) <> 0) or (GetMethodInsideWith(RecPointer, RecType, Name) <> 0);
+end;
+
 
 
 end.

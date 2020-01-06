@@ -51,7 +51,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Arrays, records and sets cannot be passed to subroutines without `const` or `var`
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical
-* The `with` statement cannot access methods 
+* The `with` statement does not work with interfaces 
 
 #### Formal grammar
 ```
