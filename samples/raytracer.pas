@@ -257,7 +257,9 @@ if BestIndex > 0 then
   DiffuseRay.Origin := BestPoint;
   DiffuseRay.Dir := DiffuseDir;
 
-  Result := sc.Trace(DiffuseRay, Depth + 1).mul(BestBody^.LambertFactor(Lambert)).elementwise(BestBody^.Color);
+  with BestBody^ do
+    Result := sc.Trace(DiffuseRay, Depth + 1).mul(LambertFactor(Lambert)).elementwise(Color);
+    
   Exit;
   end;
 

@@ -1606,10 +1606,8 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
         begin
         // Add new anonymous 'method' type
         DeclareType(METHODTYPE);
-        Types[NumTypes].MethodIdentIndex := MethodIndex;
-       
+        Types[NumTypes].MethodIdentIndex := MethodIndex;       
         ValType := NumTypes;
-        NextTok;
         end  
       // If unsuccessful, search for a record field  
       else
@@ -1620,18 +1618,10 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
         FieldIndex := GetField(ValType, Tok.Name);
         Field := Types[ValType].Field[FieldIndex];        
         GetFieldPtr(Field^.Offset);
-        
-        // For interfaces, save Self pointer offset from the procedural variable
-        if (Types[ValType].Kind = INTERFACETYPE) and (Types[Field^.DataType].Kind = PROCEDURALTYPE) then
-          Types[Field^.DataType].SelfPointerOffset := -Types[ValType].Field[FieldIndex]^.Offset
-        else
-          Types[Field^.DataType].SelfPointerOffset := 0;  
-        
-        ValType := Field^.DataType;
-        
-        NextTok;
+        ValType := Field^.DataType;                
         end;
-         
+        
+      NextTok;   
       end;
       
     
@@ -2585,8 +2575,8 @@ procedure CompileStatement{(LoopNesting: Integer)};
     PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
     
     CompileDesignator(DesignatorType, FALSE);
-    if Types[DesignatorType].Kind <> RECORDTYPE then
-      Error('Record expected');
+    if not (Types[DesignatorType].Kind in [RECORDTYPE, INTERFACETYPE]) then
+      Error('Record or interface expected');
       
     GenerateAssignment(POINTERTYPEINDEX);
 
@@ -2854,8 +2844,12 @@ procedure CompileType{(var DataType: Integer)};
       begin
       Name     := FieldName;
       DataType := FieldType;
-      Offset   := NextFieldOffset;
+      Offset   := NextFieldOffset;            
       end;
+      
+    // For interfaces, save Self pointer offset from the procedural field
+    if Types[RecType].Kind = INTERFACETYPE then
+      Types[FieldType].SelfPointerOffset := -NextFieldOffset;      
     
     NextFieldOffset := NextFieldOffset + TypeSize(FieldType);
     end; // DeclareField

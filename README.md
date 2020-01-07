@@ -50,8 +50,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Arrays, records and sets cannot serve as untyped constants. Typed constants should be used instead
 * Arrays, records and sets cannot be passed to subroutines without `const` or `var`
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
-* Statement labels cannot be numerical
-* The `with` statement does not work with interfaces 
+* Statement labels cannot be numerical 
 
 #### Formal grammar
 ```
@@ -98,7 +97,7 @@ Receiver = "for" Ident ":" TypeIdent .
 Directive = "forward" | ("external" StringLiteral "name" StringLiteral) .         
 
 ActualParams = "(" [ (Expression | Designator) |
-              {"," (Expression | Designator)} ] ")" .
+                {"," (Expression | Designator)} ] ")" .
 
 FormalParams = "(" FormalParamList {";" FormalParamList} ")" .
               
