@@ -3535,7 +3535,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     if BlockStack[BlockStackTop].Index <> 1 then
       Error('Methods cannot be nested');
 
-    if Types[ReceiverType].Kind = RECORDTYPE then
+    if Types[ReceiverType].Kind in [RECORDTYPE, INTERFACETYPE] then
       begin
       FieldIndex := GetFieldUnsafe(ReceiverType, ProcName);
       if FieldIndex <> 0 then
