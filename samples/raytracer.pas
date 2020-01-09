@@ -60,7 +60,7 @@ end;
 function rand: TVec;
 var i: Integer;
 begin 
-for i := 1 to 3 do Result[i] := Random; 
+for i := 1 to 3 do Result[i] := Random - 0.5; 
 end;
 
 
