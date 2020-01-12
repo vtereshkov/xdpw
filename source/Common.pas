@@ -35,7 +35,9 @@ const
 
 
 type
-  TString  = string;  
+  TCharacter = Char;
+  PCharacter = PChar;
+  TString = string;  
   
   TInFile = file;  
   TOutFile = file;  
@@ -301,7 +303,7 @@ type
 var
   Ident: array [1..MAXIDENTS] of TIdentifier;
   Types: array [1..MAXTYPES] of TType;
-  InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of Char;
+  InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of TCharacter;
   Units: array [1..MAXUNITS] of TUnit;
   BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
   WithStack: array [1..MAXWITHNESTING] of TWithDesignator;
@@ -625,7 +627,7 @@ case Types[DataType].Kind of
   SHORTINTTYPE:             Result := SizeOf(ShortInt);
   WORDTYPE:                 Result := SizeOf(Word);
   BYTETYPE:                 Result := SizeOf(Byte);  
-  CHARTYPE:                 Result := SizeOf(Char);
+  CHARTYPE:                 Result := SizeOf(TCharacter);
   BOOLEANTYPE:              Result := SizeOf(Boolean);
   REALTYPE:                 Result := SizeOf(Single);
   POINTERTYPE:              Result := SizeOf(Pointer);

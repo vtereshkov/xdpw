@@ -37,7 +37,7 @@ implementation
 
 type
   TBuffer = record    
-    Ptr: PChar;
+    Ptr: PCharacter;
     Size, Pos: Integer;
   end;  
   
@@ -47,7 +47,7 @@ type
     FileName: TString;
     Line: Integer;
     Buffer: TBuffer;
-    ch, ch2: Char;
+    ch, ch2: TCharacter;
     EndOfUnit: Boolean;    
   end;
 
@@ -64,10 +64,10 @@ var
 const
   ScannerStackTop: Integer = 0;
  
-  Digits:    set of Char = ['0'..'9'];
-  HexDigits: set of Char = ['0'..'9', 'A'..'F'];
-  Spaces:    set of Char = [#1..#31, ' '];
-  AlphaNums: set of Char = ['A'..'Z', '0'..'9', '_'];
+  Digits:    set of TCharacter = ['0'..'9'];
+  HexDigits: set of TCharacter = ['0'..'9', 'A'..'F'];
+  Spaces:    set of TCharacter = [#1..#31, ' '];
+  AlphaNums: set of TCharacter = ['A'..'Z', '0'..'9', '_'];
   
   
 
@@ -161,7 +161,7 @@ end;
 
 
 
-procedure AppendStrSafe(var s: TString; ch: Char);
+procedure AppendStrSafe(var s: TString; ch: TCharacter);
 begin
 if Length(s) >= MAXSTRLENGTH - 1 then
   Error('String is too long');
@@ -171,15 +171,15 @@ end;
 
 
 
-procedure ReadChar(var ch: Char);
+procedure ReadChar(var ch: TCharacter);
 var
-  ChPtr: PChar;
+  ChPtr: PCharacter;
 begin
 ch := #0;
 with ScannerState.Buffer do
   if Pos < Size then
     begin
-    ChPtr := PChar(Integer(Ptr) + Pos);
+    ChPtr := PCharacter(Integer(Ptr) + Pos);
     ch := ChPtr^;
     Inc(Pos);
     end
@@ -192,7 +192,7 @@ end;
 
 
 
-procedure ReadValidChar(var ch: Char);
+procedure ReadValidChar(var ch: TCharacter);
 begin
 ReadChar(ch);
 ch := UpCase(ch);
@@ -201,7 +201,7 @@ end;
 
 
 
-procedure ReadLiteralChar(var ch: Char);
+procedure ReadLiteralChar(var ch: TCharacter);
 begin
 ReadChar(ch);
 if (ch = #0) or (ch = #10) then

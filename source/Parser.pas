@@ -1482,7 +1482,7 @@ if (Types[ValType].Kind = CHARTYPE) or ((Types[ValType].Kind = SUBRANGETYPE) and
   if IsDesignator then
     DerefPtr(ValType);
   
-  TempStorageAddr := AllocateTempStorage(2 * SizeOf(Char));    
+  TempStorageAddr := AllocateTempStorage(2 * SizeOf(TCharacter));    
   PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
   
   GetCharAsTempString;    

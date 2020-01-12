@@ -39,7 +39,7 @@ type
  
 
   TPEHeader = packed record
-    PE: array [0..3] of Char;
+    PE: array [0..3] of TCharacter;
     Machine: Word;
     NumberOfSections: Word;
     TimeDateStamp: LongInt;
@@ -91,7 +91,7 @@ type
 
 
   TPESectionHeader = packed record
-    Name: array [0..7] of Char;
+    Name: array [0..7] of TCharacter;
     VirtualSize: LongInt;
     VirtualAddress: LongInt;
     SizeOfRawData: LongInt;
@@ -113,8 +113,8 @@ type
   end;
   
   
-  TImportLibName = array [0..15] of Char;
-  TImportFuncName = array [0..31] of Char;
+  TImportLibName = array [0..15] of TCharacter;
+  TImportFuncName = array [0..31] of TCharacter;
 
 
   TImportDirectoryTableEntry = packed record
