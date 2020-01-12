@@ -30,8 +30,8 @@ const
   
   // Other constants
   
-  pi                    = 3.1415927;
-
+  Pi                    = 3.1415927;
+  MaxStrLength          = 255;
   MaxSetElements        = 256;
   MaxSetIndex           = MaxSetElements div 32 - 1;
   
@@ -42,7 +42,7 @@ type
   LongInt = Integer;  
   Single = Real;
   Text = file;  
-  PChar = ^Char;
+  PChar = ^Char;  
   
   TFileRec = record
     Name: string;

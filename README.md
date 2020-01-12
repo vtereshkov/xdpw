@@ -249,7 +249,9 @@ function Ln(x: Real): Real;
 function SqRt(x: Real): Real;
 ```
 
-### System library
+### Standard library
+
+#### System unit
 ```pascal
 function Timer: Integer;
 procedure Randomize;
@@ -277,6 +279,14 @@ procedure Str(Number: Real; var s: string[; DecPlaces: Integer]);
 procedure IVal(const s: string; var Number: Integer; var Code: Integer);
 procedure IStr(Number: Integer; var s: string);
 function UpCase(ch: Char): Char;
+```
+
+#### SysUtils unit
+```pascal
+function StrToPChar(const s: string): PChar;
+function PCharToStr(p: PChar): string;
+function StrToPWideChar(const s: string): PWideChar;
+function PWideCharToStr(p: PWideChar): string;
 ```
 
 ### Samples
