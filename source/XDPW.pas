@@ -79,7 +79,7 @@ if ParamCount < 1 then
   Halt(1);
   end;
 
-PasPath := ParamStr(1);
+PasPath := TString(ParamStr(1));
 SplitPath(PasPath, PasFolder, PasName, PasExt);
 
 SetErrorProc(@ErrorProc);

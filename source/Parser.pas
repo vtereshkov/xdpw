@@ -1833,8 +1833,9 @@ case Tok.Kind of
             CompileExpression(ValType, FALSE);
             EatTok(CPARTOK);
 
-            if not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and 
-                    (Types[ValType].Kind in CastableTypes)) then
+            if (Ident[IdentIndex].DataType <> ValType) and 
+              not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and (Types[ValType].Kind in CastableTypes)) 
+            then
               Error('Invalid typecast');            
             end;
           

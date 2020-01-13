@@ -35,11 +35,13 @@ const
 
 
 type
-  TCharacter = Char;
-  PCharacter = PChar;
-  TString = string;  
+  TCharacter     = Char;
+  PCharacter     = PChar;
+  TString        = string;  
+  TShortString   = string;
+  TGenericString = string;
   
-  TInFile = file;  
+  TInFile  = file;  
   TOutFile = file;  
   
   TTokenKind =
@@ -274,7 +276,7 @@ type
     
     METHODTYPE:                (MethodIdentIndex: Integer);   // For static methods as temporary results
   
-    FORWARDTYPE:               (TypeIdentName: TString);   
+    FORWARDTYPE:               (TypeIdentName: TShortString);   
   end;
   
   TBlock = record

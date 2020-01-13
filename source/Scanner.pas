@@ -79,11 +79,11 @@ var
   
 begin
 // First search the source folder, then the units folder
-Assign(F, SourceFolder + Name);
+Assign(F, TGenericString(SourceFolder + Name));
 Reset(F, 1);
 if IOResult <> 0 then
   begin
-  Assign(F, UnitsFolder + Name);
+  Assign(F, TGenericString(UnitsFolder + Name));
   Reset(F, 1);  
   if IOResult <> 0 then
     Error('Unable to open source file ' + Name);

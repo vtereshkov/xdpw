@@ -460,7 +460,7 @@ Relocate(IMGBASE + Headers.CodeSectionHeader.VirtualAddress,
 FixupImportSection(Headers.ImportSectionHeader.VirtualAddress);
 
 // Write output file
-Assign(OutFile, ExeName);
+Assign(OutFile, TGenericString(ExeName));
 Rewrite(OutFile, 1);
 
 if IOResult <> 0 then
