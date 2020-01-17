@@ -290,17 +290,12 @@ end;
 
 
 function PrevInstrDWord(Depth, Offset: Integer): LongInt;
-var
-  Ptr: ^LongInt;
 begin
 Result := 0;
 
 // The last generated instruction starts at Depth = 0, Offset = 0
 if Depth < NumPrevCodeSizes then
-  begin
-  Ptr := @Code[PrevCodeSizes[NumPrevCodeSizes - Depth] + Offset];
-  Result := Ptr^;
-  end;
+  Result := PLongInt(@Code[PrevCodeSizes[NumPrevCodeSizes - Depth] + Offset])^;
 end;
 
 

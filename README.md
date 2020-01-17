@@ -53,6 +53,8 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Statement labels cannot be numerical 
 
 #### Formal grammar
+<details>
+<summary>Click to expand</summary>
 ```
 ProgramOrUnit = ("program" | "unit") Ident ";" 
                 ["interface"] [UsesClause] Block "." .
@@ -124,7 +126,11 @@ Fields = IdentList ":" Type {";" IdentList ":" Type} .
        
 TypeIdent = "string" | "file" | Ident .       
 
-Designator = Ident {Selector} .
+Designator = BasicDesignator {Selector} .
+
+BasicDesignator = Ident |
+                  Ident [ActualParams] |
+                  Ident "(" Expression ")" .
 
 Selector = "^" | 
            "[" Expression {"," Expression} "]" | 
@@ -185,7 +191,7 @@ Factor = (Designator | Ident) [ActualParams] {Selector} |
          "not" Factor |
          SetConstructor |
          "nil" |
-         Ident "(" Expression ")" .
+         Ident "(" Expression ")" {Selector} .
          
 SetConstructor = "[" [Expression [".." Expression] 
                      {"," Expression [".." Expression]}] "]" .         
@@ -200,6 +206,7 @@ CharLiteral = "'" (Character | "'" "'") "'" |
 
 StringLiteral = "'" {Character | "'" "'"} "'".
 ```
+</details>
 
 ### Compiler 
 The compiler is based on a recursive descent parser. It directly builds a Windows PE executable without using any external assembler or linker.

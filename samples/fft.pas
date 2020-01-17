@@ -70,7 +70,6 @@ var
   k, HalfLen, Step: Integer;
   FFTEven, FFTOdd: TComplexData;
   FFTOddTwiddled: Complex;
-  xShiftedPtr: PData;
 
 begin
 HalfLen := DataLength shr (Depth + 1);
@@ -82,11 +81,9 @@ if HalfLen = 0 then
   FFT[0].Im := 0;
   end
 else
-  begin
-  xShiftedPtr := @x[Step];
-  
-  GetFFT(x,            FFTEven, Depth + 1);
-  GetFFT(xShiftedPtr^, FFTOdd,  Depth + 1);
+  begin  
+  GetFFT(x,                FFTEven, Depth + 1);
+  GetFFT(PData(@x[Step])^, FFTOdd,  Depth + 1);
 
   for k := 0 to HalfLen - 1 do
     begin

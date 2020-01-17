@@ -1555,6 +1555,31 @@ end; // CompileSetConstructor
 
 
 
+function DereferencePointerAsDesignator(var ValType: Integer; MustDereferenceAnyPointer: Boolean): Boolean;
+begin
+// If a pointer-type result is immediately followed by dereferencing, treat it as a designator that has the pointer's base type
+Result := FALSE;
+
+if Types[ValType].Kind = POINTERTYPE then                      
+  if Types[ValType].BaseType <> ANYTYPEINDEX then
+    begin
+    if Tok.Kind = DEREFERENCETOK then
+      begin
+      ValType := Types[ValType].BaseType;
+      Result := TRUE;
+      NextTok;
+      end
+    else if MustDereferenceAnyPointer then 
+      CheckTok(DEREFERENCETOK)
+    end    
+  else if MustDereferenceAnyPointer then
+    Error('Typed pointer expected');
+      
+end; // DereferencePointerAsDesignator
+
+
+
+
 procedure CompileSelectors(var ValType: Integer; ForceCharToString: Boolean);
 var
   FieldIndex, MethodIndex: Integer;
@@ -1665,14 +1690,15 @@ end; // CompileSelectors
 
 
 
-procedure CompileDesignator{(var ValType: Integer; ForceCharToString: Boolean)};
+procedure CompileBasicDesignator(var ValType: Integer; ForceCharToString: Boolean);
 var
+  ResultType: Integer;
   IdentIndex: Integer;  
   IsRefParam: Boolean;
   
 begin
 // A designator always designates a memory location
-// A function call can be part of a designator only if it returns an address (i.e. a structured result), not an immediate value
+// A function call can be part of a designator only if it returns an address (i.e. a structured result or a pointer), not an immediate value
 // All other calls are part of a factor or a statement
    
 AssertIdent;
@@ -1680,50 +1706,87 @@ AssertIdent;
 // First search among records in WITH blocks
 CompileFieldOrMethodInsideWith(ValType);
 
-// If unsuccessful, search among ordinary variables
+// If unsuccessful, search among ordinary identifiers
 if ValType = 0 then
   begin
   IdentIndex := GetIdent(Tok.Name);
   
-  // Call of a function that returns a designator     
-  if (Ident[IdentIndex].Kind = FUNC) and (Types[Ident[IdentIndex].Signature.ResultType].Kind in StructuredTypes) then 
-    begin
-    NextTok;
-    CompileCall(IdentIndex);
-    RestoreStackTopFromEAX;
-    ValType := Ident[IdentIndex].Signature.ResultType;    
-    end
-    
-  // Designator itself
-  else if Ident[IdentIndex].Kind = VARIABLE then                                  
-    begin   
-    PushVarPtr(Ident[IdentIndex].Value, 
-               Ident[IdentIndex].Scope, 
-               BlockStackTop - Ident[IdentIndex].NestingLevel, 
-               Ident[IdentIndex].RelocType);
-    
-    ValType := Ident[IdentIndex].DataType;           
-    
-    if ForceCharToString then
-      ConvertCharToString(ValType, TRUE);
+  case Ident[IdentIndex].Kind of
+  
+    FUNC:
+      begin
+      ResultType := Ident[IdentIndex].Signature.ResultType;
 
-    if Types[Ident[IdentIndex].DataType].Kind in StructuredTypes + [ANYTYPE] then
-      IsRefParam := Ident[IdentIndex].PassMethod in [CONSTPASSING, VARPASSING]    // For structured parameters, CONST is equivalent to VAR
-    else
-      IsRefParam := Ident[IdentIndex].PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
+      if not (Types[ResultType].Kind in StructuredTypes + [POINTERTYPE]) then   // Only allow a function that returns a designator
+        Error('Function must return pointer or structured result');
 
-    if IsRefParam then DerefPtr(POINTERTYPEINDEX);                                // Parameter is passed by reference
-    
-    NextTok;
-    end
+      NextTok;
+      CompileCall(IdentIndex);
+      RestoreStackTopFromEAX;        
+      ValType := ResultType;
+      
+      DereferencePointerAsDesignator(ValType, TRUE);
+      end;  
+             
+    VARIABLE:                                  
+      begin   
+      PushVarPtr(Ident[IdentIndex].Value, 
+                 Ident[IdentIndex].Scope, 
+                 BlockStackTop - Ident[IdentIndex].NestingLevel, 
+                 Ident[IdentIndex].RelocType);
+      
+      ValType := Ident[IdentIndex].DataType;           
+      
+      if ForceCharToString then
+        ConvertCharToString(ValType, TRUE);
+
+      if Types[Ident[IdentIndex].DataType].Kind in StructuredTypes + [ANYTYPE] then
+        IsRefParam := Ident[IdentIndex].PassMethod in [CONSTPASSING, VARPASSING]    // For structured parameters, CONST is equivalent to VAR
+      else
+        IsRefParam := Ident[IdentIndex].PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
+
+      if IsRefParam then DerefPtr(POINTERTYPEINDEX);                                // Parameter is passed by reference
+      
+      NextTok;
+      end;
+      
+    USERTYPE:                                                                       // Type cast
+      begin                                                                      
+      NextTok;
+      
+      EatTok(OPARTOK);
+      CompileExpression(ValType, FALSE);
+      EatTok(CPARTOK);
+
+      if not (Types[Ident[IdentIndex].DataType].Kind in StructuredTypes + [POINTERTYPE]) then   // Only allow a typecast that returns a designator
+        Error('Typecast must return pointer or structured result');      
+      
+      if (Ident[IdentIndex].DataType <> ValType) and 
+        not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and (Types[ValType].Kind in CastableTypes)) 
+      then
+        Error('Invalid typecast');            
+      
+      ValType := Ident[IdentIndex].DataType;
+      
+      DereferencePointerAsDesignator(ValType, TRUE);      
+      end  
     
   else
-    Error('Variable expected but ' + GetTokSpelling(Tok.Kind) + ' found');    
+    Error('Variable or function expected but ' + GetTokSpelling(Tok.Kind) + ' found');
+  end; // case
+    
   end
 else
-  NextTok;
+  NextTok;  
+end; // CompileBasicDesignator
 
-CompileSelectors(ValType, ForceCharToString);  
+
+
+
+procedure CompileDesignator{(var ValType: Integer; ForceCharToString: Boolean)};
+begin
+CompileBasicDesignator(ValType, ForceCharToString);
+CompileSelectors(ValType, ForceCharToString);
 end; // CompileDesignator
 
 
@@ -1795,14 +1858,14 @@ case Tok.Kind of
             RestoreStackTopFromEAX;
             ValType := Ident[IdentIndex].Signature.ResultType; 
             
-            if Types[ValType].Kind in StructuredTypes then
+            if (Types[ValType].Kind in StructuredTypes) or DereferencePointerAsDesignator(ValType, FALSE) then
               begin
               CompileSelectors(ValType, ForceCharToString);
               CompileDereferenceOrCall(ValType);
-              end;
+              end; 
             end;
             
-        VARIABLE:                                                                       // Designator
+        VARIABLE:                                                                       // Variable
           begin
           CompileDesignator(ValType, ForceCharToString);
           CompileDereferenceOrCall(ValType);   
@@ -1818,28 +1881,26 @@ case Tok.Kind of
         USERTYPE:                                                                       // Type cast
           begin                                                                      
           NextTok;
+          EatTok(OPARTOK);
           
           if Types[Ident[IdentIndex].DataType].Kind = INTERFACETYPE then    // Special case: concrete type to interface type
-            begin
-            EatTok(OPARTOK);
+            begin            
             CompileDesignator(ValType, ForceCharToString);
-            EatTok(CPARTOK);
-            
             CompileConcreteTypeToInterfaceTypeConversion(ValType, Ident[IdentIndex].DataType);                        
             end
           else                                                              // General rule
             begin  
-            EatTok(OPARTOK);
             CompileExpression(ValType, FALSE);
-            EatTok(CPARTOK);
 
             if (Ident[IdentIndex].DataType <> ValType) and 
               not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and (Types[ValType].Kind in CastableTypes)) 
             then
               Error('Invalid typecast');            
             end;
-          
-          ValType := Ident[IdentIndex].DataType;  
+            
+          EatTok(CPARTOK);
+          ValType := Ident[IdentIndex].DataType;
+          CompileSelectors(ValType, ForceCharToString);  
           end
           
       else
@@ -2645,7 +2706,7 @@ case Tok.Kind of
       
       case Ident[IdentIndex].Kind of
       
-        VARIABLE:                                                       // Assignment or procedural variable call
+        VARIABLE, USERTYPE:                                             // Assignment or procedural variable call
           begin
           CompileDesignator(DesignatorType, FALSE);
           CompileAssignmentOrCall(DesignatorType); 
@@ -2685,8 +2746,8 @@ case Tok.Kind of
               
               DesignatorType := Ident[IdentIndex].Signature.ResultType;
               
-              if (Ident[IdentIndex].Kind = FUNC) and (Types[DesignatorType].Kind in StructuredTypes) and
-                 (Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK])                  
+              if (Ident[IdentIndex].Kind = FUNC) and (Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK]) and
+                 ((Types[DesignatorType].Kind in StructuredTypes) or DereferencePointerAsDesignator(DesignatorType, FALSE))                                   
               then
                 begin
                 RestoreStackTopFromEAX;
@@ -2696,7 +2757,7 @@ case Tok.Kind of
               end;              
               
             end  
-              
+                 
       else
         Error('Statement expected but ' + Ident[IdentIndex].Name + ' found');
       end // case Ident[IdentIndex].Kind

@@ -41,6 +41,8 @@ type
   TShortString   = string;
   TGenericString = string;
   
+  PLongInt = ^LongInt;
+  
   TInFile  = file;  
   TOutFile = file;  
   

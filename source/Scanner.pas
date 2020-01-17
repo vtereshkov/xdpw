@@ -172,15 +172,12 @@ end;
 
 
 procedure ReadChar(var ch: TCharacter);
-var
-  ChPtr: PCharacter;
 begin
 ch := #0;
 with ScannerState.Buffer do
   if Pos < Size then
     begin
-    ChPtr := PCharacter(Integer(Ptr) + Pos);
-    ch := ChPtr^;
+    ch := PCharacter(Integer(Ptr) + Pos)^;
     Inc(Pos);
     end
   else
