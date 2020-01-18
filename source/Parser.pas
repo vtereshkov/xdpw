@@ -1372,17 +1372,11 @@ end; // CompileCall
 
 
 
-procedure CompileMethodCall(ProcVarType: Integer; FunctionOnly: Boolean);
+procedure CompileMethodCall(ProcVarType: Integer);
 var
   MethodIndex: Integer;
 begin
-if Types[ProcVarType].Kind <> METHODTYPE then 
-  Error('Method expected');
-  
 MethodIndex := Types[ProcVarType].MethodIdentIndex;  
-
-if FunctionOnly and (Ident[MethodIndex].Signature.ResultType = 0) then
-  Error('Function method expected');
  
 // Self pointer has already been passed as the first (hidden) argument
 CompileActualParameters(Ident[MethodIndex].Signature);
@@ -1393,16 +1387,10 @@ end; // CompileMethodCall
 
 
 
-procedure CompileIndirectCall(ProcVarType: Integer; FunctionOnly: Boolean);
+procedure CompileIndirectCall(ProcVarType: Integer);
 var
   TotalNumParams: Integer;
 begin
-if Types[ProcVarType].Kind <> PROCEDURALTYPE then 
-  Error('Procedural variable expected');
-
-if FunctionOnly and (Types[ProcVarType].Signature.ResultType = 0) then
-  Error('Functional variable expected');
-
 TotalNumParams := Types[ProcVarType].Signature.NumParams;
 
 if Types[ProcVarType].SelfPointerOffset <> 0 then   // Interface method found
@@ -1427,6 +1415,41 @@ if Types[ProcVarType].Signature.IsStdCall then
 
 GenerateIndirectCall(TotalNumParams);
 end; // CompileIndirectCall
+
+
+
+
+function CompileMethodOrProceduralVariableCall(var ValType: Integer; FunctionOnly, DesignatorOnly: Boolean): Boolean;
+var
+  ResultType: Integer;
+  
+begin
+if Types[ValType].Kind = METHODTYPE then
+  ResultType := Ident[Types[ValType].MethodIdentIndex].Signature.ResultType
+else if Types[ValType].Kind = PROCEDURALTYPE then
+  ResultType := Types[ValType].Signature.ResultType
+else
+  begin
+  ResultType := 0;
+  Error('Procedure or function expected'); 
+  end; 
+
+Result := FALSE; 
+   
+if not DesignatorOnly or ((ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes)) then 
+  begin
+  if FunctionOnly and (ResultType = 0) then
+    Error('Function expected');
+  
+  if Types[ValType].Kind = METHODTYPE then  
+    CompileMethodCall(ValType)
+  else
+    CompileIndirectCall(ValType);
+  
+  ValType := ResultType;
+  Result := TRUE; 
+  end; 
+end; // CompileMethodOrProceduralVariableCall
 
 
 
@@ -1583,7 +1606,7 @@ end; // DereferencePointerAsDesignator
 procedure CompileSelectors(var ValType: Integer; ForceCharToString: Boolean);
 var
   FieldIndex, MethodIndex: Integer;
-  ArrayIndexType, ResultType: Integer;
+  ArrayIndexType: Integer;
   Field: PField;   
 
 begin
@@ -1650,33 +1673,10 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
       end;
       
     
-    OPARTOK:                                          // Call of a method or procedural variable that returns a designator
+    OPARTOK: 
       begin
-      if Types[ValType].Kind = METHODTYPE then                                              // Method call
-        begin
-        ResultType := Ident[Types[ValType].MethodIdentIndex].Signature.ResultType;
-        if (ResultType = 0) or not (Types[ResultType].Kind in StructuredTypes) then 
-          Break;  // Not a designator
-          
-        CompileMethodCall(ValType, TRUE);
-        RestoreStackTopFromEAX;
-        ValType := ResultType;  
-        end
-        
-      else if Types[ValType].Kind = PROCEDURALTYPE then                                     // Procedural variable call
-        begin
-        ResultType := Types[ValType].Signature.ResultType;
-        if (ResultType = 0) or not (Types[ResultType].Kind in StructuredTypes) then
-          Break;  // Not a designator
-       
-        CompileIndirectCall(ValType, TRUE);
-        RestoreStackTopFromEAX;    
-        ValType := ResultType;
-        end
-        
-      else
-        Error('Method expected');  
-       
+      if not CompileMethodOrProceduralVariableCall(ValType, TRUE, TRUE) then Break;  // Not a designator 
+      RestoreStackTopFromEAX; 
       end;
       
   end; // case
@@ -1799,25 +1799,11 @@ procedure CompileFactor(var ValType: Integer; ForceCharToString: Boolean);
   begin
   if Tok.Kind = OPARTOK then   // For method or procedural variable calls, parentheses are required even with empty parameter lists                                     
     begin
-    if Types[ValType].Kind = METHODTYPE then                          // Method call
-      begin
-      CompileMethodCall(ValType, TRUE);
-      RestoreStackTopFromEAX;
-      ValType := Ident[Types[ValType].MethodIdentIndex].Signature.ResultType;
-      end
-   
-    else if Types[ValType].Kind = PROCEDURALTYPE then                 // Procedural variable call
-      begin
-      CompileIndirectCall(ValType, TRUE);
-      RestoreStackTopFromEAX;    
-      ValType := Types[ValType].Signature.ResultType;          
-      end
-      
-    else
-      Error('Function expected');
+    CompileMethodOrProceduralVariableCall(ValType, TRUE, FALSE);
+    RestoreStackTopFromEAX;
     end       
-  else                                                              // Usual variable
-    if not (Types[ValType].Kind in StructuredTypes) then // Factors of type 'array', 'record', 'set' should contain a pointer to them
+  else                         // Usual variable
+    if not (Types[ValType].Kind in StructuredTypes) then // Structured expressions are stored as pointers to them
       DerefPtr(ValType);
   end; // CompileDereferenceOrCall
   
@@ -2352,17 +2338,8 @@ procedure CompileStatement{(LoopNesting: Integer)};
   procedure CompileAssignmentOrCall(DesignatorType: Integer);
   begin
   if Tok.Kind = OPARTOK then   // For method or procedural variable calls, parentheses are required even with empty parameter lists                                     
-    begin
-    if Types[DesignatorType].Kind = METHODTYPE then                 // Method call
-      CompileMethodCall(DesignatorType, FALSE)
- 
-    else if Types[DesignatorType].Kind = PROCEDURALTYPE then        // Procedural variable call
-      CompileIndirectCall(DesignatorType, FALSE)
-      
-    else
-      Error('Procedure expected')
-    end
-  else                                                              // Assignment
+    CompileMethodOrProceduralVariableCall(DesignatorType, FALSE, FALSE)
+  else                         // Assignment
     begin  
     CheckTok(ASSIGNTOK);                               
     CompileAssignment(DesignatorType)

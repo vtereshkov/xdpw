@@ -30,28 +30,28 @@ var
 
 
 
-procedure CAdd(var a, b, c: Complex);
+function CAdd(var a, b: Complex): Complex;
 begin
-c.Re := a.Re + b.Re;
-c.Im := a.Im + b.Im;
+Result.Re := a.Re + b.Re;
+Result.Im := a.Im + b.Im;
 end;
 
 
 
 
-procedure CSub(var a, b, c: Complex);
+function CSub(var a, b: Complex): Complex;
 begin
-c.Re := a.Re - b.Re;
-c.Im := a.Im - b.Im;
+Result.Re := a.Re - b.Re;
+Result.Im := a.Im - b.Im;
 end;
 
 
 
 
-procedure CMul(var a, b, c: Complex);
+function CMul(var a, b: Complex): Complex;
 begin
-c.Re := a.Re * b.Re - a.Im * b.Im;
-c.Im := a.Re * b.Im + a.Im * b.Re;
+Result.Re := a.Re * b.Re - a.Im * b.Im;
+Result.Im := a.Re * b.Im + a.Im * b.Re;
 end;
 
 
@@ -65,7 +65,7 @@ end;
 
 
 
-procedure GetFFT(var x: TData; var FFT: TComplexData; Depth: Integer);
+function GetFFT(var x: TData; Depth: Integer): TComplexData;
 var
   k, HalfLen, Step: Integer;
   FFTEven, FFTOdd: TComplexData;
@@ -77,20 +77,20 @@ Step := 1 shl Depth;
 
 if HalfLen = 0 then
   begin
-  FFT[0].Re := x[0];
-  FFT[0].Im := 0;
+  Result[0].Re := x[0];
+  Result[0].Im := 0;
   end
 else
   begin  
-  GetFFT(x,                FFTEven, Depth + 1);
-  GetFFT(PData(@x[Step])^, FFTOdd,  Depth + 1);
+  FFTEven := GetFFT(x,                Depth + 1);
+  FFTOdd  := GetFFT(PData(@x[Step])^, Depth + 1);
 
   for k := 0 to HalfLen - 1 do
     begin
-    CMul(FFTOdd[k], Twiddle[k * Step], FFTOddTwiddled);
+    FFTOddTwiddled := CMul(FFTOdd[k], Twiddle[k * Step]);
 
-    CAdd(FFTEven[k], FFTOddTwiddled, FFT[k]);
-    CSub(FFTEven[k], FFTOddTwiddled, FFT[k + HalfLen]);
+    Result[k]           := CAdd(FFTEven[k], FFTOddTwiddled);
+    Result[k + HalfLen] := CSub(FFTEven[k], FFTOddTwiddled);
     end; // for
   end; // else
 
@@ -99,7 +99,7 @@ end;
 
 
 
-procedure Spectrum(var x, S: TData);
+function Spectrum(var x: TData): TData;
 var
   FFT: TComplexData;
   i: Integer;
@@ -110,10 +110,10 @@ for i := 0 to DataLength - 1 do
   Twiddle[i].Im := -sin(2 * Pi * i / DataLength);
   end;
 
-GetFFT(x, FFT, 0);
+FFT := GetFFT(x, 0);
 
 for i := 0 to DataLength - 1 do
-  S[i] := CAbs(FFT[i]);
+  Result[i] := CAbs(FFT[i]);
 
 end;
 
@@ -147,7 +147,7 @@ for i := 0 to DataLength - 1 do
   end; // for
 
 // FFT
-Spectrum(x, S);
+S := Spectrum(x);
 
 for i := 0 to DataLength shr 1 - 1 do  
   WriteLn('Freq ', i: 5, '   Mag ', S[i] * 2 / DataLength: 10: 4);
