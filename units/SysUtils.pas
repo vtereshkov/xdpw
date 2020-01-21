@@ -33,7 +33,7 @@ var
 
   
   
-function StrToPChar{(const s: string): PChar};
+function StrToPChar(const s: string): PChar;
 begin
 Result := @s[1];
 end;
@@ -41,7 +41,7 @@ end;
 
 
 
-function PCharToStr{(p: PChar): string};
+function PCharToStr(p: PChar): string;
 var
   i: Integer;
 begin
@@ -56,7 +56,7 @@ end;
 
 
 
-function StrToPWideChar{(const s: string): PWideChar};
+function StrToPWideChar(const s: string): PWideChar;
 var
   i: Integer;  
 begin
@@ -71,7 +71,7 @@ end;
 
 
 
-function PWideCharToStr{(p: PWideChar): string};
+function PWideCharToStr(p: PWideChar): string;
 var
   i: Integer;
 begin

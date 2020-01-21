@@ -131,7 +131,7 @@ procedure StrToChars(const S: string; var Chars: array of Char);
 implementation
 
 
-procedure StrToChars{(const S: string; var Chars: array of Char)};
+procedure StrToChars(const S: string; var Chars: array of Char);
 var
   Len: Integer;
 begin

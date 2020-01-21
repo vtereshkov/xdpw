@@ -488,7 +488,7 @@ end;// CompileSimpleConstExpression
 
 
 
-procedure CompileConstExpression{(var ConstVal: TConst; var ConstValType: Integer)};
+procedure CompileConstExpression(var ConstVal: TConst; var ConstValType: Integer);
 var
   OpTok: TToken;
   RightConstVal: TConst;
@@ -1783,7 +1783,7 @@ end; // CompileBasicDesignator
 
 
 
-procedure CompileDesignator{(var ValType: Integer; ForceCharToString: Boolean)};
+procedure CompileDesignator(var ValType: Integer; ForceCharToString: Boolean);
 begin
 CompileBasicDesignator(ValType, ForceCharToString);
 CompileSelectors(ValType, ForceCharToString);
@@ -2158,7 +2158,7 @@ end;// CompileSimpleExpression
 
 
 
-procedure CompileExpression{(var ValType: Integer; ForceCharToString: Boolean)};
+procedure CompileExpression(var ValType: Integer; ForceCharToString: Boolean);
 var
   OpTok: TToken;
   RightValType: Integer;
@@ -2270,7 +2270,7 @@ end; // CompileCompoundStatement
 
 
 
-procedure CompileStatement{(LoopNesting: Integer)};
+procedure CompileStatement(LoopNesting: Integer);
 
 
 
@@ -2772,7 +2772,7 @@ end;// CompileStatement
 
 
 
-procedure CompileType{(var DataType: Integer)};
+procedure CompileType(var DataType: Integer);
 
 
   procedure CompileEnumeratedType(var DataType: Integer);
@@ -3547,6 +3547,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     ReceiverType: Integer;
     ProcOrFunc: TIdentKind;
     ProcName, ReceiverName: TString;
+    ForwardResolutionSignature: TSignature;
     
     
   begin // CompileProcFuncDeclarations   
@@ -3588,24 +3589,31 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   else
     ForwardIdentIndex := GetIdentUnsafe(ProcName);
   
+  // Possibly found an identifier of another kind or scope, or it is already resolved
   if ForwardIdentIndex <> 0 then
     if not Ident[ForwardIdentIndex].IsUnresolvedForward or
        (Ident[ForwardIdentIndex].Block <> BlockStack[BlockStackTop].Index) or
        ((Ident[ForwardIdentIndex].Kind <> PROC) and not IsFunction) or
        ((Ident[ForwardIdentIndex].Kind <> FUNC) and IsFunction) then
-     ForwardIdentIndex := 0;                                      // Found an identifier of another kind or scope, or it is already resolved
+     ForwardIdentIndex := 0;
 
-  if ForwardIdentIndex = 0 then
+  // Procedure/function signature
+  if ForwardIdentIndex <> 0 then                                      // Forward declaration resolution
     begin    
+    CompileFormalParametersAndResult(IsFunction, ForwardResolutionSignature);
+    CheckSignatures(Ident[ForwardIdentIndex].Signature, ForwardResolutionSignature, ProcName);
+    DisposeParams(ForwardResolutionSignature);
+    end
+  else                                                                // Conventional declaration
+    begin
     if IsFunction then ProcOrFunc := FUNC else ProcOrFunc := PROC;
     
     DeclareIdent(ProcName, ProcOrFunc, 0, 0, VALPASSING, 0, 0.0, EMPTYPROC, ReceiverName, ReceiverType);
     CompileFormalParametersAndResult(IsFunction, Ident[NumIdent].Signature);
 
     if (ReceiverType <> 0) and Ident[NumIdent].Signature.IsStdCall then
-      Error('STDCALL is not allowed for methods');
- 
-    end; // if ForwardIdentIndex = 0  
+      Error('STDCALL is not allowed for methods'); 
+    end;           
 
   EatTok(SEMICOLONTOK);  
   
@@ -3773,19 +3781,14 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   
 
 
-  procedure DeleteDeclarations;
-  var
-    ParamIndex, FieldIndex: Integer;
-    
+  procedure DeleteDeclarations;  
   begin  
-  // Delete local identifiers to save space
+  // Delete local identifiers
   while (NumIdent > 0) and (Ident[NumIdent].Block = BlockStack[BlockStackTop].Index) do
     begin 
     // If procedure or function, delete parameters first
-    with Ident[NumIdent] do
-      if Kind in [PROC, FUNC] then
-        for ParamIndex := 1 to Signature.NumParams do
-          Dispose(Signature.Param[ParamIndex]);
+    if Ident[NumIdent].Kind in [PROC, FUNC] then
+      DisposeParams(Ident[NumIdent].Signature);
 
     // Delete identifier itself
     Dec(NumIdent);
@@ -3794,16 +3797,13 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   // Delete local types
   while (NumTypes > 0) and (Types[NumTypes].Block = BlockStack[BlockStackTop].Index) do
     begin
-    with Types[NumTypes] do
-      // If procedural type, delete parameters first
-      if Kind = PROCEDURALTYPE then
-        for ParamIndex := 1 to Signature.NumParams do
-          Dispose(Signature.Param[ParamIndex]) 
-      
-      // If record or interface, delete fields first
-      else if Kind in [RECORDTYPE, INTERFACETYPE] then
-        for FieldIndex := 1 to NumFields do
-          Dispose(Field[FieldIndex]);    
+    // If procedural type, delete parameters first
+    if Types[NumTypes].Kind = PROCEDURALTYPE then
+      DisposeParams(Types[NumTypes].Signature) 
+    
+    // If record or interface, delete fields first
+    else if Types[NumTypes].Kind in [RECORDTYPE, INTERFACETYPE] then
+      DisposeFields(Types[NumTypes]);    
 
     // Delete type itself
     Dec(NumTypes);
@@ -3964,7 +3964,7 @@ end; // CompileUsesClause
 
 
 
-function CompileProgramOrUnit{(const Name: TString): Integer}; 
+function CompileProgramOrUnit(const Name: TString): Integer; 
 begin
 InitializeScanner(Name);
 

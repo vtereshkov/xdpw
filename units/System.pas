@@ -237,7 +237,7 @@ end;
 // Timer
 
 
-function Timer{: LongInt};
+function Timer: LongInt;
 begin
 Result := GetTickCount;
 end;
@@ -248,7 +248,7 @@ end;
 // Heap routines
 
 
-procedure GetMem{(var P: Pointer; Size: Integer)};
+procedure GetMem(var P: Pointer; Size: Integer);
 begin
 P := HeapAlloc(Heap, 0, Size);
 end;
@@ -256,7 +256,7 @@ end;
 
 
 
-procedure FreeMem{(var P: Pointer; Size: Integer)};
+procedure FreeMem(var P: Pointer; Size: Integer);
 begin
 HeapFree(Heap, 0, P);
 end;
@@ -275,7 +275,7 @@ end;
 
 
 
-function Random{: Real};
+function Random: Real;
 begin
 RandSeed := 1975433173 * RandSeed;
 Result := 0.5 * (RandSeed / $7FFFFFFF + 1.0);
@@ -287,7 +287,7 @@ end;
 // String manipulation routines
 
 
-function Length{(const s: string): Integer};
+function Length(const s: string): Integer;
 begin
 Result := 0;
 while s[Result + 1] <> #0 do Inc(Result);
@@ -296,7 +296,7 @@ end;
 
 
 
-procedure SetLength{(var s: string; NewLength: Integer)};
+procedure SetLength(var s: string; NewLength: Integer);
 begin
 if NewLength >= 0 then s[NewLength + 1] := #0;
 end;
@@ -304,7 +304,7 @@ end;
 
 
 
-procedure AppendStr{(var Dest: string; const Source: string)};
+procedure AppendStr(var Dest: string; const Source: string);
 var
   DestLen, i: Integer;
 begin
@@ -319,7 +319,7 @@ end;
 
 
 
-procedure ConcatStr{(const s1, s2: string; var s: string)};
+procedure ConcatStr(const s1, s2: string; var s: string);
 begin
 s := s1;
 AppendStr(s, s2);
@@ -328,7 +328,7 @@ end;
 
 
 
-function CompareStr{(const s1, s2: string): Integer};
+function CompareStr(const s1, s2: string): Integer;
 var
   i: Integer;
 begin
@@ -343,7 +343,7 @@ end;
 
 
 
-procedure Move{(const Source; var Dest; Count: Integer)};
+procedure Move(const Source; var Dest; Count: Integer);
 var
   S, D: ^string;
   i: Integer;
@@ -360,7 +360,7 @@ end;
 
 
 
-function Copy{(const S: string; Index, Count: Integer): string};
+function Copy(const S: string; Index, Count: Integer): string;
 var
   i: Integer;
 begin
@@ -371,7 +371,7 @@ end;
 
 
 
-procedure FillChar{(var Data; Count: Integer; Value: Char)};
+procedure FillChar(var Data; Count: Integer; Value: Char);
 var
   D: ^string;
   i: Integer;
@@ -384,7 +384,7 @@ end;
 
 
 
-function ParseCmdLine{(Index: Integer; var Str: string): Integer};
+function ParseCmdLine(Index: Integer; var Str: string): Integer;
 var
   CmdLine: string;
   CmdLinePtr: ^string;
@@ -423,7 +423,7 @@ end;
 
 
 
-function ParamCount{: Integer};
+function ParamCount: Integer;
 var
   Str: string;
 begin  
@@ -433,7 +433,7 @@ end;
 
 
 
-function ParamStr{(Index: Integer): string};
+function ParamStr(Index: Integer): string;
 var
   NumParam: Integer;
 begin  
@@ -447,7 +447,7 @@ end;
 
 
 
-procedure Assign{(var F: file; const Name: string)};
+procedure Assign(var F: file; const Name: string);
 var
   FileRecPtr: PFileRec;
 begin
@@ -458,7 +458,7 @@ end;
 
 
 
-procedure Rewrite{(var F: file; BlockSize: Integer = 1)};
+procedure Rewrite(var F: file; BlockSize: Integer = 1);
 var
   FileRecPtr: PFileRec;
 begin
@@ -470,7 +470,7 @@ end;
 
 
 
-procedure Reset{(var F: file; BlockSize: Integer = 1)};
+procedure Reset(var F: file; BlockSize: Integer = 1);
 var
   FileRecPtr: PFileRec;
 begin
@@ -482,7 +482,7 @@ end;
 
 
 
-procedure Close{(var F: file)};
+procedure Close(var F: file);
 var
   FileRecPtr: PFileRec;
 begin
@@ -493,7 +493,7 @@ end;
 
 
   
-procedure BlockWrite{(var F: file; var Buf; Len: Integer)};
+procedure BlockWrite(var F: file; var Buf; Len: Integer);
 var
   FileRecPtr: PFileRec;
   LenWritten: Integer;
@@ -505,7 +505,7 @@ end;
 
 
 
-procedure BlockRead{(var F: file; var Buf; Len: Integer; var LenRead: Integer)};
+procedure BlockRead(var F: file; var Buf; Len: Integer; var LenRead: Integer);
 var
   FileRecPtr: PFileRec;
 begin
@@ -517,7 +517,7 @@ end;
 
 
 
-procedure Seek{(var F: file; Pos: Integer)};
+procedure Seek(var F: file; Pos: Integer);
 var
   FileRecPtr: PFileRec;
 begin
@@ -528,7 +528,7 @@ end;
 
 
 
-function FileSize{(var F: file): Integer};
+function FileSize(var F: file): Integer;
 var
   FileRecPtr: PFileRec;
 begin
@@ -539,7 +539,7 @@ end;
 
 
 
-function FilePos{(var F: file): Integer};
+function FilePos(var F: file): Integer;
 var
   FileRecPtr: PFileRec;
 begin
@@ -550,7 +550,7 @@ end;
 
 
 
-function EOF{(var F: file): Boolean};
+function EOF(var F: file): Boolean;
 var
   FileRecPtr: PFileRec;
 begin
@@ -564,7 +564,7 @@ end;
 
 
 
-function IOResult{: Integer};
+function IOResult: Integer;
 begin
 Result := IOError;
 IOError := 0;
@@ -573,7 +573,7 @@ end;
 
 
 
-procedure WriteRec{(var F: file; P: PStream; var Buf; Len: Integer)};
+procedure WriteRec(var F: file; P: PStream; var Buf; Len: Integer);
 begin
 BlockWrite(F, Buf, Len);
 end;
@@ -615,7 +615,7 @@ end;
 
 
 
-procedure WriteStringF{(var F: file; P: PStream; const S: string; MinWidth, DecPlaces: Integer)};
+procedure WriteStringF(var F: file; P: PStream; const S: string; MinWidth, DecPlaces: Integer);
 var
   Spaces: string;
   i, NumSpaces: Integer;
@@ -672,7 +672,7 @@ end;
 
 
 
-procedure WriteIntF{(var F: file; P: PStream; Number: Integer; MinWidth, DecPlaces: Integer)};
+procedure WriteIntF(var F: file; P: PStream; Number: Integer; MinWidth, DecPlaces: Integer);
 var
   S: string;
 begin
@@ -698,7 +698,7 @@ end;
 
 
 
-procedure WritePointerF{(var F: file; P: PStream; Number: Integer; MinWidth, DecPlaces: Integer)};
+procedure WritePointerF(var F: file; P: PStream; Number: Integer; MinWidth, DecPlaces: Integer);
 var
   S: string;
 begin
@@ -799,7 +799,7 @@ end;
 
 
 
-procedure WriteRealF{(var F: file; P: PStream; Number: Real; MinWidth, DecPlaces: Integer)};
+procedure WriteRealF(var F: file; P: PStream; Number: Real; MinWidth, DecPlaces: Integer);
 var
   S: string;
 begin
@@ -818,7 +818,7 @@ end;
 
 
 
-procedure WriteBooleanF{(var F: file; P: PStream; Flag: Boolean; MinWidth, DecPlaces: Integer)};
+procedure WriteBooleanF(var F: file; P: PStream; Flag: Boolean; MinWidth, DecPlaces: Integer);
 begin
 if Flag then WriteStringF(F, P, 'TRUE', MinWidth, DecPlaces) else WriteStringF(F, P, 'FALSE', MinWidth, DecPlaces);
 end;
@@ -826,7 +826,7 @@ end;
 
 
 
-procedure WriteNewLine{(var F: file; P: PStream)};
+procedure WriteNewLine(var F: file; P: PStream);
 begin
 WriteCh(F, P, #13);  WriteCh(F, P, #10);
 end;
@@ -834,7 +834,7 @@ end;
 
 
 
-procedure ReadRec{(var F: file; P: PStream; var Buf; Len: Integer)};
+procedure ReadRec(var F: file; P: PStream; var Buf; Len: Integer);
 var
   LenRead: Integer;
 begin
@@ -844,7 +844,7 @@ end;
 
 
 
-procedure ReadCh{(var F: file; P: PStream; var ch: Char)};
+procedure ReadCh(var F: file; P: PStream; var ch: Char);
 var
   Len: Integer;
   Dest: PChar;
@@ -883,7 +883,7 @@ end;
 
 
 
-procedure ReadInt{(var F: file; P: PStream; var Number: Integer)};
+procedure ReadInt(var F: file; P: PStream; var Number: Integer);
 var
   Ch: Char;
   Negative: Boolean;
@@ -915,7 +915,7 @@ end;
 
 
 
-procedure ReadSmallInt{(var F: file; P: PStream; var Number: SmallInt)};
+procedure ReadSmallInt(var F: file; P: PStream; var Number: SmallInt);
 var
   IntNumber: Integer;
 begin
@@ -926,7 +926,7 @@ end;
 
 
 
-procedure ReadShortInt{(var F: file; P: PStream; var Number: ShortInt)};
+procedure ReadShortInt(var F: file; P: PStream; var Number: ShortInt);
 var
   IntNumber: Integer;
 begin
@@ -937,7 +937,7 @@ end;
 
 
 
-procedure ReadWord{(var F: file; P: PStream; var Number: Word)};
+procedure ReadWord(var F: file; P: PStream; var Number: Word);
 var
   IntNumber: Integer;
 begin
@@ -948,7 +948,7 @@ end;
 
 
 
-procedure ReadByte{(var F: file; P: PStream; var Number: Byte)};
+procedure ReadByte(var F: file; P: PStream; var Number: Byte);
 var
   IntNumber: Integer;
 begin
@@ -959,7 +959,7 @@ end;
 
 
 
-procedure ReadBoolean{(var F: file; P: PStream; var Value: Boolean)};
+procedure ReadBoolean(var F: file; P: PStream; var Value: Boolean);
 var
   IntNumber: Integer;
 begin
@@ -970,7 +970,7 @@ end;
 
 
 
-procedure ReadReal{(var F: file; P: PStream; var Number: Real)};
+procedure ReadReal(var F: file; P: PStream; var Number: Real);
 var
   Ch: Char;
   Negative, ExponNegative: Boolean;
@@ -1043,7 +1043,7 @@ end;
 
 
 
-procedure ReadString{(var F: file; P: PStream; const s: string)};
+procedure ReadString(var F: file; P: PStream; const s: string);
 var
   i: Integer;
   Ch: Char;
@@ -1064,7 +1064,7 @@ end;
 
 
 
-procedure ReadNewLine{(var F: file; P: PStream)};
+procedure ReadNewLine(var F: file; P: PStream);
 var
   Ch: Char;
 begin
@@ -1079,7 +1079,7 @@ end;
 // Conversion routines
 
 
-procedure Val{(const s: string; var Number: Real; var Code: Integer)};
+procedure Val(const s: string; var Number: Real; var Code: Integer);
 var
   Stream: TStream;
 begin
@@ -1094,7 +1094,7 @@ end;
 
 
 
-procedure Str{(Number: Real; var s: string; DecPlaces: Integer = 0)};
+procedure Str(Number: Real; var s: string; DecPlaces: Integer = 0);
 var
   Stream: TStream;
 begin
@@ -1108,7 +1108,7 @@ end;
 
 
 
-procedure IVal{(const s: string; var Number: Integer; var Code: Integer)};
+procedure IVal(const s: string; var Number: Integer; var Code: Integer);
 var
   Stream: TStream;
 begin
@@ -1123,7 +1123,7 @@ end;
 
 
 
-procedure IStr{(Number: Integer; var s: string)};
+procedure IStr(Number: Integer; var s: string);
 var
   Stream: TStream;
 begin
@@ -1137,7 +1137,7 @@ end;
 
 
 
-procedure PtrStr{(Number: Integer; var s: string)};
+procedure PtrStr(Number: Integer; var s: string);
 var
   Stream: TStream;
 begin
@@ -1151,7 +1151,7 @@ end;
 
 
 
-function UpCase{(ch: Char): Char};
+function UpCase(ch: Char): Char;
 begin
 if (ch >= 'a') and (ch <= 'z') then
   Result := Chr(Ord(ch) - Ord('a') + Ord('A'))
@@ -1165,7 +1165,7 @@ end;
 // Set manipulation routines
 
 
-procedure InitSet{(var SetStorage: TSetStorage)};
+procedure InitSet(var SetStorage: TSetStorage);
 begin
 FillChar(SetStorage, SizeOf(SetStorage), #0);
 end;
@@ -1173,7 +1173,7 @@ end;
 
 
 
-procedure AddToSet{(var SetStorage: TSetStorage; FromElement, ToElement: Integer)};
+procedure AddToSet(var SetStorage: TSetStorage; FromElement, ToElement: Integer);
 var
   Element: Integer;
   ElementPtr: ^Integer;
@@ -1192,7 +1192,7 @@ end;
 
 
 
-function InSet{(Element: Integer; var SetStorage: TSetStorage): Boolean};
+function InSet(Element: Integer; var SetStorage: TSetStorage): Boolean;
 begin
 Result := SetStorage[Element shr 5] and (1 shl (Element and 31)) <> 0;  
 end;
@@ -1200,7 +1200,7 @@ end;
 
 
 
-procedure SetUnion{(const SetStorage1, SetStorage2: TSetStorage; var SetStorage: TSetStorage)};
+procedure SetUnion(const SetStorage1, SetStorage2: TSetStorage; var SetStorage: TSetStorage);
 var
   i: Integer;
 begin
@@ -1211,7 +1211,7 @@ end;
 
 
 
-procedure SetDifference{(const SetStorage1, SetStorage2: TSetStorage; var SetStorage: TSetStorage)};
+procedure SetDifference(const SetStorage1, SetStorage2: TSetStorage; var SetStorage: TSetStorage);
 var
   i: Integer;
 begin
@@ -1222,7 +1222,7 @@ end;
 
 
 
-procedure SetIntersection{(const SetStorage1, SetStorage2: TSetStorage; var SetStorage: TSetStorage)};
+procedure SetIntersection(const SetStorage1, SetStorage2: TSetStorage; var SetStorage: TSetStorage);
 var
   i: Integer;
 begin
@@ -1233,7 +1233,7 @@ end;
 
 
 
-function CompareSets{(const SetStorage1, SetStorage2: TSetStorage): Integer};
+function CompareSets(const SetStorage1, SetStorage2: TSetStorage): Integer;
 var
   i: Integer;
 begin
@@ -1249,7 +1249,7 @@ end;
 
 
 
-function TestSubset{(const SetStorage1, SetStorage2: TSetStorage): Integer};
+function TestSubset(const SetStorage1, SetStorage2: TSetStorage): Integer;
 var
   IntersectionStorage: TSetStorage;
 begin
@@ -1260,7 +1260,7 @@ end;
 
 
 
-function TestSuperset{(const SetStorage1, SetStorage2: TSetStorage): Integer};
+function TestSuperset(const SetStorage1, SetStorage2: TSetStorage): Integer;
 var
   IntersectionStorage: TSetStorage;
 begin

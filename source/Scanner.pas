@@ -72,7 +72,7 @@ const
   
 
   
-procedure InitializeScanner{(const Name: TString)};
+procedure InitializeScanner(const Name: TString);
 var
   F: TInFile;
   ActualSize: Integer;
@@ -118,7 +118,7 @@ end;
 
 
 
-function SaveScanner{: Boolean};
+function SaveScanner: Boolean;
 begin
 Result := FALSE;
 if ScannerStackTop < SCANNERSTACKSIZE then
@@ -132,7 +132,7 @@ end;
 
 
 
-function RestoreScanner{: Boolean};
+function RestoreScanner: Boolean;
 begin
 Result := FALSE;
 if ScannerStackTop > 0 then
@@ -623,7 +623,7 @@ end; // NextTok
 
 
 
-procedure CheckTok{(ExpectedTokKind: TTokenKind)};
+procedure CheckTok(ExpectedTokKind: TTokenKind);
 begin
 with ScannerState do
   if Token.Kind <> ExpectedTokKind then
@@ -633,7 +633,7 @@ end;
 
 
 
-procedure EatTok{(ExpectedTokKind: TTokenKind)};
+procedure EatTok(ExpectedTokKind: TTokenKind);
 begin
 CheckTok(ExpectedTokKind);
 NextTok;
@@ -652,7 +652,7 @@ end;
 
 
 
-function ScannerFileName{: TString};
+function ScannerFileName: TString;
 begin
 Result := ScannerState.FileName;
 end;
@@ -660,7 +660,7 @@ end;
 
 
 
-function ScannerLine{: Integer};
+function ScannerLine: Integer;
 begin
 Result := ScannerState.Line;
 end;

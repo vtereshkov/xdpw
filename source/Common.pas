@@ -328,6 +328,8 @@ var
 
 procedure InitializeCommon;
 procedure FinalizeCommon;
+procedure DisposeParams(var Signature: TSignature);
+procedure DisposeFields(var DataType: TType);
 function GetTokSpelling(TokKind: TTokenKind): TString;
 procedure SetErrorProc(Err: TErrorProc);
 procedure Error(const Msg: TString);
@@ -438,7 +440,7 @@ UnsignedTypes    := [WORDTYPE, BYTETYPE, CHARTYPE];
 NumericTypes     := IntegerTypes + [REALTYPE];
 StructuredTypes  := [ARRAYTYPE, RECORDTYPE, INTERFACETYPE, SETTYPE, FILETYPE];
 CastableTypes    := OrdinalTypes + [POINTERTYPE, PROCEDURALTYPE];
-end; 
+end;
 
 
 
@@ -474,32 +476,50 @@ end;
 
 procedure FinalizeCommon;
 var
-  i, j: Integer;
+  i: Integer;
   
 begin
 // Dispose of dynamically allocated parameter data
 for i := 1 to NumIdent do
   if (Ident[i].Kind = PROC) or (Ident[i].Kind = FUNC) then
-    for j := 1 to Ident[i].Signature.NumParams do
-      Dispose(Ident[i].Signature.Param[j]);
+    DisposeParams(Ident[i].Signature);
 
 // Dispose of dynamically allocated parameter and field data
 for i := 1 to NumTypes do
   begin
   if Types[i].Kind = PROCEDURALTYPE then
-    for j := 1 to Types[i].Signature.NumParams do
-      Dispose(Types[i].Signature.Param[j]);
-  
-  if Types[i].Kind in [RECORDTYPE, INTERFACETYPE] then
-    for j := 1 to Types[i].NumFields do
-      Dispose(Types[i].Field[j]);
+    DisposeParams(Types[i].Signature) 
+  else if Types[i].Kind in [RECORDTYPE, INTERFACETYPE] then
+    DisposeFields(Types[i]);
   end;
 end;
 
 
 
 
-function GetTokSpelling{(TokKind: TTokenKind): TString};
+procedure DisposeParams(var Signature: TSignature);
+var
+  i: Integer;
+begin
+for i := 1 to Signature.NumParams do
+  Dispose(Signature.Param[i]);
+end; 
+
+
+
+
+procedure DisposeFields(var DataType: TType);
+var
+  i: Integer;
+begin
+for i := 1 to DataType.NumFields do
+  Dispose(DataType.Field[i]);
+end; 
+
+
+
+
+function GetTokSpelling(TokKind: TTokenKind): TString;
 begin
 case TokKind of
   EMPTYTOK:                          Result := 'no token';
@@ -538,7 +558,7 @@ end;
 
 
 
-procedure SetErrorProc{(Err: TErrorProc)};
+procedure SetErrorProc(Err: TErrorProc);
 begin
 ErrorProc := Err;
 end;
@@ -546,7 +566,7 @@ end;
 
 
   
-procedure Error{(const Msg: TString)};
+procedure Error(const Msg: TString);
 begin
 ErrorProc(Msg);
 end;
@@ -554,7 +574,7 @@ end;
 
 
 
-procedure DefineStaticString{(var Tok: TToken; const StrValue: TString)};
+procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
 var
   i: Integer;
 begin
@@ -577,7 +597,7 @@ end;
 
 
 
-function LowBound{(DataType: Integer): Integer};
+function LowBound(DataType: Integer): Integer;
 begin
 Result := 0;
 case Types[DataType].Kind of
@@ -598,7 +618,7 @@ end;
 
 
 
-function HighBound{(DataType: Integer): Integer};
+function HighBound(DataType: Integer): Integer;
 begin
 Result := 0;
 case Types[DataType].Kind of
@@ -619,7 +639,7 @@ end;
 
 
 
-function TypeSize{(DataType: Integer): Integer};
+function TypeSize(DataType: Integer): Integer;
 var
   CurSize: Integer;
   i: Integer;
@@ -657,7 +677,7 @@ end;
 
 
 
-function GetCompatibleType{(LeftType, RightType: Integer): Integer};
+function GetCompatibleType(LeftType, RightType: Integer): Integer;
 begin
 Result := 0;
 
@@ -717,7 +737,7 @@ end;
 
 
 
-function GetCompatibleRefType{(LeftType, RightType: Integer): Integer};
+function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
 begin
 // This function is asymmetric and implies Variable(LeftType) := Variable(RightType)
 Result := 0;
@@ -756,7 +776,7 @@ end;
 
 
 
-function ConversionToRealIsPossible{(SrcType, DestType: Integer): Boolean};
+function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
 begin
 // Implicit type conversion is possible if DestType is real and SrcType is integer or a subrange of integer
 Result := (Types[DestType].Kind = REALTYPE) and
@@ -767,7 +787,7 @@ end;
 
 
 
-procedure CheckOperator{(const Tok: TToken; DataType: Integer)}; 
+procedure CheckOperator(const Tok: TToken; DataType: Integer); 
 begin
 with Types[DataType] do
   if Kind = SUBRANGETYPE then
@@ -792,7 +812,7 @@ end;
 
 
 
-procedure CheckSignatures{(var Signature1, Signature2: TSignature; const Name: TString)};
+procedure CheckSignatures(var Signature1, Signature2: TSignature; const Name: TString);
 var
   i: Integer;
 begin
@@ -804,8 +824,17 @@ if Signature1.NumDefaultParams <> Signature2.NumDefaultParams then
   
 for i := 1 to Signature1.NumParams do
   begin
+  if Signature1.Param[i]^.Name <> Signature2.Param[i]^.Name then
+    Error('Incompatible parameter names in ' + Name);
+  
   if Signature1.Param[i]^.DataType <> Signature2.Param[i]^.DataType then
-    Error('Incompatible types in ' + Name);
+    if Types[Signature1.Param[i]^.DataType].IsOpenArray and Types[Signature2.Param[i]^.DataType].IsOpenArray then
+      begin
+      if Types[Signature1.Param[i]^.DataType].BaseType <> Types[Signature2.Param[i]^.DataType].BaseType then
+        Error('Incompatible parameter base types in ' + Name);
+      end
+    else  
+      Error('Incompatible parameter types in ' + Name);
     
   if Signature1.Param[i]^.PassMethod <> Signature2.Param[i]^.PassMethod then
     Error('Incompatible CONST/VAR modifiers in ' + Name);
@@ -825,7 +854,7 @@ end;
 
 
 
-procedure SetUnitStatus{(var NewUnitStatus: TUnitStatus)};
+procedure SetUnitStatus(var NewUnitStatus: TUnitStatus);
 begin 
 UnitStatus := NewUnitStatus;
 end;
@@ -833,7 +862,7 @@ end;
 
 
 
-function GetUnitUnsafe{(const UnitName: TString): Integer};
+function GetUnitUnsafe(const UnitName: TString): Integer;
 var
   UnitIndex: Integer;
 begin
@@ -850,7 +879,7 @@ end;
 
 
 
-function GetUnit{(const UnitName: TString): Integer};
+function GetUnit(const UnitName: TString): Integer;
 begin
 Result := GetUnitUnsafe(UnitName);
 if Result = 0 then
@@ -860,7 +889,7 @@ end;
 
 
 
-function GetKeyword{(const KeywordName: TString): TTokenKind};
+function GetKeyword(const KeywordName: TString): TTokenKind;
 var
   Max, Mid, Min: Integer;
   Found: Boolean;
@@ -886,7 +915,7 @@ end;
 
 
 
-function GetIdentUnsafe{(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer};
+function GetIdentUnsafe(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer;
 var
   IdentIndex: Integer;
 begin
@@ -908,7 +937,7 @@ end;
 
 
 
-function GetIdent{(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer};
+function GetIdent(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer;
 begin
 Result := GetIdentUnsafe(IdentName, AllowForwardReference, RecType);
 if Result = 0 then
@@ -918,7 +947,7 @@ end;
 
 
 
-function GetFieldUnsafe{(RecType: Integer; const FieldName: TString): Integer};
+function GetFieldUnsafe(RecType: Integer; const FieldName: TString): Integer;
 var
   FieldIndex: Integer;
 begin
@@ -935,7 +964,7 @@ end;
 
 
 
-function GetField{(RecType: Integer; const FieldName: TString): Integer};
+function GetField(RecType: Integer; const FieldName: TString): Integer;
 begin
 Result := GetFieldUnsafe(RecType, FieldName);
 if Result = 0 then
@@ -945,7 +974,7 @@ end;
 
 
 
-function GetFieldInsideWith{(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer};
+function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer;
 var
   FieldIndex, WithIndex: Integer;
 begin 
@@ -968,7 +997,7 @@ end;
 
 
 
-function GetMethodUnsafe{(RecType: Integer; const MethodName: TString): Integer};
+function GetMethodUnsafe(RecType: Integer; const MethodName: TString): Integer;
 begin
 Result := GetIdentUnsafe(MethodName, FALSE, RecType);
 end;
@@ -976,7 +1005,7 @@ end;
 
 
 
-function GetMethod{(RecType: Integer; const MethodName: TString): Integer};
+function GetMethod(RecType: Integer; const MethodName: TString): Integer;
 begin
 Result := GetIdent(MethodName, FALSE, RecType);
 if (Ident[Result].Kind <> PROC) and (Ident[Result].Kind <> FUNC) then
@@ -986,7 +1015,7 @@ end;
 
 
 
-function GetMethodInsideWith{(var RecPointer: Integer; var RecType: Integer; const MethodName: TString): Integer};
+function GetMethodInsideWith(var RecPointer: Integer; var RecType: Integer; const MethodName: TString): Integer;
 var
   MethodIndex, WithIndex: Integer;
 begin 
@@ -1009,7 +1038,7 @@ end;
 
 
 
-function FieldOrMethodInsideWithFound{(const Name: TString): Boolean};
+function FieldOrMethodInsideWithFound(const Name: TString): Boolean;
 var
   RecPointer: Integer; 
   RecType: Integer;        

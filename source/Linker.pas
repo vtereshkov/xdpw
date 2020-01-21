@@ -341,7 +341,7 @@ end;
 
     
 
-function AddImportFunc{(const ImportLibName, ImportFuncName: TString): LongInt};
+function AddImportFunc(const ImportLibName, ImportFuncName: TString): LongInt;
 begin
 with ImportSectionData do
   begin  
@@ -438,7 +438,7 @@ end;
 
 
 
-procedure LinkAndWriteProgram{(const ExeName: TString)};
+procedure LinkAndWriteProgram(const ExeName: TString);
 var
   OutFile: TOutFile;
   CodeSize, ImportSize, LookupTableOffset: Integer;

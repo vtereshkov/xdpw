@@ -159,7 +159,7 @@ end;
 
 
 
-function GetCodeSize{: LongInt};
+function GetCodeSize: LongInt;
 begin
 Result := CodeSize;
 
@@ -336,7 +336,7 @@ end;
 
 
 
-procedure PushConst{(Value: LongInt)};
+procedure PushConst(Value: LongInt);
 begin
 GenNew($68); GenDWord(Value);                            // push Value
 end;
@@ -344,7 +344,7 @@ end;
 
 
 
-procedure PushRelocConst{(Value: LongInt; RelocType: TRelocType)};
+procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 begin
 GenNew($68); GenRelocDWord(Value, RelocType);            // push Value  ; relocatable
 end;
@@ -352,7 +352,7 @@ end;
 
 
 
-procedure Relocate{(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr, ImportDeltaAddr: Integer)};
+procedure Relocate(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr, ImportDeltaAddr: Integer);
 var
   i, DeltaAddr: Integer;
 begin
@@ -638,7 +638,7 @@ end;
 
 
 
-procedure PushVarPtr{(Addr: Integer; Scope: TScope; DeltaNesting: Byte; RelocType: TRelocType)};
+procedure PushVarPtr(Addr: Integer; Scope: TScope; DeltaNesting: Byte; RelocType: TRelocType);
 const
   StaticLinkAddr = 2 * 4;
 var
@@ -672,7 +672,7 @@ end;
 
 
 
-procedure DerefPtr{(DataType: Integer)};
+procedure DerefPtr(DataType: Integer);
 
 
   function OptimizeDerefPtr: Boolean;
@@ -858,7 +858,7 @@ end;
 
 
 
-procedure GetArrayElementPtr{(ArrType: Integer)};
+procedure GetArrayElementPtr(ArrType: Integer);
 
 
   function OptimizeGetArrayElementPtr: Boolean;
@@ -1000,7 +1000,7 @@ end;
 
 
 
-procedure GetFieldPtr{(Offset: Integer)};
+procedure GetFieldPtr(Offset: Integer);
   
 
   function OptimizeGetFieldPtr: Boolean;
@@ -1076,7 +1076,7 @@ end;
 
 
 
-procedure DiscardStackTop{(NumItems: Byte)};
+procedure DiscardStackTop(NumItems: Byte);
 begin
 GenNew($83); Gen($C4); Gen(SizeOf(LongInt) * NumItems);                                 // add esp, 4 * NumItems
 end;
@@ -1118,7 +1118,7 @@ end;
 
 
 
-procedure GenerateIncDec{(proc: TPredefProc; Size: Byte)};
+procedure GenerateIncDec(proc: TPredefProc; Size: Byte);
 begin
 GenPopReg(ESI);                                                       // pop esi
 
@@ -1143,7 +1143,7 @@ end;
 
 
 
-procedure GenerateRound{(TruncMode: Boolean)};
+procedure GenerateRound(TruncMode: Boolean);
 begin
 GenPushToFPU;                                                                  // fld dword ptr [esp]  ;  st = operand
 
@@ -1166,7 +1166,7 @@ end;// GenerateRound
 
 
 
-procedure GenerateFloat{(Depth: Byte)};
+procedure GenerateFloat(Depth: Byte);
 
 
   function OptimizeGenerateFloat: Boolean;
@@ -1209,7 +1209,7 @@ end;// GenerateFloat
 
 
 
-procedure GenerateMathFunction{(func: TPredefProc; ResultType: Integer)};
+procedure GenerateMathFunction(func: TPredefProc; ResultType: Integer);
 begin
 if Types[ResultType].Kind = REALTYPE then       // Real type
   begin
@@ -1287,7 +1287,7 @@ end;// GenerateMathFunction
 
 
 
-procedure GenerateUnaryOperator{(op: TTokenKind; ResultType: Integer)};
+procedure GenerateUnaryOperator(op: TTokenKind; ResultType: Integer);
 begin
 if Types[ResultType].Kind = REALTYPE then     // Real type
   begin
@@ -1325,7 +1325,7 @@ end;
 
 
 
-procedure GenerateBinaryOperator{(op: TTokenKind; ResultType: Integer)};
+procedure GenerateBinaryOperator(op: TTokenKind; ResultType: Integer);
 begin
 if Types[ResultType].Kind = REALTYPE then     // Real type
   begin
@@ -1425,7 +1425,7 @@ end;
 
 
 
-procedure GenerateRelation{(rel: TTokenKind; ValType: Integer)};
+procedure GenerateRelation(rel: TTokenKind; ValType: Integer);
 
 
   function OptimizeGenerateRelation: Boolean;
@@ -1495,7 +1495,7 @@ end;
 
 
 
-procedure GenerateAssignment{(DesignatorType: Integer)};
+procedure GenerateAssignment(DesignatorType: Integer);
 
 
   function OptimizeGenerateAssignment: Boolean;
@@ -1579,7 +1579,7 @@ end;
 
 
 
-procedure GenerateForAssignmentAndNumberOfIterations{(CounterType: Integer; Down: Boolean)};
+procedure GenerateForAssignmentAndNumberOfIterations(CounterType: Integer; Down: Boolean);
 
 
   function OptimizeGenerateForAssignmentAndNumberOfIterations: Boolean;
@@ -1671,7 +1671,7 @@ end;
 
 
 
-procedure GenerateStructuredAssignment{(DesignatorType: Integer)};
+procedure GenerateStructuredAssignment(DesignatorType: Integer);
 begin
 GenPopReg(ESI);                                                            // pop esi      ; source address
 GenPopReg(EDI);                                                            // pop edi      ; destination address
@@ -1685,7 +1685,7 @@ end;
 
 
 
-procedure GenerateInterfaceFieldAssignment{(Offset: Integer; PopValueFromStack: Boolean; Value: LongInt; RelocType: TRelocType)};
+procedure GenerateInterfaceFieldAssignment(Offset: Integer; PopValueFromStack: Boolean; Value: LongInt; RelocType: TRelocType);
 begin
 if PopValueFromStack then
   begin
@@ -1701,7 +1701,7 @@ end;
 
 
 
-procedure InverseStack{(Depth: Integer)};
+procedure InverseStack(Depth: Integer);
 var
   i: Integer;
 begin
@@ -1717,7 +1717,7 @@ end;
 
 
 
-procedure GenerateImportFuncStub{(EntryPoint: LongInt)};
+procedure GenerateImportFuncStub(EntryPoint: LongInt);
 begin
 GenNew($FF); Gen($25); GenRelocDWord(EntryPoint, IMPORTRELOC);                           // jmp ds:EntryPoint  ; relocatable
 end;
@@ -1725,7 +1725,7 @@ end;
 
 
 
-procedure GenerateCall{(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer)};
+procedure GenerateCall(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer);
 const
   StaticLinkAddr = 2 * 4;
 var
@@ -1758,7 +1758,7 @@ end;
 
 
 
-procedure GenerateIndirectCall{(NumParam: Integer)};
+procedure GenerateIndirectCall(NumParam: Integer);
 begin
 GenNew($8B); Gen($B4); Gen($24); GenDWord(SizeOf(LongInt) * NumParam);       // mov esi, dword ptr [esp + 4 * NumParam]
 GenNew($FF); Gen($16);                                                       // call [esi]
@@ -1768,7 +1768,7 @@ end;
 
 
 
-procedure GenerateReturn{(TotalParamsSize, Nesting: Integer)};
+procedure GenerateReturn(TotalParamsSize, Nesting: Integer);
 begin
 GenNew($C2);                                                                 // ret ... 
 if Nesting = 1 then
@@ -1792,7 +1792,7 @@ end;
 
 
 
-procedure GenerateForwardResolution{(CodePos: Integer)};
+procedure GenerateForwardResolution(CodePos: Integer);
 begin
 GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, GetCodeSize - (CodePos + 5));      // jmp GetCodeSize
 end;
@@ -1891,7 +1891,7 @@ end;
 
 
 
-procedure GenerateCaseEpilog{(NumCaseStatements: Integer)};
+procedure GenerateCaseEpilog(NumCaseStatements: Integer);
 var
   i: Integer;
 begin
@@ -1902,7 +1902,7 @@ end;
 
 
 
-procedure GenerateCaseEqualityCheck{(Value: LongInt)};
+procedure GenerateCaseEqualityCheck(Value: LongInt);
 begin
 GenNew($81); Gen($F9); GenDWord(Value);                        // cmp ecx, Value
 GenNew($9F);                                                   // lahf
@@ -1912,7 +1912,7 @@ end;
 
 
 
-procedure GenerateCaseRangeCheck{(Value1, Value2: LongInt)};
+procedure GenerateCaseRangeCheck(Value1, Value2: LongInt);
 begin
 GenNew($81); Gen($F9); GenDWord(Value1);                       // cmp ecx, Value1
 GenNew($7C); Gen($0A);                                         // jl +10
@@ -2033,7 +2033,7 @@ end;
 
 
 
-procedure GenerateForEpilog{(CounterType: Integer; Down: Boolean)};
+procedure GenerateForEpilog(CounterType: Integer; Down: Boolean);
 begin
 // Increment/decrement counter variable
 if Down then
@@ -2060,7 +2060,7 @@ end;
 
 
 
-procedure GenerateGoto{(LabelIndex: Integer)};
+procedure GenerateGoto(LabelIndex: Integer);
 begin
 Inc(NumGotos);
 Gotos[NumGotos].Pos := GetCodeSize;
@@ -2093,7 +2093,7 @@ end;
 
 
 
-procedure GenerateShortCircuitProlog{(op: TTokenKind)};
+procedure GenerateShortCircuitProlog(op: TTokenKind);
 begin
 GenPopReg(EAX);                                                    // pop eax
 GenNew($85); Gen($C0);                                             // test eax, eax  
@@ -2161,7 +2161,7 @@ end;
 
 
 
-procedure GenerateStackFrameEpilog{(TotalStackStorageSize: LongInt)};
+procedure GenerateStackFrameEpilog(TotalStackStorageSize: LongInt);
 var
   CodePos: Integer;
 begin
@@ -2175,7 +2175,7 @@ end;
 
 
 
-procedure GenerateBreakProlog{(LoopNesting: Integer)};
+procedure GenerateBreakProlog(LoopNesting: Integer);
 begin
 BreakCall[LoopNesting].NumCalls := 0;
 end;
@@ -2183,7 +2183,7 @@ end;
 
 
 
-procedure GenerateBreakCall{(LoopNesting: Integer)};
+procedure GenerateBreakCall(LoopNesting: Integer);
 begin
 Inc(BreakCall[LoopNesting].NumCalls);
 BreakCall[LoopNesting].Pos[BreakCall[LoopNesting].NumCalls] := GetCodeSize;
@@ -2194,7 +2194,7 @@ end;
 
 
 
-procedure GenerateBreakEpilog{(LoopNesting: Integer)};
+procedure GenerateBreakEpilog(LoopNesting: Integer);
 var
   i: Integer;
 begin
@@ -2205,7 +2205,7 @@ end;
 
 
 
-procedure GenerateContinueProlog{(LoopNesting: Integer)};
+procedure GenerateContinueProlog(LoopNesting: Integer);
 begin
 ContinueCall[LoopNesting].NumCalls := 0;
 end;
@@ -2213,7 +2213,7 @@ end;
 
 
 
-procedure GenerateContinueCall{(LoopNesting: Integer)};
+procedure GenerateContinueCall(LoopNesting: Integer);
 begin
 Inc(ContinueCall[LoopNesting].NumCalls);
 ContinueCall[LoopNesting].Pos[ContinueCall[LoopNesting].NumCalls] := GetCodeSize;
@@ -2224,7 +2224,7 @@ end;
 
 
 
-procedure GenerateContinueEpilog{(LoopNesting: Integer)};
+procedure GenerateContinueEpilog(LoopNesting: Integer);
 var
   i: Integer;
 begin
