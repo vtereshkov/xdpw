@@ -78,6 +78,8 @@ var
   ActualSize: Integer;
   
 begin
+ScannerState.Buffer.Ptr := nil;
+
 // First search the source folder, then the units folder
 Assign(F, TGenericString(SourceFolder + Name));
 Reset(F, 1);
