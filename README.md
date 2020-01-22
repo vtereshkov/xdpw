@@ -155,7 +155,7 @@ CompoundStatement = "begin" StatementList "end" .
 IfStatement = "if" Expression "then" Statement ["else" Statement] .
 
 CaseStatement = "case" Expression "of" CaseElement {";" CaseElement} 
-                    ["else" StatementList] [";"] "end" .
+                    [";"] ["else" StatementList] [";"] "end" .
                     
 WhileStatement = "while" Expression "do" Statement .
 

@@ -346,7 +346,7 @@ case Tok.Kind of
     begin
     CompileConstFactor(ConstVal, ConstValType);
     ConstVal.Value := not ConstVal.Value;
-    end 
+    end; 
 
 else
   Error('Expression expected but ' + GetTokSpelling(Tok.Kind) + ' found');
@@ -2424,19 +2424,19 @@ procedure CompileStatement(LoopNesting: Integer);
     GenerateCaseStatementEpilog;
 
     Inc(NumCaseStatements);
-
-    if Tok.Kind <> SEMICOLONTOK then
-      begin
-      if Tok.Kind = ELSETOK then              // Default statements
-        begin
-        NextTok;
-        CompileStatementList(LoopNesting);
-        end;          
-      Break;
-      end;
-
+    
+    if (Tok.Kind = ELSETOK) or (Tok.Kind = ENDTOK) then Break;
+    
+    CheckTok(SEMICOLONTOK);
     NextTok;
-  until Tok.Kind = ENDTOK;
+  until (Tok.Kind = ELSETOK) or (Tok.Kind = ENDTOK);  
+  
+  // Default statements
+  if Tok.Kind = ELSETOK then              
+    begin
+    NextTok;
+    CompileStatementList(LoopNesting);
+    end;          
 
   EatTok(ENDTOK);
 
@@ -2733,7 +2733,7 @@ case Tok.Kind of
                 end;
               end;              
               
-            end  
+            end;  
                  
       else
         Error('Statement expected but ' + Ident[IdentIndex].Name + ' found');
