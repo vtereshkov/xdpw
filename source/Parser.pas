@@ -1737,15 +1737,15 @@ if ValType = 0 then
       
       ValType := Ident[IdentIndex].DataType;           
       
-      if ForceCharToString then
-        ConvertCharToString(ValType, TRUE);
-
-      if Types[Ident[IdentIndex].DataType].Kind in StructuredTypes + [ANYTYPE] then
+      if Types[ValType].Kind in StructuredTypes + [ANYTYPE] then
         IsRefParam := Ident[IdentIndex].PassMethod in [CONSTPASSING, VARPASSING]    // For structured parameters, CONST is equivalent to VAR
       else
         IsRefParam := Ident[IdentIndex].PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
 
       if IsRefParam then DerefPtr(POINTERTYPEINDEX);                                // Parameter is passed by reference
+      
+      if ForceCharToString then
+        ConvertCharToString(ValType, TRUE);      
       
       NextTok;
       end;
