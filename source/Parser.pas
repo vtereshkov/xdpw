@@ -340,6 +340,38 @@ end; // ConvertCharToString
 
 
 
+procedure ConvertConcreteToInterface(DestType: Integer; var SrcType: Integer);
+var
+  Field: PField;
+  TempStorageAddr: LongInt;
+  FieldIndex, MethodIndex: Integer;
+begin
+// Try to convert a concrete type to an interface type
+if (Types[DestType].Kind = INTERFACETYPE) and (DestType <> SrcType) then
+  begin
+  // Allocate new interface variable
+  TempStorageAddr := AllocateTempStorage(TypeSize(DestType));
+
+  // Set interface's Self pointer (offset 0) to the concrete data
+  GenerateInterfaceFieldAssignment(TempStorageAddr, TRUE, 0, UNINITDATARELOC);
+
+  // Set interface's procedure pointers to the concrete methods
+  for FieldIndex := 2 to Types[DestType].NumFields do
+    begin
+    Field := Types[DestType].Field[FieldIndex];
+    MethodIndex := GetMethod(SrcType, Field^.Name);
+    CheckSignatures(Ident[MethodIndex].Signature, Types[Field^.DataType].Signature, Ident[MethodIndex].Name, FALSE);
+    GenerateInterfaceFieldAssignment(TempStorageAddr + (FieldIndex - 1) * SizeOf(Pointer), FALSE, Ident[MethodIndex].Value, CODERELOC);
+    end; // for  
+
+  PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+  SrcType := DestType;
+  end;
+end; // ConvertConcreteToInterface
+
+
+
+
 procedure CompileConstFactor(var ConstVal: TConst; var ConstValType: Integer);
 var
   IdentIndex: Integer;
@@ -1048,33 +1080,6 @@ end;// CompilePredefinedFunc
 
 
 
-procedure CompileConcreteTypeToInterfaceTypeConversion(ConcreteType, InterfType: Integer);
-var
-  Field: PField;
-  TempStorageAddr: LongInt;
-  FieldIndex, MethodIndex: Integer;
-begin
-// Allocate new interface variable
-TempStorageAddr := AllocateTempStorage(TypeSize(InterfType));
-
-// Set interface's Self pointer (offset 0) to the concrete data
-GenerateInterfaceFieldAssignment(TempStorageAddr, TRUE, 0, UNINITDATARELOC);
-
-// Set interface's procedure pointers to the concrete methods
-for FieldIndex := 2 to Types[InterfType].NumFields do
-  begin
-  Field := Types[InterfType].Field[FieldIndex];
-  MethodIndex := GetMethod(ConcreteType, Field^.Name);
-  CheckSignatures(Ident[MethodIndex].Signature, Types[Field^.DataType].Signature, Ident[MethodIndex].Name);
-  GenerateInterfaceFieldAssignment(TempStorageAddr + (FieldIndex - 1) * SizeOf(Pointer), FALSE, Ident[MethodIndex].Value, CODERELOC);
-  end; // for  
-
-PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
-end; // CompileConcreteTypeToInterfaceTypeConversion
-
-
-
-
 procedure CompileTypeIdent(var DataType: Integer; AllowForwardReference: Boolean);
 var
   IdentIndex: Integer;
@@ -1337,11 +1342,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       ConvertCharToString(CurParam^.DataType, ActualParamType, 0);      
         
       // Try to convert a concrete type to an interface type
-      if (Types[CurParam^.DataType].Kind = INTERFACETYPE) and (CurParam^.DataType <> ActualParamType) then
-        begin
-        CompileConcreteTypeToInterfaceTypeConversion(ActualParamType, CurParam^.DataType);
-        ActualParamType := CurParam^.DataType;
-        end;   
+      ConvertConcreteToInterface(CurParam^.DataType, ActualParamType);
       
       if IsRefParam then  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
         GetCompatibleRefType(CurParam^.DataType, ActualParamType)
@@ -1864,21 +1865,13 @@ case Tok.Kind of
           NextTok;
           EatTok(OPARTOK);
           
-          if Types[Ident[IdentIndex].DataType].Kind = INTERFACETYPE then    // Special case: concrete type to interface type
-            begin            
-            CompileDesignator(ValType);
-            CompileConcreteTypeToInterfaceTypeConversion(ValType, Ident[IdentIndex].DataType);                        
-            end
-          else                                                              // General rule
-            begin  
-            CompileExpression(ValType);
+          CompileExpression(ValType);
 
-            if (Ident[IdentIndex].DataType <> ValType) and 
-              not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and (Types[ValType].Kind in CastableTypes)) 
-            then
-              Error('Invalid typecast');            
-            end;
-            
+          if (Ident[IdentIndex].DataType <> ValType) and 
+             not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and (Types[ValType].Kind in CastableTypes)) 
+          then
+            Error('Invalid typecast');            
+           
           EatTok(CPARTOK);
           ValType := Ident[IdentIndex].DataType;
           CompileSelectors(ValType);  
@@ -2292,11 +2285,7 @@ procedure CompileStatement(LoopNesting: Integer);
   ConvertCharToString(DesignatorType, ExpressionType, 0);    
     
   // Try to convert a concrete type to an interface type
-  if (Types[DesignatorType].Kind = INTERFACETYPE) and (DesignatorType <> ExpressionType) then
-    begin
-    CompileConcreteTypeToInterfaceTypeConversion(ExpressionType, DesignatorType);
-    ExpressionType := DesignatorType;
-    end;       
+  ConvertConcreteToInterface(DesignatorType, ExpressionType);       
 
   GetCompatibleType(DesignatorType, ExpressionType);
 

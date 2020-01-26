@@ -340,7 +340,7 @@ function TypeSize(DataType: Integer): Integer;
 function GetCompatibleType(LeftType, RightType: Integer): Integer;
 function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
 procedure CheckOperator(const Tok: TToken; DataType: Integer);
-procedure CheckSignatures(var Signature1, Signature2: TSignature; const Name: TString); 
+procedure CheckSignatures(var Signature1, Signature2: TSignature; const Name: TString; CheckParamNames: Boolean = TRUE); 
 procedure SetUnitStatus(var NewUnitStatus: TUnitStatus);
 function GetUnitUnsafe(const UnitName: TString): Integer;
 function GetUnit(const UnitName: TString): Integer;
@@ -800,7 +800,7 @@ end;
 
 
 
-procedure CheckSignatures(var Signature1, Signature2: TSignature; const Name: TString);
+procedure CheckSignatures(var Signature1, Signature2: TSignature; const Name: TString; CheckParamNames: Boolean = TRUE);
 var
   i: Integer;
 begin
@@ -812,7 +812,7 @@ if Signature1.NumDefaultParams <> Signature2.NumDefaultParams then
   
 for i := 1 to Signature1.NumParams do
   begin
-  if Signature1.Param[i]^.Name <> Signature2.Param[i]^.Name then
+  if (Signature1.Param[i]^.Name <> Signature2.Param[i]^.Name) and CheckParamNames then
     Error('Incompatible parameter names in ' + Name);
   
   if Signature1.Param[i]^.DataType <> Signature2.Param[i]^.DataType then
