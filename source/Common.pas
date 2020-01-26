@@ -339,7 +339,6 @@ function HighBound(DataType: Integer): Integer;
 function TypeSize(DataType: Integer): Integer;
 function GetCompatibleType(LeftType, RightType: Integer): Integer;
 function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
-function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
 procedure CheckOperator(const Tok: TToken; DataType: Integer);
 procedure CheckSignatures(var Signature1, Signature2: TSignature; const Name: TString); 
 procedure SetUnitStatus(var NewUnitStatus: TUnitStatus);
@@ -771,17 +770,6 @@ else                                         // Special cases
 
 if Result = 0 then
   Error('Incompatible types');  
-end;
-
-
-
-
-function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
-begin
-// Implicit type conversion is possible if DestType is real and SrcType is integer or a subrange of integer
-Result := (Types[DestType].Kind = REALTYPE) and
-          ((Types[SrcType].Kind in IntegerTypes) or
-           ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind in IntegerTypes)));
 end;
 
 

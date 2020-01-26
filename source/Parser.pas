@@ -288,18 +288,52 @@ end; // AllocateTempStorage
 
 
 
-procedure ConvertCharToString(LeftType: Integer; var RightType: Integer; Depth: Integer);
+procedure ConvertConstIntegerToReal(DestType: Integer; var SrcType: Integer; var ConstVal: TConst);
+begin
+// Try to convert an integer (right-hand side) into a real
+if (Types[DestType].Kind = REALTYPE) and
+   ((Types[SrcType].Kind in IntegerTypes) or 
+   ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind in IntegerTypes)))
+then
+  begin
+  ConstVal.FracValue := ConstVal.Value;
+  SrcType := REALTYPEINDEX;
+  end;   
+end; // ConvertConstIntegerToReal
+
+
+
+
+procedure ConvertIntegerToReal(DestType: Integer; var SrcType: Integer; Depth: Integer);
+begin
+// Try to convert an integer (right-hand side) into a real
+if (Types[DestType].Kind = REALTYPE) and
+   ((Types[SrcType].Kind in IntegerTypes) or 
+   ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind in IntegerTypes)))
+then
+  begin
+  GenerateFloat(Depth);
+  SrcType := REALTYPEINDEX;
+  end;   
+end; // ConvertIntegerToReal
+
+
+
+
+procedure ConvertCharToString(DestType: Integer; var SrcType: Integer; Depth: Integer);
 var
   TempStorageAddr: LongInt;
 begin
 // Try to convert a character (right-hand side) into a 2-character temporary string
-if (LeftType = STRINGTYPEINDEX) and 
-   ((Types[RightType].Kind = CHARTYPE) or ((Types[RightType].Kind = SUBRANGETYPE) and (Types[Types[RightType].BaseType].Kind = CHARTYPE))) then
+if (DestType = STRINGTYPEINDEX) and 
+   ((Types[SrcType].Kind = CHARTYPE) or 
+   ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind = CHARTYPE))) 
+then
   begin
   TempStorageAddr := AllocateTempStorage(2 * SizeOf(TCharacter));    
   PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);  
   GetCharAsTempString(Depth);    
-  RightType := STRINGTYPEINDEX;
+  SrcType := STRINGTYPEINDEX;
   end;
 end; // ConvertCharToString
 
@@ -391,24 +425,14 @@ while Tok.Kind in MultiplicativeOperators do
   CompileConstFactor(RightConstVal, RightConstValType);
 
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ConstValType, RightConstValType) then
-    begin
-    ConstVal.FracValue := ConstVal.Value;
-    ConstValType := REALTYPEINDEX;
-    end;
-  if ConversionToRealIsPossible(RightConstValType, ConstValType) then
-    begin
-    RightConstVal.FracValue := RightConstVal.Value;
-    RightConstValType := REALTYPEINDEX;
-    end;
-
+  ConvertConstIntegerToReal(RightConstValType, ConstValType, ConstVal);
+  ConvertConstIntegerToReal(ConstValType, RightConstValType, RightConstVal);
+  
   // Special case: real division of two integers
-  if (OpTok.Kind = DIVTOK) and ConversionToRealIsPossible(ConstValType, REALTYPEINDEX) and ConversionToRealIsPossible(RightConstValType, REALTYPEINDEX) then
+  if OpTok.Kind = DIVTOK then
     begin
-    ConstVal.FracValue := ConstVal.Value;
-    RightConstVal.FracValue := RightConstVal.Value;
-    ConstValType := REALTYPEINDEX;
-    RightConstValType := REALTYPEINDEX;
+    ConvertConstIntegerToReal(REALTYPEINDEX, ConstValType, ConstVal);
+    ConvertConstIntegerToReal(REALTYPEINDEX, RightConstValType, RightConstVal);
     end;
 
   ConstValType := GetCompatibleType(ConstValType, RightConstValType);
@@ -473,16 +497,8 @@ while Tok.Kind in AdditiveOperators do
   CompileConstTerm(RightConstVal, RightConstValType);
 
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ConstValType, RightConstValType) then
-    begin
-    ConstVal.FracValue := ConstVal.Value;
-    ConstValType := REALTYPEINDEX;
-    end;
-  if ConversionToRealIsPossible(RightConstValType, ConstValType) then
-    begin
-    RightConstVal.FracValue := RightConstVal.Value;
-    RightConstValType := REALTYPEINDEX;
-    end;  
+  ConvertConstIntegerToReal(RightConstValType, ConstValType, ConstVal);
+  ConvertConstIntegerToReal(ConstValType, RightConstValType, RightConstVal);
 
   ConstValType := GetCompatibleType(ConstValType, RightConstValType);
   CheckOperator(OpTok, ConstValType);
@@ -524,16 +540,8 @@ if Tok.Kind in RelationOperators then
   CompileSimpleConstExpression(RightConstVal, RightConstValType);
 
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ConstValType, RightConstValType) then
-    begin
-    ConstVal.FracValue := ConstVal.Value;
-    ConstValType := REALTYPEINDEX;
-    end;
-  if ConversionToRealIsPossible(RightConstValType, ConstValType) then
-    begin
-    RightConstVal.FracValue := RightConstVal.Value;
-    RightConstValType := REALTYPEINDEX;
-    end;
+  ConvertConstIntegerToReal(RightConstValType, ConstValType, ConstVal);
+  ConvertConstIntegerToReal(ConstValType, RightConstValType, RightConstVal);
 
   GetCompatibleType(ConstValType, RightConstValType);
   CheckOperator(OpTok, ConstValType);
@@ -975,12 +983,8 @@ case func of
     CompileExpression(ValType);
 
     // Try to convert integer to real
-    if ConversionToRealIsPossible(ValType, REALTYPEINDEX) then
-      begin
-      GenerateFloat(0);
-      ValType := REALTYPEINDEX;
-      end;
-
+    ConvertIntegerToReal(REALTYPEINDEX, ValType, 0);
+    
     GetCompatibleType(ValType, REALTYPEINDEX);
     GenerateRound(func = TRUNCFUNC);
     ValType := INTEGERTYPEINDEX;
@@ -1028,14 +1032,8 @@ case func of
       end
     else
       begin
-      
       // Try to convert integer to real
-      if ConversionToRealIsPossible(ValType, REALTYPEINDEX) then
-        begin
-        GenerateFloat(0);
-        ValType := REALTYPEINDEX;
-        end;
-
+      ConvertIntegerToReal(REALTYPEINDEX, ValType, 0);
       GetCompatibleType(ValType, REALTYPEINDEX);
       end;
 
@@ -1332,12 +1330,9 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       Inc(NumActualParams);
 
       // Try to convert integer to real
-      if ConversionToRealIsPossible(ActualParamType, CurParam^.DataType) and not IsRefParam then
-        begin
-        GenerateFloat(0);
-        ActualParamType := REALTYPEINDEX;
-        end;
-        
+      if not IsRefParam then
+        ConvertIntegerToReal(CurParam^.DataType, ActualParamType, 0);
+       
       // Try to convert character to string
       ConvertCharToString(CurParam^.DataType, ActualParamType, 0);      
         
@@ -2014,24 +2009,14 @@ while Tok.Kind in MultiplicativeOperators do
   CompileFactor(RightValType);
 
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ValType, RightValType) then
-    begin
-    GenerateFloat(SizeOf(Single));
-    ValType := REALTYPEINDEX;
-    end;
-  if ConversionToRealIsPossible(RightValType, ValType) then
-    begin
-    GenerateFloat(0);
-    RightValType := REALTYPEINDEX;
-    end;
-
+  ConvertIntegerToReal(ValType, RightValType, 0);
+  ConvertIntegerToReal(RightValType, ValType, SizeOf(Single));
+  
   // Special case: real division of two integers
-  if (OpTok.Kind = DIVTOK) and ConversionToRealIsPossible(ValType, REALTYPEINDEX) and ConversionToRealIsPossible(RightValType, REALTYPEINDEX) then
+  if OpTok.Kind = DIVTOK then
     begin
-    GenerateFloat(SizeOf(Single));
-    GenerateFloat(0);
-    ValType := REALTYPEINDEX;
-    RightValType := REALTYPEINDEX;
+    ConvertIntegerToReal(REALTYPEINDEX, RightValType, 0);
+    ConvertIntegerToReal(REALTYPEINDEX, ValType, SizeOf(Single));
     end;
     
   // Special case: set intersection  
@@ -2098,16 +2083,8 @@ while Tok.Kind in AdditiveOperators do
   CompileTerm(RightValType); 
 
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ValType, RightValType) then
-    begin
-    GenerateFloat(SizeOf(Single));
-    ValType := REALTYPEINDEX;
-    end;
-  if ConversionToRealIsPossible(RightValType, ValType) then
-    begin
-    GenerateFloat(0);
-    RightValType := REALTYPEINDEX;
-    end;
+  ConvertIntegerToReal(ValType, RightValType, 0);
+  ConvertIntegerToReal(RightValType, ValType, SizeOf(Single));
     
   // Try to convert character to string
   ConvertCharToString(ValType, RightValType, 0);
@@ -2177,16 +2154,8 @@ if Tok.Kind in RelationOperators then
   CompileSimpleExpression(RightValType);
 
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ValType, RightValType) then
-    begin
-    GenerateFloat(SizeOf(Single));
-    ValType := REALTYPEINDEX;
-    end;
-  if ConversionToRealIsPossible(RightValType, ValType) then
-    begin
-    GenerateFloat(0);
-    RightValType := REALTYPEINDEX;
-    end;
+  ConvertIntegerToReal(ValType, RightValType, 0);
+  ConvertIntegerToReal(RightValType, ValType, SizeOf(Single));
     
   // Try to convert character to string
   ConvertCharToString(ValType, RightValType, 0);
@@ -2315,13 +2284,9 @@ procedure CompileStatement(LoopNesting: Integer);
   NextTok;
 
   CompileExpression(ExpressionType);
-
+  
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ExpressionType, DesignatorType) then
-    begin
-    GenerateFloat(0);
-    ExpressionType := REALTYPEINDEX;
-    end;
+  ConvertIntegerToReal(DesignatorType, ExpressionType, 0);
     
   // Try to convert character to string
   ConvertCharToString(DesignatorType, ExpressionType, 0);    
@@ -3277,12 +3242,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
         CompileConstExpression(ConstVal, ConstValType);
 
         // Try to convert integer to real
-        if ConversionToRealIsPossible(ConstValType, ConstType) then
-          begin
-          ConstVal.FracValue := ConstVal.Value;
-          ConstValType := REALTYPEINDEX;
-          end;
-          
+        ConvertConstIntegerToReal(ConstType, ConstValType, ConstVal);          
         GetCompatibleType(ConstType, ConstValType); 
           
         if Types[ConstType].Kind = REALTYPE then
