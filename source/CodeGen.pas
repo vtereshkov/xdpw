@@ -31,7 +31,7 @@ procedure PushVarPtr(Addr: Integer; Scope: TScope; DeltaNesting: Byte; RelocType
 procedure DerefPtr(DataType: Integer);
 procedure GetArrayElementPtr(ArrType: Integer);
 procedure GetFieldPtr(Offset: Integer);
-procedure GetCharAsTempString;
+procedure GetCharAsTempString(Depth: Integer);
 procedure SaveStackTopToEAX;
 procedure RestoreStackTopFromEAX;
 procedure DiscardStackTop(NumItems: Byte);
@@ -1048,13 +1048,23 @@ end;
 
 
 
-procedure GetCharAsTempString;
+procedure GetCharAsTempString(Depth: Integer);
 begin
+if (Depth <> 0) and (Depth <> SizeOf(LongInt)) then
+  Error('Internal fault: Illegal depth');
+  
 GenPopReg(ESI);                                                   // pop esi                  ; Temporary string address
+
+if Depth = SizeOf(LongInt) then
+  GenPopReg(ECX);                                                 // pop ecx                  ; Some other string address
+  
 GenPopReg(EAX);                                                   // pop eax                  ; Character
 GenNew($88); Gen($06);                                            // mov byte ptr [esi], al
 GenNew($C6); Gen($46); Gen($01); Gen($00);                        // mov byte ptr [esi + 1], 0
 GenPushReg(ESI);                                                  // push esi
+
+if Depth = SizeOf(LongInt) then
+  GenPushReg(ECX);                                                // push ecx                  ; Some other string address
 end;
 
 

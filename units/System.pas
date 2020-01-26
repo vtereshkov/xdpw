@@ -139,6 +139,7 @@ procedure Randomize;
 function Random: Real;
 function Length(const s: string): Integer;
 procedure SetLength(var s: string; NewLength: Integer);
+procedure AssignStr(var Dest: string; const Source: string);
 procedure AppendStr(var Dest: string; const Source: string);
 procedure ConcatStr(const s1, s2: string; var s: string);
 function CompareStr(const s1, s2: string): Integer;
@@ -299,6 +300,14 @@ end;
 procedure SetLength(var s: string; NewLength: Integer);
 begin
 if NewLength >= 0 then s[NewLength + 1] := #0;
+end;
+
+
+
+
+procedure AssignStr(var Dest: string; const Source: string);
+begin
+Move(Source, Dest, Length(Source) + 1);
 end;
 
 
