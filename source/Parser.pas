@@ -1322,12 +1322,11 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
 
       // Evaluate actual parameters and push them onto the stack
       if Types[CurParam^.DataType].Kind in StructuredTypes + [ANYTYPE] then
-        IsRefParam := (CurParam^.PassMethod = CONSTPASSING) or
-                      (CurParam^.PassMethod = VARPASSING)                   // For structured parameters, CONST is equivalent to VAR
+        IsRefParam := CurParam^.PassMethod in [CONSTPASSING, VARPASSING]    // For structured parameters, CONST is equivalent to VAR
       else
         IsRefParam := CurParam^.PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
 
-      if IsRefParam and (CurParam^.DataType <> STRINGTYPEINDEX) then
+      if IsRefParam and (CurParam^.DataType <> STRINGTYPEINDEX) and (Types[CurParam^.DataType].Kind <> SETTYPE) then
         CompileDesignator(ActualParamType)
       else
         CompileExpression(ActualParamType);
@@ -1344,10 +1343,10 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       // Try to convert a concrete type to an interface type
       ConvertConcreteToInterface(CurParam^.DataType, ActualParamType);
       
-      if IsRefParam then  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
-        GetCompatibleRefType(CurParam^.DataType, ActualParamType)
-      else                // Relaxed type checking for parameters passed by value      
-        GetCompatibleType(CurParam^.DataType, ActualParamType);
+      if IsRefParam and (CurParam^.DataType <> STRINGTYPEINDEX) and (Types[CurParam^.DataType].Kind <> SETTYPE) then  
+        GetCompatibleRefType(CurParam^.DataType, ActualParamType)  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
+      else      
+        GetCompatibleType(CurParam^.DataType, ActualParamType);    // Relaxed type checking for parameters passed by value
         
     if Tok.Kind <> COMMATOK then Break;
     NextTok;
