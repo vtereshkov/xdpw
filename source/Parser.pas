@@ -340,34 +340,57 @@ end; // ConvertCharToString
 
 
 
-procedure ConvertConcreteToInterface(DestType: Integer; var SrcType: Integer);
+procedure ConvertToInterface(DestType: Integer; var SrcType: Integer);
 var
-  Field: PField;
+  SrcField, DestField: PField;
   TempStorageAddr: LongInt;
   FieldIndex, MethodIndex: Integer;
 begin
-// Try to convert a concrete type to an interface type
+// Try to convert a concrete or interface type to an interface type
 if (Types[DestType].Kind = INTERFACETYPE) and (DestType <> SrcType) then
   begin
   // Allocate new interface variable
   TempStorageAddr := AllocateTempStorage(TypeSize(DestType));
 
-  // Set interface's Self pointer (offset 0) to the concrete data
-  GenerateInterfaceFieldAssignment(TempStorageAddr, TRUE, 0, UNINITDATARELOC);
+  // Set interface's Self pointer (offset 0) to the concrete/interface data
+  if Types[SrcType].Kind = INTERFACETYPE then
+    begin
+    DuplicateStackTop;
+    DerefPtr(POINTERTYPEINDEX);
+    GenerateInterfaceFieldAssignment(TempStorageAddr, TRUE, 0, UNINITDATARELOC);
+    DiscardStackTop(1);
+    end
+  else
+    GenerateInterfaceFieldAssignment(TempStorageAddr, TRUE, 0, UNINITDATARELOC);  
 
-  // Set interface's procedure pointers to the concrete methods
+  // Set interface's procedure pointers to the concrete/interface methods
   for FieldIndex := 2 to Types[DestType].NumFields do
     begin
-    Field := Types[DestType].Field[FieldIndex];
-    MethodIndex := GetMethod(SrcType, Field^.Name);
-    CheckSignatures(Ident[MethodIndex].Signature, Types[Field^.DataType].Signature, Ident[MethodIndex].Name, FALSE);
-    GenerateInterfaceFieldAssignment(TempStorageAddr + (FieldIndex - 1) * SizeOf(Pointer), FALSE, Ident[MethodIndex].Value, CODERELOC);
+    DestField := Types[DestType].Field[FieldIndex];
+    
+    if Types[SrcType].Kind = INTERFACETYPE then       // Interface to interface 
+      begin
+      SrcField := Types[SrcType].Field[GetField(SrcType, DestField^.Name)];
+      CheckSignatures(Types[SrcField^.DataType].Signature, Types[DestField^.DataType].Signature, SrcField^.Name, FALSE);
+      DuplicateStackTop;
+      GetFieldPtr(SrcField^.Offset);
+      DerefPtr(POINTERTYPEINDEX);
+      GenerateInterfaceFieldAssignment(TempStorageAddr + (FieldIndex - 1) * SizeOf(Pointer), TRUE, 0, CODERELOC);
+      DiscardStackTop(1);
+      end
+    else                                              // Concrete to interface
+      begin  
+      MethodIndex := GetMethod(SrcType, DestField^.Name);
+      CheckSignatures(Ident[MethodIndex].Signature, Types[DestField^.DataType].Signature, Ident[MethodIndex].Name, FALSE);
+      GenerateInterfaceFieldAssignment(TempStorageAddr + (FieldIndex - 1) * SizeOf(Pointer), FALSE, Ident[MethodIndex].Value, CODERELOC);
+      end;
     end; // for  
-
-  PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+  
+  DiscardStackTop(1);                                       // Remove source pointer
+  PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);   // Push destination pointer
   SrcType := DestType;
   end;
-end; // ConvertConcreteToInterface
+end; // ConvertToInterface
 
 
 
@@ -1341,7 +1364,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       ConvertCharToString(CurParam^.DataType, ActualParamType, 0);      
         
       // Try to convert a concrete type to an interface type
-      ConvertConcreteToInterface(CurParam^.DataType, ActualParamType);
+      ConvertToInterface(CurParam^.DataType, ActualParamType);
       
       if IsRefParam and (CurParam^.DataType <> STRINGTYPEINDEX) and (Types[CurParam^.DataType].Kind <> SETTYPE) then  
         GetCompatibleRefType(CurParam^.DataType, ActualParamType)  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
@@ -2284,7 +2307,7 @@ procedure CompileStatement(LoopNesting: Integer);
   ConvertCharToString(DesignatorType, ExpressionType, 0);    
     
   // Try to convert a concrete type to an interface type
-  ConvertConcreteToInterface(DesignatorType, ExpressionType);       
+  ConvertToInterface(DesignatorType, ExpressionType);       
 
   GetCompatibleType(DesignatorType, ExpressionType);
 
@@ -2887,7 +2910,7 @@ procedure CompileType(var DataType: Integer);
 
         NextTok;
 
-        if Tok.Kind <> COMMATOK then Break;
+        if (Tok.Kind <> COMMATOK) or IsInterfaceType then Break;
         NextTok;
       until FALSE;
 

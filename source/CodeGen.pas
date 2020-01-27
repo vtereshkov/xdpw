@@ -1701,6 +1701,7 @@ if PopValueFromStack then
   begin
   GenPopReg(ESI);                                                               // pop esi
   GenNew($89); Gen($B5); GenDWord(Offset);                                      // mov dword ptr [ebp + Offset], esi
+  GenPushReg(ESI);                                                              // push esi
   end
 else
   begin
