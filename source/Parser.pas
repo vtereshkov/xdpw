@@ -1231,10 +1231,10 @@ if Tok.Kind = OPARTOK then
 
     
     if (ListPassMethod = VALPASSING) and (Types[ParamType].Kind in StructuredTypes) then
-      Error('Structured parameters cannot be passed by value');
+      Error('Structured parameters require CONST or VAR');
       
     if (ListPassMethod = VALPASSING) and (ParamType = ANYTYPEINDEX) then
-      Error('Untyped parameters cannot be passed by value');
+      Error('Untyped parameters require VAR');
       
 
     // Default parameter value
@@ -1325,7 +1325,6 @@ var
   ActualParamType: Integer;
   DefaultParamIndex: Integer;
   TempStorageAddr: Integer;
-  IsRefParam: Boolean;
   CurParam: PParam;
   
 begin
@@ -1343,13 +1342,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
 
       CurParam := Signature.Param[NumActualParams + 1];
 
-      // Evaluate actual parameters and push them onto the stack
-      if Types[CurParam^.DataType].Kind in StructuredTypes + [ANYTYPE] then
-        IsRefParam := CurParam^.PassMethod in [CONSTPASSING, VARPASSING]    // For structured parameters, CONST is equivalent to VAR
-      else
-        IsRefParam := CurParam^.PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
-
-      if IsRefParam and (CurParam^.DataType <> STRINGTYPEINDEX) and (Types[CurParam^.DataType].Kind <> SETTYPE) then
+      if CurParam^.PassMethod = VARPASSING then
         CompileDesignator(ActualParamType)
       else
         CompileExpression(ActualParamType);
@@ -1357,7 +1350,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       Inc(NumActualParams);
 
       // Try to convert integer to real
-      if not IsRefParam then
+      if CurParam^.PassMethod <> VARPASSING then
         ConvertIntegerToReal(CurParam^.DataType, ActualParamType, 0);
        
       // Try to convert character to string
@@ -1366,7 +1359,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       // Try to convert a concrete type to an interface type
       ConvertToInterface(CurParam^.DataType, ActualParamType);
       
-      if IsRefParam and (CurParam^.DataType <> STRINGTYPEINDEX) and (Types[CurParam^.DataType].Kind <> SETTYPE) then  
+      if CurParam^.PassMethod = VARPASSING then  
         GetCompatibleRefType(CurParam^.DataType, ActualParamType)  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
       else      
         GetCompatibleType(CurParam^.DataType, ActualParamType);    // Relaxed type checking for parameters passed by value
@@ -1715,7 +1708,6 @@ procedure CompileBasicDesignator(var ValType: Integer);
 var
   ResultType: Integer;
   IdentIndex: Integer;  
-  IsRefParam: Boolean;
   
 begin
 // A designator always designates a memory location
@@ -1758,12 +1750,10 @@ if ValType = 0 then
       
       ValType := Ident[IdentIndex].DataType;           
       
-      if Types[ValType].Kind in StructuredTypes + [ANYTYPE] then
-        IsRefParam := Ident[IdentIndex].PassMethod in [CONSTPASSING, VARPASSING]    // For structured parameters, CONST is equivalent to VAR
-      else
-        IsRefParam := Ident[IdentIndex].PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
-
-      if IsRefParam then DerefPtr(POINTERTYPEINDEX);                                // Parameter is passed by reference
+      // Structured CONST parameters are passed by reference, scalar CONST parameters are passed by value
+      if (Ident[IdentIndex].PassMethod = VARPASSING) or
+         ((Ident[IdentIndex].PassMethod = CONSTPASSING) and (Types[ValType].Kind in StructuredTypes + [ANYTYPE])) then
+        DerefPtr(POINTERTYPEINDEX);
      
       NextTok;
       end;

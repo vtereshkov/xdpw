@@ -143,7 +143,7 @@ procedure AssignStr(var Dest: string; const Source: string);
 procedure AppendStr(var Dest: string; const Source: string);
 procedure ConcatStr(const s1, s2: string; var s: string);
 function CompareStr(const s1, s2: string): Integer;
-procedure Move(const Source; var Dest; Count: Integer);
+procedure Move(var Source; var Dest; Count: Integer);
 function Copy(const S: string; Index, Count: Integer): string;
 procedure FillChar(var Data; Count: Integer; Value: Char);
 function ParseCmdLine(Index: Integer; var Str: string): Integer;
@@ -352,7 +352,7 @@ end;
 
 
 
-procedure Move(const Source; var Dest; Count: Integer);
+procedure Move(var Source; var Dest; Count: Integer);
 var
   S, D: ^string;
   i: Integer;
