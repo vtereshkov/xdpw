@@ -274,7 +274,7 @@ function IOResult: Integer;
 function Length(const s: string): Integer;
 procedure AppendStr(var Dest: string; const Source: string);
 function CompareStr(const s1, s2: string): Integer;
-procedure Move(const Source; var Dest; Count: Integer);
+procedure Move(var Source; var Dest; Count: Integer);
 procedure FillChar(var Data; Count: Integer; Value: Char);
 function ParamCount: Integer;
 function ParamStr(Index: Integer): string;
