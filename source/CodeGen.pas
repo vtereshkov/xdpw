@@ -580,8 +580,18 @@ procedure GenPopReg(Reg: TRegister);
     GenNew($D9); Gen($06);                                                    // fld dword ptr [esi]      
     Result := TRUE;
     Exit;
-    end;
+    end
     
+
+  // Optimization: (push dword ptr [esp]) + (pop esi) -> (mov esi, [esp])
+  else if (Reg = ESI) and (PrevInstrByte(0, 0) = $FF) and (PrevInstrByte(0, 1) = $34) and (PrevInstrByte(0, 2) = $24) // Previous: push dword ptr [esp] 
+  then        
+    begin   
+    RemovePrevInstr(0);                                                       // Remove: push dword ptr [esp]
+    GenNew($8B); Gen($34); Gen($24);                                          // mov esi, [esp]      
+    Result := TRUE;
+    Exit;
+    end;
       
   end;
 
@@ -1087,8 +1097,31 @@ end;
 
 
 procedure DiscardStackTop(NumItems: Byte);
-begin
-GenNew($83); Gen($C4); Gen(SizeOf(LongInt) * NumItems);                                 // add esp, 4 * NumItems
+
+  function OptimizeDiscardStackTop: Boolean;
+  begin
+  Result := FALSE;
+  
+  // Optimization: (push Reg) + (add esp, 4 * NumItems) -> (add esp, 4 * (NumItems - 1))
+  if PrevInstrByte(0, 0) in [$50, $51, $56, $57, $55] then
+    begin
+    RemovePrevInstr(0);                                                                 // Remove: push Reg
+    
+    if NumItems > 1 then
+      begin
+      GenNew($83); Gen($C4); Gen(SizeOf(LongInt) * (NumItems - 1));                     // add esp, 4 * (NumItems - 1)
+      end;
+      
+    Result := TRUE;
+    end;
+    
+  end;  
+
+begin  // DiscardStackTop
+if not OptimizeDiscardStackTop then
+  begin
+  GenNew($83); Gen($C4); Gen(SizeOf(LongInt) * NumItems);                               // add esp, 4 * NumItems
+  end
 end;
 
 
