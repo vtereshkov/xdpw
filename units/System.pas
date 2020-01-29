@@ -37,7 +37,6 @@ const
   
 
 
-
 type
   LongInt = Integer;  
   Single = Real;
@@ -61,6 +60,11 @@ type
   TSetStorage = array [0..MaxSetIndex] of Integer; 
 
 
+
+const
+  DecimalSeparator: Char = '.';
+  
+  
 
 var 
   StdInputFile, StdOutputFile: file;  
@@ -772,7 +776,7 @@ else
 Integ := Trunc(Number);
 Frac  := Number - Integ;
 
-WriteInt(F, P, Integ);  WriteCh(F, P, '.');
+WriteInt(F, P, Integ);  WriteCh(F, P, DecimalSeparator);
 
 // Write fractional part
 while DecPlaces > 0 do
@@ -1008,7 +1012,7 @@ while (Ch >= '0') and (Ch <= '9') do
   ReadCh(F, P, Ch);
   end;
 
-if Ch = '.' then                     // Fractional part found
+if Ch = DecimalSeparator then        // Fractional part found
   begin
   ReadCh(F, P, Ch);
 

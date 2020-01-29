@@ -287,6 +287,11 @@ function UpCase(ch: Char): Char;
 
 #### SysUtils unit
 ```pascal
+function IntToStr(n: Integer): string;
+function StrToInt(const s: string): Integer;
+function FloatToStr(x: Real): string;
+function FloatToStrF(x: Real; Format: TFloatFormat; Precision, Digits: Integer): string;
+function StrToFloat(const s: string): Real;
 function StrToPChar(const s: string): PChar;
 function PCharToStr(p: PChar): string;
 function StrToPWideChar(const s: string): PWideChar;

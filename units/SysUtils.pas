@@ -8,6 +8,8 @@ interface
 
 
 type
+  TFloatFormat = (ffGeneral, ffFixed);
+
   AnsiChar = Char;
   PAnsiChar = PChar;
   
@@ -15,8 +17,12 @@ type
   PWideChar = ^WideChar;
   WideString = array [1..MaxStrLength + 1] of WideChar;
 
- 
 
+function IntToStr(n: Integer): string;
+function StrToInt(const s: string): Integer;
+function FloatToStr(x: Real): string;
+function FloatToStrF(x: Real; Format: TFloatFormat; Precision, Digits: Integer): string;
+function StrToFloat(const s: string): Real; 
 function StrToPChar(const s: string): PChar;
 function PCharToStr(p: PChar): string;
 function StrToPWideChar(const s: string): PWideChar;
@@ -30,6 +36,63 @@ implementation
 var
   WideStringBuf: WideString;
   
+
+
+function IntToStr(n: Integer): string;
+begin
+IStr(n, Result);
+end;
+
+
+
+
+function StrToInt(const s: string): Integer;
+var
+  Code: Integer;
+begin
+IVal(s, Result, Code);
+if Code <> 0 then Halt(1);
+end;
+
+
+
+
+function FloatToStr(x: Real): string;
+begin
+if abs(ln(x) / ln(10)) > 6 then
+  Str(x, Result)
+else
+  Str(x, Result, 7);  
+end;
+
+
+
+
+function FloatToStrF(x: Real; Format: TFloatFormat; Precision, Digits: Integer): string;
+begin
+case Format of
+  ffGeneral: 
+    Result := FloatToStr(x);
+    
+  ffFixed:       
+    if Digits > Precision then
+      Str(x, Result)
+    else  
+      Str(x, Result, Digits);
+end;               
+end;
+
+
+
+
+function StrToFloat(const s: string): Real;
+var
+  Code: Integer;
+begin
+Val(s, Result, Code);
+if Code <> 0 then Halt(1);
+end;
+
 
   
   
