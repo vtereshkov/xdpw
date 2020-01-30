@@ -67,7 +67,7 @@ const
   Digits:    set of TCharacter = ['0'..'9'];
   HexDigits: set of TCharacter = ['0'..'9', 'A'..'F'];
   Spaces:    set of TCharacter = [#1..#31, ' '];
-  AlphaNums: set of TCharacter = ['A'..'Z', '0'..'9', '_'];
+  AlphaNums: set of TCharacter = ['A'..'Z', 'a'..'z', '0'..'9', '_'];
   
   
 
@@ -191,7 +191,7 @@ end;
 
 
 
-procedure ReadValidChar(var ch: TCharacter);
+procedure ReadUppercaseChar(var ch: TCharacter);
 begin
 ReadChar(ch);
 ch := UpCase(ch);
@@ -239,7 +239,7 @@ with ScannerState do
   Text := '';
   repeat
     AppendStrSafe(Text, ch);
-    ReadValidChar(ch);
+    ReadUppercaseChar(ch);
   until not (ch in AlphaNums);
 
   if Text = '$I' then
@@ -294,7 +294,7 @@ with ScannerState do
     else
       Num := 16 * Num + Ord(ch) - Ord('A') + 10;
     NumFound := TRUE;
-    ReadValidChar(ch);
+    ReadUppercaseChar(ch);
     end;
 
   if not NumFound then
@@ -324,7 +324,7 @@ with ScannerState do
   while ch in Digits do
     begin
     Num := 10 * Num + Ord(ch) - Ord('0');
-    ReadValidChar(ch);
+    ReadUppercaseChar(ch);
     end;
 
   if (ch <> '.') and (ch <> 'E') then                                   // Integer number
@@ -339,7 +339,7 @@ with ScannerState do
     RangeFound := FALSE;
     if ch = '.' then
       begin
-      ReadValidChar(ch2);
+      ReadUppercaseChar(ch2);
       if ch2 = '.' then                                                 // Integer number followed by '..' token
         begin
         Token.Kind := INTNUMBERTOK;
@@ -356,35 +356,35 @@ with ScannerState do
       if ch = '.' then
         begin
         FracWeight := 0.1;
-        ReadValidChar(ch);
+        ReadUppercaseChar(ch);
 
         while ch in Digits do
           begin
           Frac := Frac + FracWeight * (Ord(ch) - Ord('0'));
           FracWeight := FracWeight / 10;
-          ReadValidChar(ch);
+          ReadUppercaseChar(ch);
           end;
         end; // if ch = '.'
 
       // Check for exponent
       if ch = 'E' then
         begin
-        ReadValidChar(ch);
+        ReadUppercaseChar(ch);
 
         // Check for exponent sign
         if ch = '+' then
-          ReadValidChar(ch)
+          ReadUppercaseChar(ch)
         else if ch = '-' then
           begin
           NegExpon := TRUE;
-          ReadValidChar(ch);
+          ReadUppercaseChar(ch);
           end;
 
         ExponFound := FALSE;
         while ch in Digits do
           begin
           Expon := 10 * Expon + Ord(ch) - Ord('0');
-          ReadValidChar(ch);
+          ReadUppercaseChar(ch);
           ExponFound := TRUE;
           end;
 
@@ -409,7 +409,7 @@ begin
 with ScannerState do
   if ch = '$' then
     begin
-    ReadValidChar(ch);
+    ReadUppercaseChar(ch);
     ReadHexadecimalNumber;
     end
   else
@@ -423,7 +423,7 @@ procedure ReadCharCode;
 begin
 with ScannerState do
   begin
-  ReadValidChar(ch);
+  ReadUppercaseChar(ch);
 
   if not (ch in Digits + ['$']) then
     Error('Character code is not found');
@@ -442,15 +442,19 @@ end;
 
 procedure ReadKeywordOrIdentifier;
 var
-  Text: TString;
+  Text, NonUppercaseText: TString;
   CurToken: TTokenKind;
 begin
 with ScannerState do
   begin
   Text := '';
+  NonUppercaseText := '';
+
   repeat
+    AppendStrSafe(NonUppercaseText, ch);
+    ch := UpCase(ch);
     AppendStrSafe(Text, ch);
-    ReadValidChar(ch);
+    ReadChar(ch);
   until not (ch in AlphaNums);
 
   CurToken := GetKeyword(Text);
@@ -460,6 +464,7 @@ with ScannerState do
     begin                             // Identifier found
     Token.Kind := IDENTTOK;
     Token.Name := Text;
+    Token.NonUppercaseName := NonUppercaseText;
     end;
   end;  
 end;
@@ -506,7 +511,7 @@ with ScannerState do
     DefineStaticString(Token, Text);
     end;
 
-  ReadValidChar(ch);
+  ReadUppercaseChar(ch);
   end;
 end;
 
@@ -524,12 +529,12 @@ with ScannerState do
     begin
     if ch = '{' then                                                      // Multi-line comment or directive
       begin
-      ReadValidChar(ch);
+      ReadUppercaseChar(ch);
       if ch = '$' then ReadDirective else ReadMultiLineComment;
       end
     else if ch = '/' then
       begin
-      ReadValidChar(ch2);
+      ReadUppercaseChar(ch2);
       if ch2 = '/' then
         ReadSingleLineComment                                             // Single-line comment
       else
@@ -538,7 +543,7 @@ with ScannerState do
         Break;
         end;
       end;
-    ReadValidChar(ch);
+    ReadChar(ch);
     end;
 
   // Read token
@@ -547,53 +552,53 @@ with ScannerState do
       ReadNumber;
     '#':
       ReadCharCode;
-    'A'..'Z', '_':
+    'A'..'Z', 'a'..'z', '_':
       ReadKeywordOrIdentifier;
     '''':
       ReadCharOrStringLiteral;
     ':':                              // Single- or double-character tokens
       begin
       Token.Kind := COLONTOK;
-      ReadValidChar(ch);
+      ReadUppercaseChar(ch);
       if ch = '=' then
         begin
         Token.Kind := ASSIGNTOK;
-        ReadValidChar(ch);
+        ReadUppercaseChar(ch);
         end;
       end;
     '>':
       begin
       Token.Kind := GTTOK;
-      ReadValidChar(ch);
+      ReadUppercaseChar(ch);
       if ch = '=' then
         begin
         Token.Kind := GETOK;
-        ReadValidChar(ch);
+        ReadUppercaseChar(ch);
         end;
       end;
     '<':
       begin
       Token.Kind := LTTOK;
-      ReadValidChar(ch);
+      ReadUppercaseChar(ch);
       if ch = '=' then
         begin
         Token.Kind := LETOK;
-        ReadValidChar(ch);
+        ReadUppercaseChar(ch);
         end
       else if ch = '>' then
         begin
         Token.Kind := NETOK;
-        ReadValidChar(ch);
+        ReadUppercaseChar(ch);
         end;
       end;
     '.':
       begin
       Token.Kind := PERIODTOK;
-      ReadValidChar(ch);
+      ReadUppercaseChar(ch);
       if ch = '.' then
         begin
         Token.Kind := RANGETOK;
-        ReadValidChar(ch);
+        ReadUppercaseChar(ch);
         end;
       end
   else                                // Single-character tokens
@@ -615,7 +620,7 @@ with ScannerState do
       Error('Unexpected end of program');
     end; // case
 
-    ReadValidChar(ch);
+    ReadChar(ch);
   end; // case
   end;
   

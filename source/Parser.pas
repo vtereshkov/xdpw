@@ -3444,9 +3444,9 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   procedure CompileProcFuncDeclarations(IsFunction: Boolean);
 
     
-    function CompileDirective: Boolean;
+    function CompileDirective(const ImportFuncName: TString): Boolean;
     var
-      ImportLibName, ImportFuncName: TString;
+      ImportLibName: TString;
       
     begin
     Result := FALSE;
@@ -3462,13 +3462,6 @@ procedure CompileBlock(BlockIdentIndex: Integer);
         ImportLibName := Tok.Name;
         EatTok(STRINGLITERALTOK);      
         
-        // Read import function name
-        if (Tok.Kind <> IDENTTOK) or (Tok.Name <> 'NAME') then
-          Error('NAME expected but ' + GetTokSpelling(Tok.Kind) + ' found');
-        NextTok;
-        ImportFuncName := Tok.Name;
-        EatTok(STRINGLITERALTOK);
-
         // Register import function
         GenerateImportFuncStub(AddImportFunc(ImportLibName, ImportFuncName));
         
@@ -3522,13 +3515,14 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     ForwardIdentIndex, FieldIndex: Integer;
     ReceiverType: Integer;
     ProcOrFunc: TIdentKind;
-    ProcName, ReceiverName: TString;
+    ProcName, NonUppercaseProcName, ReceiverName: TString;
     ForwardResolutionSignature: TSignature;
     
     
   begin // CompileProcFuncDeclarations   
   AssertIdent;
   ProcName := Tok.Name;
+  NonUppercaseProcName := Tok.NonUppercaseName;
   NextTok;
   
   // Check for method declaration
@@ -3594,7 +3588,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   EatTok(SEMICOLONTOK);  
   
   // Procedure/function body, if any
-  if ForwardIdentIndex <> 0 then                                      // Forward declaration resolution
+  if ForwardIdentIndex <> 0 then                                                    // Forward declaration resolution
     begin
     if (ReceiverType <> 0) and (ReceiverName <> Ident[ForwardIdentIndex].ReceiverName) then
       Error('Incompatible receiver name');
@@ -3606,9 +3600,9 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     
     Ident[ForwardIdentIndex].IsUnresolvedForward := FALSE; 
     end  
-  else if not CompileDirective and not CompileInterface then          // Declaration in the interface part, external or forward declaration                                                              
+  else if not CompileDirective(NonUppercaseProcName) and not CompileInterface then  // Declaration in the interface part, external or forward declaration                                                              
     begin
-    Inc(NumBlocks);                                                   // Conventional declaration
+    Inc(NumBlocks);                                                                 // Conventional declaration
     if NumTypes > MAXBLOCKS then
       Error('Maximum number of blocks exceeded');
     

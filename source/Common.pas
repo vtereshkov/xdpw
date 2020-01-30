@@ -129,8 +129,9 @@ type
     
   TToken = record
     Name: TString;
-  case Kind: TTokenKind of  
-    INTNUMBERTOK:     (Value: LongInt);       // For all ordinal types
+  case Kind: TTokenKind of
+    IDENTTOK:         (NonUppercaseName: TShortString);  
+    INTNUMBERTOK:     (Value: LongInt);                   // For all ordinal types
     FRACNUMBERTOK:    (FracValue: Single);
     STRINGLITERALTOK: (StrAddress: Integer;
                        StrLength: Integer);

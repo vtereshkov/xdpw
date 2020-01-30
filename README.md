@@ -94,7 +94,7 @@ ProcFuncDeclarations = ("procedure" | "function") Ident
 
 Receiver = "for" Ident ":" TypeIdent .
 
-Directive = "forward" | ("external" StringLiteral "name" StringLiteral) .         
+Directive = "forward" | "external" StringLiteral .         
 
 ActualParams = "(" [ (Expression | Designator) |
                 {"," (Expression | Designator)} ] ")" .
