@@ -332,6 +332,7 @@ procedure FinalizeCommon;
 procedure DisposeParams(var Signature: TSignature);
 procedure DisposeFields(var DataType: TType);
 function GetTokSpelling(TokKind: TTokenKind): TString;
+function GetTypeSpelling(DataType: Integer): TString;
 procedure SetErrorProc(Err: TErrorProc);
 procedure Error(const Msg: TString);
 procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
@@ -558,6 +559,44 @@ end;
 
 
 
+function GetTypeSpelling(DataType: Integer): TString;
+begin
+case Types[DataType].Kind of
+  EMPTYTYPE:      Result := 'no type';
+  ANYTYPE:        Result := 'any type';
+  INTEGERTYPE:    Result := 'integer';
+  SMALLINTTYPE:   Result := 'small integer';
+  SHORTINTTYPE:   Result := 'short integer';
+  WORDTYPE:       Result := 'word';
+  BYTETYPE:       Result := 'byte';
+  CHARTYPE:       Result := 'character';
+  BOOLEANTYPE:    Result := 'Boolean';
+  REALTYPE:       Result := 'real';
+  POINTERTYPE:    begin
+                  Result := 'pointer';
+                  if Types[Types[DataType].BaseType].Kind <> ANYTYPE then
+                    Result := Result + ' to ' + GetTypeSpelling(Types[DataType].BaseType);
+                  end;  
+  FILETYPE:       begin
+                  Result := 'file';
+                  if Types[Types[DataType].BaseType].Kind <> ANYTYPE then
+                    Result := Result + ' of ' + GetTypeSpelling(Types[DataType].BaseType);
+                  end;  
+  ARRAYTYPE:      Result := 'array of ' + GetTypeSpelling(Types[DataType].BaseType); 
+  RECORDTYPE:     Result := 'record';
+  INTERFACETYPE:  Result := 'interface';
+  SETTYPE:        Result := 'set of ' + GetTypeSpelling(Types[DataType].BaseType);
+  ENUMERATEDTYPE: Result := 'enumeration';
+  SUBRANGETYPE:   Result := 'subrange of ' + GetTypeSpelling(Types[DataType].BaseType); 
+  PROCEDURALTYPE: Result := 'procedural type';
+else
+  Result := 'unknown type';
+end; //case
+end;
+
+
+
+
 procedure SetErrorProc(Err: TErrorProc);
 begin
 ErrorProc := Err;
@@ -731,7 +770,7 @@ else                                         // Special cases
   end; // if
 
 if Result = 0 then
-  Error('Incompatible types');  
+  Error('Incompatible types: ' + GetTypeSpelling(LeftType) + ' and ' + GetTypeSpelling(RightType));  
 end;
 
 
@@ -770,7 +809,7 @@ else                                         // Special cases
   end; // if  
 
 if Result = 0 then
-  Error('Incompatible types');  
+  Error('Incompatible types: ' + GetTypeSpelling(LeftType) + ' and ' + GetTypeSpelling(RightType));  
 end;
 
 
@@ -784,7 +823,7 @@ with Types[DataType] do
   else 
     begin
     if not (Kind in OrdinalTypes) and (Kind <> REALTYPE) and (Kind <> POINTERTYPE) and (Kind <> PROCEDURALTYPE) then
-      Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
+      Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable to ' + GetTypeSpelling(DataType));
      
     if ((Kind in IntegerTypes)  and not (Tok.Kind in OperatorsForIntegers)) or
        ((Kind = REALTYPE)       and not (Tok.Kind in OperatorsForReals)) or   
@@ -794,7 +833,7 @@ with Types[DataType] do
        ((Kind = ENUMERATEDTYPE) and not (Tok.Kind in RelationOperators)) or
        ((Kind = PROCEDURALTYPE) and not (Tok.Kind in RelationOperators)) 
     then
-      Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
+      Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable to ' + GetTypeSpelling(DataType));
     end;  
 end;
 
@@ -817,13 +856,10 @@ for i := 1 to Signature1.NumParams do
     Error('Incompatible parameter names in ' + Name);
   
   if Signature1.Param[i]^.DataType <> Signature2.Param[i]^.DataType then
-    if Types[Signature1.Param[i]^.DataType].IsOpenArray and Types[Signature2.Param[i]^.DataType].IsOpenArray then
-      begin
-      if Types[Signature1.Param[i]^.DataType].BaseType <> Types[Signature2.Param[i]^.DataType].BaseType then
-        Error('Incompatible parameter base types in ' + Name);
-      end
-    else  
-      Error('Incompatible parameter types in ' + Name);
+    if not Types[Signature1.Param[i]^.DataType].IsOpenArray or not Types[Signature2.Param[i]^.DataType].IsOpenArray or
+       (Types[Signature1.Param[i]^.DataType].BaseType <> Types[Signature2.Param[i]^.DataType].BaseType) 
+    then 
+      Error('Incompatible parameter types in ' + Name + ': ' + GetTypeSpelling(Signature1.Param[i]^.DataType) + ' and ' + GetTypeSpelling(Signature2.Param[i]^.DataType));
     
   if Signature1.Param[i]^.PassMethod <> Signature2.Param[i]^.PassMethod then
     Error('Incompatible CONST/VAR modifiers in ' + Name);
@@ -833,7 +869,7 @@ for i := 1 to Signature1.NumParams do
   end; // if
 
 if Signature1.ResultType <> Signature2.ResultType then
-  Error('Incompatible result type in ' + Name);
+  Error('Incompatible result types in ' + Name + ': ' + GetTypeSpelling(Signature1.ResultType) + ' and ' + GetTypeSpelling(Signature2.ResultType));
   
 if Signature1.IsStdCall <> Signature2.IsStdCall then
   Error('STDCALL is incompatible with non-STDCALL in ' + Name);

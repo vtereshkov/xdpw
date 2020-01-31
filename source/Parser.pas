@@ -639,34 +639,34 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
   
   with Types[DataType] do
     if (Kind = INTEGERTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = INTEGERTYPE)) then
-          Result := GetIdent('READINT')                 // Integer argument
+      Result := GetIdent('READINT')                 // Integer argument
           
     else if (Kind = SMALLINTTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = SMALLINTTYPE)) then
-          Result := GetIdent('READSMALLINT')            // Small integer argument
+      Result := GetIdent('READSMALLINT')            // Small integer argument
           
     else if (Kind = SHORTINTTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = SHORTINTTYPE)) then
-          Result := GetIdent('READSHORTINT')            // Short integer argument
+      Result := GetIdent('READSHORTINT')            // Short integer argument
           
     else if (Kind = WORDTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = WORDTYPE)) then
-          Result := GetIdent('READWORD')                // Word argument
+      Result := GetIdent('READWORD')                // Word argument
 
     else if (Kind = BYTETYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = BYTETYPE)) then
-          Result := GetIdent('READBYTE')                // Byte argument
+      Result := GetIdent('READBYTE')                // Byte argument
          
     else if (Kind = BOOLEANTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = BOOLEANTYPE)) then
-          Result := GetIdent('READBOOLEAN')             // Boolean argument
+      Result := GetIdent('READBOOLEAN')             // Boolean argument
     
     else if (Kind = CHARTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = CHARTYPE)) then
-          Result := GetIdent('READCH')                  // Character argument
+      Result := GetIdent('READCH')                  // Character argument
           
     else if Kind = REALTYPE then
-          Result := GetIdent('READREAL')                // Real argument
+      Result := GetIdent('READREAL')                // Real argument
           
     else if (Kind = ARRAYTYPE) and (BaseType = CHARTYPEINDEX) then
-          Result := GetIdent('READSTRING')              // String argument
+      Result := GetIdent('READSTRING')              // String argument
           
     else
-      Error('Incompatible types');
+      Error('Cannot read ' + GetTypeSpelling(DataType));
  
   end; // GetReadProcIdent
   
@@ -678,22 +678,22 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
   
   with Types[DataType] do
     if (Kind in IntegerTypes) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind in IntegerTypes)) then
-          Result := GetIdent('WRITEINTF')                 // Integer argument
+      Result := GetIdent('WRITEINTF')                 // Integer argument
           
     else if (Kind = BOOLEANTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = BOOLEANTYPE)) then
-          Result := GetIdent('WRITEBOOLEANF')             // Boolean argument
+      Result := GetIdent('WRITEBOOLEANF')             // Boolean argument
           
     else if Kind = REALTYPE then
-          Result := GetIdent('WRITEREALF')                // Real argument
+      Result := GetIdent('WRITEREALF')                // Real argument
           
     else if Kind = POINTERTYPE then
-          Result := GetIdent('WRITEPOINTERF')             // Pointer argument
+      Result := GetIdent('WRITEPOINTERF')             // Pointer argument
           
     else if (Kind = ARRAYTYPE) and (BaseType = CHARTYPEINDEX) then
-          Result := GetIdent('WRITESTRINGF')              // String argument
+      Result := GetIdent('WRITESTRINGF')              // String argument
           
     else
-      Error('Incompatible types');
+      Error('Cannot write ' + GetTypeSpelling(DataType));
   
   end; // GetWriteProcIdentIndex
   
@@ -748,7 +748,7 @@ case proc of
         if Types[DesignatorType].Kind = FILETYPE then               // File handle
           begin
           if not IsFirstParam or ((proc = READLNPROC) and (Types[DesignatorType].BaseType <> ANYTYPEINDEX)) then
-            Error('Incompatible types');            
+            Error('Cannot read ' + GetTypeSpelling(DesignatorType));            
           FileVarType := DesignatorType;          
           end
         else                                                        // Any input variable
@@ -842,7 +842,7 @@ case proc of
         if Types[ExpressionType].Kind = FILETYPE then           // File handle
           begin
           if not IsFirstParam or ((proc = WRITELNPROC) and (Types[ExpressionType].BaseType <> ANYTYPEINDEX)) then
-            Error('Incompatible types');
+            Error('Cannot write ' + GetTypeSpelling(ExpressionType));
           FileVarType := ExpressionType;
           end
         else                                                    // Any output expression
@@ -3028,7 +3028,7 @@ procedure CompileType(var DataType: Integer);
     CompileType(NestedDataType);
     
     if Types[NestedDataType].Kind = FILETYPE then
-      Error('Incompatible types'); 
+      Error('File of files is not allowed'); 
    
     // Add new anonymous type
     DeclareType(FILETYPE);    
