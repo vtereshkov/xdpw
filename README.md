@@ -48,7 +48,6 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Units cannot be compiled separately
 * No `Double` and `Extended` types
 * Arrays, records and sets cannot serve as untyped constants. Typed constants should be used instead
-* Arrays, records and sets cannot be passed to subroutines without `const` or `var`
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical 
 

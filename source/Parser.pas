@@ -131,7 +131,7 @@ case IdentKind of
 
 
   CONSTANT:
-    if IdentPassMethod = VALPASSING then                                     // Untyped constant
+    if IdentPassMethod = EMPTYPASSING then                                     // Untyped constant
       if Types[IdentDataType].Kind = REALTYPE then
         Ident[NumIdent].FracValue := IdentFracConstValue                // Real constant value
       else
@@ -143,7 +143,7 @@ case IdentKind of
         Kind        := VARIABLE;
         Scope       := GLOBAL;
         RelocType   := INITDATARELOC;
-        PassMethod  := VALPASSING;
+        PassMethod  := EMPTYPASSING;
         end;
       
       Ident[NumIdent].Value := InitializedGlobalDataSize;               // Typed constant address (relocatable)
@@ -192,50 +192,50 @@ end; // DeclareType
 procedure DeclarePredefinedIdents;
 begin
 // Constants
-DeclareIdent('TRUE',  CONSTANT, 0, BOOLEANTYPEINDEX, VALPASSING, 1, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('FALSE', CONSTANT, 0, BOOLEANTYPEINDEX, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
+DeclareIdent('TRUE',  CONSTANT, 0, BOOLEANTYPEINDEX, EMPTYPASSING, 1, 0.0, EMPTYPROC, '', 0);
+DeclareIdent('FALSE', CONSTANT, 0, BOOLEANTYPEINDEX, EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);
 
 // Types
-DeclareIdent('INTEGER',  USERTYPE, 0, INTEGERTYPEINDEX,  VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('SMALLINT', USERTYPE, 0, SMALLINTTYPEINDEX, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('SHORTINT', USERTYPE, 0, SHORTINTTYPEINDEX, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('WORD',     USERTYPE, 0, WORDTYPEINDEX,     VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('BYTE',     USERTYPE, 0, BYTETYPEINDEX,     VALPASSING, 0, 0.0, EMPTYPROC, '', 0);  
-DeclareIdent('CHAR',     USERTYPE, 0, CHARTYPEINDEX,     VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('BOOLEAN',  USERTYPE, 0, BOOLEANTYPEINDEX,  VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('REAL',     USERTYPE, 0, REALTYPEINDEX,     VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('POINTER',  USERTYPE, 0, POINTERTYPEINDEX,  VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
+DeclareIdent('INTEGER',  USERTYPE, 0, INTEGERTYPEINDEX,  EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);
+DeclareIdent('SMALLINT', USERTYPE, 0, SMALLINTTYPEINDEX, EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);
+DeclareIdent('SHORTINT', USERTYPE, 0, SHORTINTTYPEINDEX, EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);
+DeclareIdent('WORD',     USERTYPE, 0, WORDTYPEINDEX,     EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);
+DeclareIdent('BYTE',     USERTYPE, 0, BYTETYPEINDEX,     EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);  
+DeclareIdent('CHAR',     USERTYPE, 0, CHARTYPEINDEX,     EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);
+DeclareIdent('BOOLEAN',  USERTYPE, 0, BOOLEANTYPEINDEX,  EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);
+DeclareIdent('REAL',     USERTYPE, 0, REALTYPEINDEX,     EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);
+DeclareIdent('POINTER',  USERTYPE, 0, POINTERTYPEINDEX,  EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);
 
 // Procedures
-DeclareIdent('INC',      PROC, 0, 0, VALPASSING, 0, 0.0, INCPROC,      '', 0);
-DeclareIdent('DEC',      PROC, 0, 0, VALPASSING, 0, 0.0, DECPROC,      '', 0);
-DeclareIdent('READ',     PROC, 0, 0, VALPASSING, 0, 0.0, READPROC,     '', 0);
-DeclareIdent('WRITE',    PROC, 0, 0, VALPASSING, 0, 0.0, WRITEPROC,    '', 0);
-DeclareIdent('READLN',   PROC, 0, 0, VALPASSING, 0, 0.0, READLNPROC,   '', 0);
-DeclareIdent('WRITELN',  PROC, 0, 0, VALPASSING, 0, 0.0, WRITELNPROC,  '', 0);
-DeclareIdent('NEW',      PROC, 0, 0, VALPASSING, 0, 0.0, NEWPROC,      '', 0);
-DeclareIdent('DISPOSE',  PROC, 0, 0, VALPASSING, 0, 0.0, DISPOSEPROC,  '', 0);
-DeclareIdent('BREAK',    PROC, 0, 0, VALPASSING, 0, 0.0, BREAKPROC,    '', 0);
-DeclareIdent('CONTINUE', PROC, 0, 0, VALPASSING, 0, 0.0, CONTINUEPROC, '', 0);  
-DeclareIdent('EXIT',     PROC, 0, 0, VALPASSING, 0, 0.0, EXITPROC,     '', 0);
-DeclareIdent('HALT',     PROC, 0, 0, VALPASSING, 0, 0.0, HALTPROC,     '', 0);
+DeclareIdent('INC',      PROC, 0, 0, EMPTYPASSING, 0, 0.0, INCPROC,      '', 0);
+DeclareIdent('DEC',      PROC, 0, 0, EMPTYPASSING, 0, 0.0, DECPROC,      '', 0);
+DeclareIdent('READ',     PROC, 0, 0, EMPTYPASSING, 0, 0.0, READPROC,     '', 0);
+DeclareIdent('WRITE',    PROC, 0, 0, EMPTYPASSING, 0, 0.0, WRITEPROC,    '', 0);
+DeclareIdent('READLN',   PROC, 0, 0, EMPTYPASSING, 0, 0.0, READLNPROC,   '', 0);
+DeclareIdent('WRITELN',  PROC, 0, 0, EMPTYPASSING, 0, 0.0, WRITELNPROC,  '', 0);
+DeclareIdent('NEW',      PROC, 0, 0, EMPTYPASSING, 0, 0.0, NEWPROC,      '', 0);
+DeclareIdent('DISPOSE',  PROC, 0, 0, EMPTYPASSING, 0, 0.0, DISPOSEPROC,  '', 0);
+DeclareIdent('BREAK',    PROC, 0, 0, EMPTYPASSING, 0, 0.0, BREAKPROC,    '', 0);
+DeclareIdent('CONTINUE', PROC, 0, 0, EMPTYPASSING, 0, 0.0, CONTINUEPROC, '', 0);  
+DeclareIdent('EXIT',     PROC, 0, 0, EMPTYPASSING, 0, 0.0, EXITPROC,     '', 0);
+DeclareIdent('HALT',     PROC, 0, 0, EMPTYPASSING, 0, 0.0, HALTPROC,     '', 0);
 
 // Functions
-DeclareIdent('SIZEOF', FUNC, 0, 0, VALPASSING, 0, 0.0, SIZEOFFUNC, '', 0);
-DeclareIdent('ORD',    FUNC, 0, 0, VALPASSING, 0, 0.0, ORDFUNC,    '', 0);
-DeclareIdent('CHR',    FUNC, 0, 0, VALPASSING, 0, 0.0, CHRFUNC,    '', 0);
-DeclareIdent('PRED',   FUNC, 0, 0, VALPASSING, 0, 0.0, PREDFUNC,   '', 0);
-DeclareIdent('SUCC',   FUNC, 0, 0, VALPASSING, 0, 0.0, SUCCFUNC,   '', 0);
-DeclareIdent('ROUND',  FUNC, 0, 0, VALPASSING, 0, 0.0, ROUNDFUNC,  '', 0);
-DeclareIdent('TRUNC',  FUNC, 0, 0, VALPASSING, 0, 0.0, TRUNCFUNC,  '', 0);
-DeclareIdent('ABS',    FUNC, 0, 0, VALPASSING, 0, 0.0, ABSFUNC,    '', 0);
-DeclareIdent('SQR',    FUNC, 0, 0, VALPASSING, 0, 0.0, SQRFUNC,    '', 0);
-DeclareIdent('SIN',    FUNC, 0, 0, VALPASSING, 0, 0.0, SINFUNC,    '', 0);
-DeclareIdent('COS',    FUNC, 0, 0, VALPASSING, 0, 0.0, COSFUNC,    '', 0);
-DeclareIdent('ARCTAN', FUNC, 0, 0, VALPASSING, 0, 0.0, ARCTANFUNC, '', 0);
-DeclareIdent('EXP',    FUNC, 0, 0, VALPASSING, 0, 0.0, EXPFUNC,    '', 0);
-DeclareIdent('LN',     FUNC, 0, 0, VALPASSING, 0, 0.0, LNFUNC,     '', 0);
-DeclareIdent('SQRT',   FUNC, 0, 0, VALPASSING, 0, 0.0, SQRTFUNC,   '', 0);
+DeclareIdent('SIZEOF', FUNC, 0, 0, EMPTYPASSING, 0, 0.0, SIZEOFFUNC, '', 0);
+DeclareIdent('ORD',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, ORDFUNC,    '', 0);
+DeclareIdent('CHR',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, CHRFUNC,    '', 0);
+DeclareIdent('PRED',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, PREDFUNC,   '', 0);
+DeclareIdent('SUCC',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, SUCCFUNC,   '', 0);
+DeclareIdent('ROUND',  FUNC, 0, 0, EMPTYPASSING, 0, 0.0, ROUNDFUNC,  '', 0);
+DeclareIdent('TRUNC',  FUNC, 0, 0, EMPTYPASSING, 0, 0.0, TRUNCFUNC,  '', 0);
+DeclareIdent('ABS',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, ABSFUNC,    '', 0);
+DeclareIdent('SQR',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, SQRFUNC,    '', 0);
+DeclareIdent('SIN',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, SINFUNC,    '', 0);
+DeclareIdent('COS',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, COSFUNC,    '', 0);
+DeclareIdent('ARCTAN', FUNC, 0, 0, EMPTYPASSING, 0, 0.0, ARCTANFUNC, '', 0);
+DeclareIdent('EXP',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, EXPFUNC,    '', 0);
+DeclareIdent('LN',     FUNC, 0, 0, EMPTYPASSING, 0, 0.0, LNFUNC,     '', 0);
+DeclareIdent('SQRT',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, SQRTFUNC,   '', 0);
 end;// DeclarePredefinedIdents
 
 
@@ -1230,10 +1230,7 @@ if Tok.Kind = OPARTOK then
       ParamType := ANYTYPEINDEX;
 
     
-    if (ListPassMethod = VALPASSING) and (Types[ParamType].Kind in StructuredTypes) then
-      Error('Structured parameters require CONST or VAR');
-      
-    if (ListPassMethod = VALPASSING) and (ParamType = ANYTYPEINDEX) then
+    if (ListPassMethod <> VARPASSING) and (ParamType = ANYTYPEINDEX) then
       Error('Untyped parameters require VAR');
       
 
@@ -1320,6 +1317,38 @@ end; // CompileFormalParametersAndResult
 
 
 procedure CompileActualParameters(var Signature: TSignature);
+
+
+  procedure CompileExpressionCopy(var ValType: Integer);
+  var
+    TempStorageAddr: Integer;
+    LibProcIdentIndex: Integer;
+    
+  begin
+  CompileExpression(ValType);
+  
+  // Copy structured parameter passed by value
+  if Types[ValType].Kind in StructuredTypes then
+    begin
+    SaveStackTopToEAX; 
+    TempStorageAddr := AllocateTempStorage(TypeSize(ValType));
+    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    RestoreStackTopFromEAX;
+    
+    if ValType = STRINGTYPEINDEX then
+      begin 
+      LibProcIdentIndex := GetIdent('ASSIGNSTR');    
+      GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);    
+      end
+    else
+      GenerateStructuredAssignment(ValType);
+
+    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    end;
+    
+  end; // CompileExpressionCopy
+    
+
 var
   NumActualParams: Integer;
   ActualParamType: Integer;
@@ -1342,10 +1371,13 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
 
       CurParam := Signature.Param[NumActualParams + 1];
 
-      if CurParam^.PassMethod = VARPASSING then
-        CompileDesignator(ActualParamType)
+      case CurParam^.PassMethod of
+        VALPASSING:   CompileExpressionCopy(ActualParamType);
+        CONSTPASSING: CompileExpression(ActualParamType);
+        VARPASSING:   CompileDesignator(ActualParamType);
       else
-        CompileExpression(ActualParamType);
+        Error('Internal fault: Illegal parameter passing method');        
+      end;
 
       Inc(NumActualParams);
 
@@ -1363,9 +1395,9 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
         GetCompatibleRefType(CurParam^.DataType, ActualParamType)  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
       else      
         GetCompatibleType(CurParam^.DataType, ActualParamType);    // Relaxed type checking for parameters passed by value
-        
-    if Tok.Kind <> COMMATOK then Break;
-    NextTok;
+         
+      if Tok.Kind <> COMMATOK then Break;
+      NextTok;
     until FALSE;
 
   EatTok(CPARTOK);
@@ -1748,11 +1780,12 @@ if ValType = 0 then
                  BlockStackTop - Ident[IdentIndex].NestingLevel, 
                  Ident[IdentIndex].RelocType);
       
-      ValType := Ident[IdentIndex].DataType;           
+      ValType := Ident[IdentIndex].DataType;          
       
       // Structured CONST parameters are passed by reference, scalar CONST parameters are passed by value
-      if (Ident[IdentIndex].PassMethod = VARPASSING) or
-         ((Ident[IdentIndex].PassMethod = CONSTPASSING) and (Types[ValType].Kind in StructuredTypes + [ANYTYPE])) then
+      if (Ident[IdentIndex].PassMethod = VARPASSING) or 
+        ((Ident[IdentIndex].PassMethod <> EMPTYPASSING) and (Types[ValType].Kind in StructuredTypes))
+      then
         DerefPtr(POINTERTYPEINDEX);
      
       NextTok;
@@ -2496,7 +2529,7 @@ procedure CompileStatement(LoopNesting: Integer);
 
   if (Ident[CounterIndex].Kind <> VARIABLE) or
     ((Ident[CounterIndex].NestingLevel <> 1) and (Ident[CounterIndex].NestingLevel <> BlockStackTop)) or
-     (Ident[CounterIndex].PassMethod <> VALPASSING) then
+     (Ident[CounterIndex].PassMethod <> EMPTYPASSING) then
     Error('Simple local variable expected as FOR loop counter');
 
   if not (Types[Ident[CounterIndex].DataType].Kind in OrdinalTypes) then
@@ -2770,7 +2803,7 @@ procedure CompileType(var DataType: Integer);
   
   repeat
     AssertIdent;
-    DeclareIdent(Tok.Name, CONSTANT, 0, DataType, VALPASSING, ConstIndex, 0.0, EMPTYPROC, '', 0);
+    DeclareIdent(Tok.Name, CONSTANT, 0, DataType, EMPTYPASSING, ConstIndex, 0.0, EMPTYPROC, '', 0);
     
     Inc(ConstIndex);
     if ConstIndex > MAXENUMELEMENTS - 1 then
@@ -3195,7 +3228,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   repeat
     AssertIdent;
     
-    DeclareIdent(Tok.Name, GOTOLABEL, 0, 0, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
+    DeclareIdent(Tok.Name, GOTOLABEL, 0, 0, EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);
     
     NextTok;
     if Tok.Kind <> COMMATOK then Break;
@@ -3220,7 +3253,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     EatTok(EQTOK);
     
     CompileConstExpression(ConstVal, ConstValType);
-    DeclareIdent(NameTok.Name, CONSTANT, 0, ConstValType, VALPASSING, ConstVal.Value, ConstVal.FracValue, EMPTYPROC, '', 0);
+    DeclareIdent(NameTok.Name, CONSTANT, 0, ConstValType, EMPTYPASSING, ConstVal.Value, ConstVal.FracValue, EMPTYPROC, '', 0);
     end; // CompileUntypedConstDeclaration;
     
     
@@ -3394,7 +3427,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     EatTok(EQTOK);
 
     CompileType(VarType);
-    DeclareIdent(NameTok.Name, USERTYPE, 0, VarType, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);   
+    DeclareIdent(NameTok.Name, USERTYPE, 0, VarType, EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);   
     
     EatTok(SEMICOLONTOK);
   until Tok.Kind <> IDENTTOK;
@@ -3430,7 +3463,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     CompileType(VarType);
 
     for IdentInListIndex := 1 to NumIdentInList do
-      DeclareIdent(IdentInListName[IdentInListIndex], VARIABLE, 0, VarType, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
+      DeclareIdent(IdentInListName[IdentInListIndex], VARIABLE, 0, VarType, EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);
 
     EatTok(SEMICOLONTOK);
   until Tok.Kind <> IDENTTOK;
@@ -3578,7 +3611,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     begin
     if IsFunction then ProcOrFunc := FUNC else ProcOrFunc := PROC;
     
-    DeclareIdent(ProcName, ProcOrFunc, 0, 0, VALPASSING, 0, 0.0, EMPTYPROC, ReceiverName, ReceiverType);
+    DeclareIdent(ProcName, ProcOrFunc, 0, 0, EMPTYPASSING, 0, 0.0, EMPTYPROC, ReceiverName, ReceiverType);
     CompileFormalParametersAndResult(IsFunction, Ident[NumIdent].Signature);
 
     if (ReceiverType <> 0) and Ident[NumIdent].Signature.IsStdCall then
@@ -3669,8 +3702,8 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       begin
       if Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes then    // For functions returning structured variables, Result is a hidden VAR parameter 
         DeclareIdent('RESULT', VARIABLE, TotalNumParams, Ident[BlockIdentIndex].Signature.ResultType, VARPASSING, 0, 0.0, EMPTYPROC, '', 0)
-      else                                                                      // Otherwise, Result is a hidden local variable
-        DeclareIdent('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].Signature.ResultType, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
+      else                                                                                  // Otherwise, Result is a hidden local variable
+        DeclareIdent('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].Signature.ResultType, EMPTYPASSING, 0, 0.0, EMPTYPROC, '', 0);
         
       Ident[BlockIdentIndex].ResultIdentIndex := NumIdent;
       end;  

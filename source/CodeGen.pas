@@ -654,6 +654,8 @@ const
 var
   i: Integer;  
 begin
+// EAX must be preserved
+
 case Scope of
   GLOBAL:                                     // Global variable
     PushRelocConst(Addr, RelocType);
