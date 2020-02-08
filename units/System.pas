@@ -40,6 +40,8 @@ const
 type
   LongInt = Integer;  
   Single = Real;
+  Double = Real;
+  Extended = Real;
   Text = file;  
   PChar = ^Char;  
   

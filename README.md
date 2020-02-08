@@ -46,7 +46,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 #### Limitations
 * No "classical" object-oriented programming
 * Units cannot be compiled separately
-* No `Double` and `Extended` types
+* `Real`, `Double` and `Extended` types are equivalent to `Single`
 * Arrays, records and sets cannot serve as untyped constants. Typed constants should be used instead
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical 
@@ -114,6 +114,7 @@ Type = "(" Ident {"," Ident} ")" |
           {";" ConstExpression {"," ConstExpression} ":" "(" Fields ")"}] [";"] "end" |
        ["packed"] "interface" Fields [";"] "end" |
        ["packed"] "set" "of" Type |
+       ["packed"] "string" [ "[" ConstExpression "]" ] |
        ["packed"] "file" ["of" Type] |
        ConstExpression ".." ConstExpression |
        ("procedure" | "function") [FormalParams] [":" TypeIdent] ["stdcall"] |

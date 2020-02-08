@@ -11,7 +11,7 @@ type
 
   TPerson = record
     Next: PPerson;
-    Name, Surname: string;
+    Name, Surname: string [40];
     Born: SmallInt;
   end;
 
@@ -45,7 +45,7 @@ repeat
     Node^.Next := nil;
     Write('Name    : '); ReadLn(Node^.Name);
     Write('Surname : '); ReadLn(Node^.Surname);
-    Write('Born    : '); ReadLn(Node^.Born);
+    Write('Born in : '); ReadLn(Node^.Born);
     WriteLn; 
     end;
 until (ch = 'n') or (ch = 'N');

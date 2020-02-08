@@ -325,7 +325,7 @@ var
   TempStorageAddr: LongInt;
 begin
 // Try to convert a character (right-hand side) into a 2-character temporary string
-if (DestType = STRINGTYPEINDEX) and 
+if IsString(DestType) and 
    ((Types[SrcType].Kind = CHARTYPE) or 
    ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind = CHARTYPE))) 
 then
@@ -1335,7 +1335,7 @@ procedure CompileActualParameters(var Signature: TSignature);
     PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
     RestoreStackTopFromEAX;
     
-    if ValType = STRINGTYPEINDEX then
+    if IsString(ValType) then
       begin 
       LibProcIdentIndex := GetIdent('ASSIGNSTR');    
       GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);    
@@ -2129,7 +2129,7 @@ while Tok.Kind in AdditiveOperators do
   ConvertCharToString(RightValType, ValType, SizeOf(LongInt));  
       
   // Special case: string concatenation
-  if (ValType = STRINGTYPEINDEX) and (RightValType = STRINGTYPEINDEX) and (OpTok.Kind = PLUSTOK) then
+  if IsString(ValType) and IsString(RightValType) and (OpTok.Kind = PLUSTOK) then
     begin 
     LibProcIdentIndex := GetIdent('CONCATSTR');   
 
@@ -2200,7 +2200,7 @@ if Tok.Kind in RelationOperators then
   ConvertCharToString(RightValType, ValType, SizeOf(LongInt));     
     
   // Special case: string comparison
-  if (ValType = STRINGTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then
+  if IsString(ValType) and IsString(RightValType) then
     begin 
     LibProcIdentIndex := GetIdent('COMPARESTR');
    
@@ -2334,7 +2334,7 @@ procedure CompileStatement(LoopNesting: Integer);
 
   GetCompatibleType(DesignatorType, ExpressionType);
 
-  if DesignatorType = STRINGTYPEINDEX then
+  if IsString(DesignatorType) then
     begin 
     LibProcIdentIndex := GetIdent('ASSIGNSTR');    
     GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);    
@@ -3048,6 +3048,50 @@ procedure CompileType(var DataType: Integer);
   
   
   
+
+  procedure CompileStringType(var DataType: Integer);
+  var
+    LenConstVal: TConst;
+    LenType, IndexType: Integer;    
+  begin
+  NextTok;    
+  
+  if Tok.Kind = OBRACKETTOK then
+    begin
+    NextTok;
+    CompileConstExpression(LenConstVal, LenType);
+    
+    if not (Types[LenType].Kind in IntegerTypes) then
+      Error('Integer type expected'); 
+      
+    if (LenConstVal.Value <= 0) or (LenConstVal.Value > MAXSTRLENGTH) then
+      Error('Illegal string length');  
+    
+    // Add new anonymous type: 1..Len + 1
+    DeclareType(SUBRANGETYPE);
+    IndexType := NumTypes;
+
+    Types[IndexType].BaseType := LenType;
+    Types[IndexType].Low      := 1;
+    Types[IndexType].High     := LenConstVal.Value + 1;
+    
+    // Add new anonymous type: array [1..Len + 1] of Char
+    DeclareType(ARRAYTYPE);
+    DataType := NumTypes;
+
+    Types[DataType].BaseType    := CHARTYPEINDEX;
+    Types[DataType].IndexType   := IndexType;
+    Types[DataType].IsOpenArray := FALSE;
+    
+    EatTok(CBRACKETTOK);
+    end
+  else
+    DataType := STRINGTYPEINDEX;  
+
+  end; // CompileStringType
+
+
+
   
   procedure CompileFileType(var DataType: Integer);
   var
@@ -3154,10 +3198,7 @@ case Tok.Kind of
     CompileSetType(DataType); 
    
   STRINGTOK:
-    begin 
-    DataType := STRINGTYPEINDEX;
-    NextTok;
-    end;
+    CompileStringType(DataType);
     
   FILETOK:
     CompileFileType(DataType);
@@ -3289,7 +3330,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       else if Types[ConstType].Kind = ARRAYTYPE then
         begin
         
-        if ConstType = STRINGTYPEINDEX then         // Special case: strings
+        if IsString(ConstType) then                 // Special case: strings
           begin
           if (Tok.Kind <> CHARLITERALTOK) and (Tok.Kind <> STRINGLITERALTOK) then
             CheckTok(STRINGLITERALTOK);

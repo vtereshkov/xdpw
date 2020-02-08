@@ -154,9 +154,9 @@ const
   CHARTYPEINDEX         = 7;
   BOOLEANTYPEINDEX      = 8;
   REALTYPEINDEX         = 9;
-  POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other
+  POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other pointers
   FILETYPEINDEX         = 11;     // Untyped file, compatible with text files
-  STRINGTYPEINDEX       = 12;
+  STRINGTYPEINDEX       = 12;     // String of maximum allowed length
 
 
 
@@ -336,6 +336,7 @@ function GetTypeSpelling(DataType: Integer): TString;
 procedure SetErrorProc(Err: TErrorProc);
 procedure Error(const Msg: TString);
 procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
+function IsString(DataType: Integer): Boolean;
 function LowBound(DataType: Integer): Integer;
 function HighBound(DataType: Integer): Integer;
 function TypeSize(DataType: Integer): Integer;
@@ -636,6 +637,14 @@ end;
 
 
 
+function IsString(DataType: Integer): Boolean;
+begin
+Result := (Types[DataType].Kind = ARRAYTYPE) and (Types[Types[DataType].BaseType].Kind = CHARTYPE);
+end;
+
+
+
+
 function LowBound(DataType: Integer): Integer;
 begin
 Result := 0;
@@ -737,6 +746,10 @@ else                                         // Special cases
       Result := LeftType;
       end;
     end;
+    
+  // Strings are compatible with any other strings
+  if IsString(LeftType) and IsString(RightType) then
+    Result := LeftType;  
     
   // Untyped pointers are compatible with any other pointers
   if (Types[LeftType].Kind = POINTERTYPE) and (Types[RightType].Kind = POINTERTYPE) and
