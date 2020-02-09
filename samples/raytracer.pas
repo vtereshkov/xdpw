@@ -344,6 +344,10 @@ const
   Antialiasing = 1.0;
   
   
+  // Output file
+  FileName = 'scene.ppm';
+  
+  
 var
   Scene: TScene;
   Dir, RotDir, RandomDir: TVec;
@@ -376,7 +380,7 @@ with Scene do
   
 sinAz := sin(Azimuth);  cosAz := cos(Azimuth);
   
-Assign(F, 'scene.ppm');
+Assign(F, FileName);
 Rewrite(F);
 WriteLn(F, 'P3');
 WriteLn(F, Width, ' ', Height);
@@ -422,6 +426,6 @@ Close(F);
 
 WriteLn;
 WriteLn('Rendering time: ', (StopTime - StartTime) / 1000 :5:1, ' s');
-WriteLn('Done. See scene.ppm');
+WriteLn('Done. See ' + FileName);
 ReadLn;  
 end.

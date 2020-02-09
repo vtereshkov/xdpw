@@ -164,7 +164,8 @@ type
   TConst = record
   case Kind: TTypeKind of
     INTEGERTYPE: (Value: LongInt);            // For all ordinal types 
-    REALTYPE:    (FracValue: Single);    
+    REALTYPE:    (FracValue: Single);
+    ARRAYTYPE:   (StrValue: TShortString);    
   end;   
   
   TPassMethod = (EMPTYPASSING, VALPASSING, CONSTPASSING, VARPASSING); 
@@ -234,23 +235,24 @@ type
     Kind: TIdentKind;
     Name: TString;
     UnitIndex: Integer;
-    Block: Integer;                       // Index of a block in which the identifier is defined
+    Block: Integer;                             // Index of a block in which the identifier is defined
     NestingLevel: Byte;
-    ReceiverName: TString;                // Receiver variable name for a method    
-    ReceiverType: Integer;                // Receiver type for a method
+    ReceiverName: TString;                      // Receiver variable name for a method    
+    ReceiverType: Integer;                      // Receiver type for a method
     Scope: TScope;
     RelocType: TRelocType;
-    PassMethod: TPassMethod;              // Value, CONST or VAR parameter status
+    PassMethod: TPassMethod;                    // Value, CONST or VAR parameter status
     Signature: TSignature;
     ResultIdentIndex: Integer;
     ProcAsBlock: Integer;
     PredefProc: TPredefProc;
     IsUnresolvedForward: Boolean;
     IsExported: Boolean;
-    ForLoopNesting: Integer;              // Number of nested FOR loops where the label is defined
+    ForLoopNesting: Integer;                    // Number of nested FOR loops where the label is defined
+    StrValue: TString;                          // Value of a string constant
   case DataType: Integer of
-    INTEGERTYPEINDEX: (Value: LongInt);   // Value for an ordinal constant, address for a label, variable, procedure or function
-    REALTYPEINDEX:    (FracValue: Single);// Value for a real constant
+    INTEGERTYPEINDEX: (Value: LongInt);         // Value of an ordinal constant, address of a label, string constant, variable, procedure or function
+    REALTYPEINDEX:    (FracValue: Single);      // Value of a real constant
   end;
 
   TField = record

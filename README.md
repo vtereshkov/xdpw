@@ -47,7 +47,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * No "classical" object-oriented programming
 * Units cannot be compiled separately
 * `Real`, `Double` and `Extended` types are equivalent to `Single`
-* Arrays, records and sets cannot serve as untyped constants. Typed constants should be used instead
+* Arrays (except strings), records and sets cannot be untyped constants. Use typed constants instead
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical 
 
@@ -93,7 +93,7 @@ ProcFuncDeclarations = ("procedure" | "function") Ident
 
 Receiver = "for" Ident ":" TypeIdent .
 
-Directive = "forward" | "external" StringLiteral .         
+Directive = "forward" | "external" ConstExpression .         
 
 ActualParams = "(" [ (Expression | Designator) |
                 {"," (Expression | Designator)} ] ")" .
