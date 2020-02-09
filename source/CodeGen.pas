@@ -27,6 +27,7 @@ function GetCodeSize: LongInt;
 procedure PushConst(Value: LongInt);
 procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 procedure Relocate(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr, ImportDeltaAddr: Integer);
+procedure PushFunctionResult(ResultType: Integer);
 procedure PushVarPtr(Addr: Integer; Scope: TScope; DeltaNesting: Byte; RelocType: TRelocType);
 procedure DerefPtr(DataType: Integer);
 procedure GetArrayElementPtr(ArrType: Integer);
@@ -644,6 +645,19 @@ procedure GenPopFromFPU;
 begin
 GenNew($D9); Gen($1C); Gen($24);                                         // fstp dword ptr [esp]
 end; 
+
+
+
+
+procedure PushFunctionResult(ResultType: Integer);
+begin
+if Types[ResultType].Kind = BOOLEANTYPE then
+  begin
+  GenNew($83); Gen($E0); Gen($01);                                       // and eax, 1
+  end;
+  
+GenPushReg(EAX);                                                         // push eax
+end;
 
 
 

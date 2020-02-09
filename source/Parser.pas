@@ -1724,7 +1724,7 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
     OPARTOK: 
       begin
       if not CompileMethodOrProceduralVariableCall(ValType, TRUE, TRUE) then Break;  // Not a designator 
-      RestoreStackTopFromEAX; 
+      PushFunctionResult(ValType); 
       end;
       
   end; // case
@@ -1767,7 +1767,7 @@ if ValType = 0 then
 
       NextTok;
       CompileCall(IdentIndex);
-      RestoreStackTopFromEAX;        
+      PushFunctionResult(ResultType);        
       ValType := ResultType;
       
       DereferencePointerAsDesignator(ValType, TRUE);
@@ -1841,7 +1841,7 @@ procedure CompileFactor(var ValType: Integer);
   if Tok.Kind = OPARTOK then   // For method or procedural variable calls, parentheses are required even with empty parameter lists                                     
     begin
     CompileMethodOrProceduralVariableCall(ValType, TRUE, FALSE);
-    RestoreStackTopFromEAX;
+    PushFunctionResult(ValType);
     end       
   else                         // Usual variable
     if not (Types[ValType].Kind in StructuredTypes) then // Structured expressions are stored as pointers to them
@@ -1881,9 +1881,10 @@ case Tok.Kind of
           else                                                                          // User-defined function call
             begin
             NextTok;
+            ValType := Ident[IdentIndex].Signature.ResultType;
+            
             CompileCall(IdentIndex);
-            RestoreStackTopFromEAX;
-            ValType := Ident[IdentIndex].Signature.ResultType; 
+            PushFunctionResult(ValType);
             
             if (Types[ValType].Kind in StructuredTypes) or DereferencePointerAsDesignator(ValType, FALSE) then
               begin
@@ -2203,13 +2204,13 @@ if Tok.Kind in RelationOperators then
   if IsString(ValType) and IsString(RightValType) then
     begin 
     LibProcIdentIndex := GetIdent('COMPARESTR');
-   
-    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
-    RestoreStackTopFromEAX;
-    ValType := Ident[LibProcIdentIndex].Signature.ResultType;
     
-    PushConst(0);
+    ValType := Ident[LibProcIdentIndex].Signature.ResultType;
     RightValType := INTEGERTYPEINDEX;
+    
+    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
+    PushFunctionResult(ValType); 
+    PushConst(0);    
     end;
 
   // Special case: set comparison
@@ -2221,14 +2222,14 @@ if Tok.Kind in RelationOperators then
       GETOK: LibProcIdentIndex := GetIdent('TESTSUPERSET');    // Returns  1 if Val >= RightVal, -1 otherwise 
       LETOK: LibProcIdentIndex := GetIdent('TESTSUBSET');      // Returns -1 if Val <= RightVal,  1 otherwise 
       else   LibProcIdentIndex := GetIdent('COMPARESETS');     // Returns  0 if Val  = RightVal,  1 otherwise  
-    end; 
+    end;
+ 
+    ValType := Ident[LibProcIdentIndex].Signature.ResultType;
+    RightValType := INTEGERTYPEINDEX;
     
     GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
-    RestoreStackTopFromEAX;
-    ValType := Ident[LibProcIdentIndex].Signature.ResultType;
-    
-    PushConst(0);  
-    RightValType := INTEGERTYPEINDEX;
+    PushFunctionResult(ValType);
+    PushConst(0); 
     end;  
 
   GetCompatibleType(ValType, RightValType);
@@ -2250,9 +2251,10 @@ else if Tok.Kind = INTOK then
     Error('Ordinal type expected');   
 
   LibProcIdentIndex := GetIdent('INSET');
+  ValType := Ident[LibProcIdentIndex].Signature.ResultType;
+  
   GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
-  RestoreStackTopFromEAX;
-  ValType := Ident[LibProcIdentIndex].Signature.ResultType;  
+  PushFunctionResult(ValType);    
   end;  
 
 end;// CompileExpression
@@ -2741,7 +2743,7 @@ case Tok.Kind of
                  ((Types[DesignatorType].Kind in StructuredTypes) or DereferencePointerAsDesignator(DesignatorType, FALSE))                                   
               then
                 begin
-                RestoreStackTopFromEAX;
+                PushFunctionResult(DesignatorType);
                 CompileSelectors(DesignatorType);
                 CompileAssignmentOrCall(DesignatorType); 
                 end;
