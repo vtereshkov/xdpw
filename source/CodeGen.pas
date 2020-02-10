@@ -654,7 +654,29 @@ begin
 if Types[ResultType].Kind = BOOLEANTYPE then
   begin
   GenNew($83); Gen($E0); Gen($01);                                       // and eax, 1
-  end;
+  end
+else  
+  case TypeSize(ResultType) of
+  
+    1: if Types[ResultType].Kind in UnsignedTypes then
+         begin
+         GenNew($0F); Gen($B6); Gen($C0);                                // movzx eax, al
+         end
+       else  
+         begin
+         GenNew($0F); Gen($BE); Gen($C0);                                // movsx eax, al
+         end; 
+         
+    2: if Types[ResultType].Kind in UnsignedTypes then
+         begin
+         GenNew($0F); Gen($B7); Gen($C0);                                // movzx eax, ax
+         end
+       else  
+         begin
+         GenNew($0F); Gen($BF); Gen($C0);                                // movsx eax, ax
+         end; 
+     
+  end; // case
   
 GenPushReg(EAX);                                                         // push eax
 end;
