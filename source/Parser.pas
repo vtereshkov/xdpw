@@ -329,7 +329,7 @@ end; // ConvertIntegerToReal
 
 procedure ConvertConstCharToString(DestType: Integer; var SrcType: Integer; var ConstVal: TConst);
 var
-  ch: Char;
+  ch: TCharacter;
 begin
 if IsString(DestType) and 
    ((Types[SrcType].Kind = CHARTYPE) or 
