@@ -9,7 +9,7 @@
 program XDPW;
 
 
-uses Common, Scanner, Parser, CodeGen, Linker;
+uses SysUtils, Common, Scanner, Parser, CodeGen, Linker;
 
 
 
@@ -48,12 +48,20 @@ end;
 
 
 
+procedure NoticeProc(const Msg: TString);
+begin
+WriteLn(Msg);  
+end;
+
+
+
+
 procedure ErrorProc(const Msg: TString);
 begin
 if NumUnits >= 1 then
-  WriteLn('Error ', ScannerFileName, ' ', ScannerLine, ': ', Msg)
+  Notice('Error ' + ScannerFileName + ' ' + IntToStr(ScannerLine) + ': ' + Msg)
 else
-  WriteLn('Error: ', Msg);  
+  Notice('Error: ' + Msg);  
 
 repeat FinalizeScanner until not RestoreScanner;
 FinalizeCommon;
@@ -69,20 +77,19 @@ var
 
 
 begin
-WriteLn;
-WriteLn('XD Pascal for Windows ', VERSIONMAJOR, '.', VERSIONMINOR);
-WriteLn('Copyright (c) 2009-2010, 2019-2020, Vasiliy Tereshkov');
+SetWriteProcs(@NoticeProc, @ErrorProc);
+
+Notice('XD Pascal for Windows ' + VERSION);
+Notice('Copyright (c) 2009-2010, 2019-2020, Vasiliy Tereshkov');
 
 if ParamCount < 1 then
   begin
-  WriteLn('Usage: xdpw <file.pas>');
+  Notice('Usage: xdpw <file.pas>');
   Halt(1);
   end;
 
 PasPath := TString(ParamStr(1));
 SplitPath(PasPath, PasFolder, PasName, PasExt);
-
-SetErrorProc(@ErrorProc);
 
 InitializeCommon;
 InitializeLinker;
@@ -97,7 +104,7 @@ CompileProgramOrUnit(PasName + PasExt);
 ExePath := PasFolder + PasName + '.exe';
 LinkAndWriteProgram(ExePath);
 
-WriteLn('Compilation complete. Code size: ', GetCodeSize, ' bytes. Data size: ', InitializedGlobalDataSize + UninitializedGlobalDataSize, ' bytes.');
+Notice('Complete. Code size: ' + IntToStr(GetCodeSize) + ' bytes. Data size: ' + IntToStr(InitializedGlobalDataSize + UninitializedGlobalDataSize) + ' bytes');
 
 repeat FinalizeScanner until not RestoreScanner;
 FinalizeCommon;

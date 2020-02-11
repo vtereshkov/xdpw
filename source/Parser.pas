@@ -4129,7 +4129,7 @@ SetUnitStatus(ParserState.UnitStatus);
 if Tok.Kind = USESTOK then
   CompileUsesClause;
 
-WriteLn('Compiling ', Name);
+Notice('Compiling ' + Name);
 
 NumBlocks := 1;  
 CompileBlock(0);

@@ -12,8 +12,7 @@ interface
 
 
 const
-  VERSIONMAJOR              = 0;
-  VERSIONMINOR              = 10;
+  VERSION                   = '0.11';
   
   NUMKEYWORDS               = 43;          
   MAXSTRLENGTH              = 255;
@@ -303,7 +302,7 @@ type
     DataType: Integer;
   end;
   
-  TErrorProc = procedure (const Msg: TString);
+  TWriteProc = procedure (const Msg: TString);
   
   
 
@@ -335,7 +334,8 @@ procedure DisposeParams(var Signature: TSignature);
 procedure DisposeFields(var DataType: TType);
 function GetTokSpelling(TokKind: TTokenKind): TString;
 function GetTypeSpelling(DataType: Integer): TString;
-procedure SetErrorProc(Err: TErrorProc);
+procedure SetWriteProcs(NewNoticeProc, NewErrorProc: TWriteProc);
+procedure Notice(const Msg: TString);
 procedure Error(const Msg: TString);
 procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
 function IsString(DataType: Integer): Boolean;
@@ -415,7 +415,7 @@ const
 
 
 var
-  ErrorProc: TErrorProc;
+  NoticeProc, ErrorProc: TWriteProc;
   UnitStatus: TUnitStatus;
   
   
@@ -600,9 +600,18 @@ end;
 
 
 
-procedure SetErrorProc(Err: TErrorProc);
+procedure SetWriteProcs(NewNoticeProc, NewErrorProc: TWriteProc);
 begin
-ErrorProc := Err;
+NoticeProc := NewNoticeProc;
+ErrorProc := NewErrorProc;
+end;
+
+
+
+
+procedure Notice(const Msg: TString);
+begin
+NoticeProc(Msg);
 end;
 
 
