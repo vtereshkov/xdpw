@@ -21,9 +21,8 @@ const
   MAXIDENTS                 = 1000;
   MAXTYPES                  = 1000;
   MAXUNITS                  = 100;
-  MAXBLOCKS                 = 1000;
   MAXBLOCKNESTING           = 10;
-  MAXPARAMS                 = 20;
+  MAXPARAMS                 = 30;
   MAXFIELDS                 = 100;
   MAXWITHNESTING            = 20;
 

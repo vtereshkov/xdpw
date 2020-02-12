@@ -2967,6 +2967,9 @@ procedure CompileType(var DataType: Integer);
 
     // Add new field
     Inc(Types[RecType].NumFields);
+    if Types[RecType].NumFields > MAXFIELDS then
+      Error('Too many fields');
+      
     New(Types[RecType].Field[Types[RecType].NumFields]);
     
     with Types[RecType].Field[Types[RecType].NumFields]^ do
@@ -3005,10 +3008,12 @@ procedure CompileType(var DataType: Integer);
         AssertIdent;
 
         Inc(NumFieldsInList);
+        if NumFieldsInList > MAXFIELDS then
+          Error('Too many fields');
+          
         FieldInListName[NumFieldsInList] := Tok.Name;
 
         NextTok;
-
         if (Tok.Kind <> COMMATOK) or IsInterfaceType then Break;
         NextTok;
       until FALSE;
@@ -3567,6 +3572,9 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       AssertIdent;
 
       Inc(NumIdentInList);
+      if NumIdentInList > MAXPARAMS then
+        Error('Too many variables in one list');
+      
       IdentInListName[NumIdentInList] := Tok.Name;
 
       NextTok;
@@ -3622,10 +3630,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
         end
       else if Tok.Name = 'FORWARD' then  // Forward declaration
         begin
-        Inc(NumBlocks);
-        if NumBlocks > MAXBLOCKS then
-          Error('Maximum number of blocks exceeded');
-          
+        Inc(NumBlocks);         
         Ident[NumIdent].ProcAsBlock := NumBlocks;
         Ident[NumIdent].IsUnresolvedForward := TRUE;
         GenerateForwardReference;
@@ -3648,10 +3653,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     // Procedure interface in the interface section of a unit is an implicit forward declaration
     if ParserState.IsInterfaceSection and (BlockStack[BlockStackTop].Index = 1) then
       begin 
-      Inc(NumBlocks);
-      if NumBlocks > MAXBLOCKS then
-        Error('Maximum number of blocks exceeded');
-        
+      Inc(NumBlocks);      
       Ident[NumIdent].ProcAsBlock := NumBlocks;
       Ident[NumIdent].IsUnresolvedForward := TRUE;
       GenerateForwardReference;
@@ -3754,10 +3756,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     end  
   else if not CompileDirective(NonUppercaseProcName) and not CompileInterface then  // Declaration in the interface part, external or forward declaration                                                              
     begin
-    Inc(NumBlocks);                                                                 // Conventional declaration
-    if NumTypes > MAXBLOCKS then
-      Error('Maximum number of blocks exceeded');
-    
+    Inc(NumBlocks);                                                                 // Conventional declaration   
     Ident[NumIdent].ProcAsBlock := NumBlocks;
     
     CompileBlock(NumIdent);    

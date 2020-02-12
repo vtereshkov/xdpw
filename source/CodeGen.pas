@@ -101,6 +101,7 @@ implementation
 
 
 const
+  MAXINSTRSIZE      = 15;
   MAXPREVCODESIZES  = 10;
   MAXRELOCS         = 20000;
   MAXGOTOS          = 100;
@@ -163,7 +164,6 @@ end;
 function GetCodeSize: LongInt;
 begin
 Result := CodeSize;
-
 NumPrevCodeSizes := 0;
 end;
  
@@ -172,8 +172,6 @@ end;
  
 procedure Gen(b: Byte);
 begin
-if CodeSize >= MAXCODESIZE then
-  Error('Maximum code size exceeded');
 Code[CodeSize] := b;
 Inc(CodeSize);
 end;
@@ -185,6 +183,9 @@ procedure GenNew(b: Byte);
 var
   i: Integer;
 begin
+if CodeSize + MAXINSTRSIZE >= MAXCODESIZE then
+  Error('Maximum code size exceeded');
+  
 if NumPrevCodeSizes < MAXPREVCODESIZES then
   Inc(NumPrevCodeSizes)
 else
