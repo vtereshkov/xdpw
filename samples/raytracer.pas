@@ -60,7 +60,7 @@ end;
 function rand: TVec;
 var i: Integer;
 begin 
-for i := 1 to 3 do Result[i] := Random; 
+for i := 1 to 3 do Result[i] := Random - 0.5; 
 end;
 
 
@@ -257,7 +257,9 @@ if BestIndex > 0 then
   DiffuseRay.Origin := BestPoint;
   DiffuseRay.Dir := DiffuseDir;
 
-  Result := sc.Trace(DiffuseRay, Depth + 1).mul(BestBody^.LambertFactor(Lambert)).elementwise(BestBody^.Color);
+  with BestBody^ do
+    Result := sc.Trace(DiffuseRay, Depth + 1).mul(LambertFactor(Lambert)).elementwise(Color);
+    
   Exit;
   end;
 
@@ -342,6 +344,10 @@ const
   Antialiasing = 1.0;
   
   
+  // Output file
+  FileName = 'scene.ppm';
+  
+  
 var
   Scene: TScene;
   Dir, RotDir, RandomDir: TVec;
@@ -374,7 +380,7 @@ with Scene do
   
 sinAz := sin(Azimuth);  cosAz := cos(Azimuth);
   
-Assign(F, 'scene.ppm');
+Assign(F, FileName);
 Rewrite(F);
 WriteLn(F, 'P3');
 WriteLn(F, Width, ' ', Height);
@@ -420,6 +426,6 @@ Close(F);
 
 WriteLn;
 WriteLn('Rendering time: ', (StopTime - StartTime) / 1000 :5:1, ' s');
-WriteLn('Done. See scene.ppm');
+WriteLn('Done. See ' + FileName);
 ReadLn;  
 end.

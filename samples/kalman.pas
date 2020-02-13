@@ -194,7 +194,7 @@ end;
 
 
 
-procedure ExecuteFilter{(var KF: TKalmanFilter)};
+procedure ExecuteFilter(var KF: TKalmanFilter);
 var
   PhiPPhiT, GQGT, HT, HPapriHT, HPapriHTplusR, HPapriHTplusRinv, PapriHT, Hxapri, nu, Knu, KH, EminusKH, E: TMatrix;
 begin

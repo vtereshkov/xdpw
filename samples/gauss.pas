@@ -44,7 +44,7 @@ end;
 
 
 
-procedure SolveLinearSystem{(var T: TMatrix; var x: TVector; m: Integer; Error: TError)};
+procedure SolveLinearSystem(var T: TMatrix; var x: TVector; m: Integer; Error: TError);
 var
   i, j: Integer;
   s: Real;

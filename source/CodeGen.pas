@@ -1,5 +1,5 @@
 // XD Pascal - a 32-bit compiler for Windows
-// Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov
+// Copyright (c) 2009-2010, 2019-2020, Vasiliy Tereshkov
 
 {$I-}
 {$H-}
@@ -27,11 +27,12 @@ function GetCodeSize: LongInt;
 procedure PushConst(Value: LongInt);
 procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 procedure Relocate(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr, ImportDeltaAddr: Integer);
+procedure PushFunctionResult(ResultType: Integer);
 procedure PushVarPtr(Addr: Integer; Scope: TScope; DeltaNesting: Byte; RelocType: TRelocType);
 procedure DerefPtr(DataType: Integer);
 procedure GetArrayElementPtr(ArrType: Integer);
 procedure GetFieldPtr(Offset: Integer);
-procedure GetCharAsTempString;
+procedure GetCharAsTempString(Depth: Integer);
 procedure SaveStackTopToEAX;
 procedure RestoreStackTopFromEAX;
 procedure DiscardStackTop(NumItems: Byte);
@@ -100,6 +101,7 @@ implementation
 
 
 const
+  MAXINSTRSIZE      = 15;
   MAXPREVCODESIZES  = 10;
   MAXRELOCS         = 20000;
   MAXGOTOS          = 100;
@@ -159,10 +161,9 @@ end;
 
 
 
-function GetCodeSize{: LongInt};
+function GetCodeSize: LongInt;
 begin
 Result := CodeSize;
-
 NumPrevCodeSizes := 0;
 end;
  
@@ -171,8 +172,6 @@ end;
  
 procedure Gen(b: Byte);
 begin
-if CodeSize >= MAXCODESIZE then
-  Error('Maximum code size exceeded');
 Code[CodeSize] := b;
 Inc(CodeSize);
 end;
@@ -184,6 +183,9 @@ procedure GenNew(b: Byte);
 var
   i: Integer;
 begin
+if CodeSize + MAXINSTRSIZE >= MAXCODESIZE then
+  Error('Maximum code size exceeded');
+  
 if NumPrevCodeSizes < MAXPREVCODESIZES then
   Inc(NumPrevCodeSizes)
 else
@@ -290,17 +292,12 @@ end;
 
 
 function PrevInstrDWord(Depth, Offset: Integer): LongInt;
-var
-  Ptr: ^LongInt;
 begin
 Result := 0;
 
 // The last generated instruction starts at Depth = 0, Offset = 0
 if Depth < NumPrevCodeSizes then
-  begin
-  Ptr := @Code[PrevCodeSizes[NumPrevCodeSizes - Depth] + Offset];
-  Result := Ptr^;
-  end;
+  Result := PLongInt(@Code[PrevCodeSizes[NumPrevCodeSizes - Depth] + Offset])^;
 end;
 
 
@@ -341,7 +338,7 @@ end;
 
 
 
-procedure PushConst{(Value: LongInt)};
+procedure PushConst(Value: LongInt);
 begin
 GenNew($68); GenDWord(Value);                            // push Value
 end;
@@ -349,7 +346,7 @@ end;
 
 
 
-procedure PushRelocConst{(Value: LongInt; RelocType: TRelocType)};
+procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 begin
 GenNew($68); GenRelocDWord(Value, RelocType);            // push Value  ; relocatable
 end;
@@ -357,7 +354,7 @@ end;
 
 
 
-procedure Relocate{(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr, ImportDeltaAddr: Integer)};
+procedure Relocate(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr, ImportDeltaAddr: Integer);
 var
   i, DeltaAddr: Integer;
 begin
@@ -585,8 +582,18 @@ procedure GenPopReg(Reg: TRegister);
     GenNew($D9); Gen($06);                                                    // fld dword ptr [esi]      
     Result := TRUE;
     Exit;
-    end;
+    end
     
+
+  // Optimization: (push dword ptr [esp]) + (pop esi) -> (mov esi, [esp])
+  else if (Reg = ESI) and (PrevInstrByte(0, 0) = $FF) and (PrevInstrByte(0, 1) = $34) and (PrevInstrByte(0, 2) = $24) // Previous: push dword ptr [esp] 
+  then        
+    begin   
+    RemovePrevInstr(0);                                                       // Remove: push dword ptr [esp]
+    GenNew($8B); Gen($34); Gen($24);                                          // mov esi, [esp]      
+    Result := TRUE;
+    Exit;
+    end;
       
   end;
 
@@ -643,12 +650,49 @@ end;
 
 
 
-procedure PushVarPtr{(Addr: Integer; Scope: TScope; DeltaNesting: Byte; RelocType: TRelocType)};
+procedure PushFunctionResult(ResultType: Integer);
+begin
+if Types[ResultType].Kind = BOOLEANTYPE then
+  begin
+  GenNew($83); Gen($E0); Gen($01);                                       // and eax, 1
+  end
+else  
+  case TypeSize(ResultType) of
+  
+    1: if Types[ResultType].Kind in UnsignedTypes then
+         begin
+         GenNew($0F); Gen($B6); Gen($C0);                                // movzx eax, al
+         end
+       else  
+         begin
+         GenNew($0F); Gen($BE); Gen($C0);                                // movsx eax, al
+         end; 
+         
+    2: if Types[ResultType].Kind in UnsignedTypes then
+         begin
+         GenNew($0F); Gen($B7); Gen($C0);                                // movzx eax, ax
+         end
+       else  
+         begin
+         GenNew($0F); Gen($BF); Gen($C0);                                // movsx eax, ax
+         end; 
+     
+  end; // case
+  
+GenPushReg(EAX);                                                         // push eax
+end;
+
+
+
+
+procedure PushVarPtr(Addr: Integer; Scope: TScope; DeltaNesting: Byte; RelocType: TRelocType);
 const
   StaticLinkAddr = 2 * 4;
 var
   i: Integer;  
 begin
+// EAX must be preserved
+
 case Scope of
   GLOBAL:                                     // Global variable
     PushRelocConst(Addr, RelocType);
@@ -677,7 +721,7 @@ end;
 
 
 
-procedure DerefPtr{(DataType: Integer)};
+procedure DerefPtr(DataType: Integer);
 
 
   function OptimizeDerefPtr: Boolean;
@@ -863,7 +907,7 @@ end;
 
 
 
-procedure GetArrayElementPtr{(ArrType: Integer)};
+procedure GetArrayElementPtr(ArrType: Integer);
 
 
   function OptimizeGetArrayElementPtr: Boolean;
@@ -1005,7 +1049,7 @@ end;
 
 
 
-procedure GetFieldPtr{(Offset: Integer)};
+procedure GetFieldPtr(Offset: Integer);
   
 
   function OptimizeGetFieldPtr: Boolean;
@@ -1053,13 +1097,23 @@ end;
 
 
 
-procedure GetCharAsTempString;
+procedure GetCharAsTempString(Depth: Integer);
 begin
+if (Depth <> 0) and (Depth <> SizeOf(LongInt)) then
+  Error('Internal fault: Illegal depth');
+  
 GenPopReg(ESI);                                                   // pop esi                  ; Temporary string address
+
+if Depth = SizeOf(LongInt) then
+  GenPopReg(ECX);                                                 // pop ecx                  ; Some other string address
+  
 GenPopReg(EAX);                                                   // pop eax                  ; Character
 GenNew($88); Gen($06);                                            // mov byte ptr [esi], al
 GenNew($C6); Gen($46); Gen($01); Gen($00);                        // mov byte ptr [esi + 1], 0
 GenPushReg(ESI);                                                  // push esi
+
+if Depth = SizeOf(LongInt) then
+  GenPushReg(ECX);                                                // push ecx                  ; Some other string address
 end;
 
 
@@ -1081,9 +1135,32 @@ end;
 
 
 
-procedure DiscardStackTop{(NumItems: Byte)};
-begin
-GenNew($83); Gen($C4); Gen(SizeOf(LongInt) * NumItems);                                 // add esp, 4 * NumItems
+procedure DiscardStackTop(NumItems: Byte);
+
+  function OptimizeDiscardStackTop: Boolean;
+  begin
+  Result := FALSE;
+  
+  // Optimization: (push Reg) + (add esp, 4 * NumItems) -> (add esp, 4 * (NumItems - 1))
+  if PrevInstrByte(0, 0) in [$50, $51, $56, $57, $55] then
+    begin
+    RemovePrevInstr(0);                                                                 // Remove: push Reg
+    
+    if NumItems > 1 then
+      begin
+      GenNew($83); Gen($C4); Gen(SizeOf(LongInt) * (NumItems - 1));                     // add esp, 4 * (NumItems - 1)
+      end;
+      
+    Result := TRUE;
+    end;
+    
+  end;  
+
+begin  // DiscardStackTop
+if not OptimizeDiscardStackTop then
+  begin
+  GenNew($83); Gen($C4); Gen(SizeOf(LongInt) * NumItems);                               // add esp, 4 * NumItems
+  end
 end;
 
 
@@ -1123,7 +1200,7 @@ end;
 
 
 
-procedure GenerateIncDec{(proc: TPredefProc; Size: Byte)};
+procedure GenerateIncDec(proc: TPredefProc; Size: Byte);
 begin
 GenPopReg(ESI);                                                       // pop esi
 
@@ -1148,7 +1225,7 @@ end;
 
 
 
-procedure GenerateRound{(TruncMode: Boolean)};
+procedure GenerateRound(TruncMode: Boolean);
 begin
 GenPushToFPU;                                                                  // fld dword ptr [esp]  ;  st = operand
 
@@ -1171,7 +1248,7 @@ end;// GenerateRound
 
 
 
-procedure GenerateFloat{(Depth: Byte)};
+procedure GenerateFloat(Depth: Byte);
 
 
   function OptimizeGenerateFloat: Boolean;
@@ -1214,7 +1291,7 @@ end;// GenerateFloat
 
 
 
-procedure GenerateMathFunction{(func: TPredefProc; ResultType: Integer)};
+procedure GenerateMathFunction(func: TPredefProc; ResultType: Integer);
 begin
 if Types[ResultType].Kind = REALTYPE then       // Real type
   begin
@@ -1292,7 +1369,7 @@ end;// GenerateMathFunction
 
 
 
-procedure GenerateUnaryOperator{(op: TTokenKind; ResultType: Integer)};
+procedure GenerateUnaryOperator(op: TTokenKind; ResultType: Integer);
 begin
 if Types[ResultType].Kind = REALTYPE then     // Real type
   begin
@@ -1330,7 +1407,7 @@ end;
 
 
 
-procedure GenerateBinaryOperator{(op: TTokenKind; ResultType: Integer)};
+procedure GenerateBinaryOperator(op: TTokenKind; ResultType: Integer);
 begin
 if Types[ResultType].Kind = REALTYPE then     // Real type
   begin
@@ -1430,7 +1507,7 @@ end;
 
 
 
-procedure GenerateRelation{(rel: TTokenKind; ValType: Integer)};
+procedure GenerateRelation(rel: TTokenKind; ValType: Integer);
 
 
   function OptimizeGenerateRelation: Boolean;
@@ -1500,7 +1577,7 @@ end;
 
 
 
-procedure GenerateAssignment{(DesignatorType: Integer)};
+procedure GenerateAssignment(DesignatorType: Integer);
 
 
   function OptimizeGenerateAssignment: Boolean;
@@ -1584,7 +1661,7 @@ end;
 
 
 
-procedure GenerateForAssignmentAndNumberOfIterations{(CounterType: Integer; Down: Boolean)};
+procedure GenerateForAssignmentAndNumberOfIterations(CounterType: Integer; Down: Boolean);
 
 
   function OptimizeGenerateForAssignmentAndNumberOfIterations: Boolean;
@@ -1676,7 +1753,7 @@ end;
 
 
 
-procedure GenerateStructuredAssignment{(DesignatorType: Integer)};
+procedure GenerateStructuredAssignment(DesignatorType: Integer);
 begin
 GenPopReg(ESI);                                                            // pop esi      ; source address
 GenPopReg(EDI);                                                            // pop edi      ; destination address
@@ -1690,12 +1767,13 @@ end;
 
 
 
-procedure GenerateInterfaceFieldAssignment{(Offset: Integer; PopValueFromStack: Boolean; Value: LongInt; RelocType: TRelocType)};
+procedure GenerateInterfaceFieldAssignment(Offset: Integer; PopValueFromStack: Boolean; Value: LongInt; RelocType: TRelocType);
 begin
 if PopValueFromStack then
   begin
   GenPopReg(ESI);                                                               // pop esi
   GenNew($89); Gen($B5); GenDWord(Offset);                                      // mov dword ptr [ebp + Offset], esi
+  GenPushReg(ESI);                                                              // push esi
   end
 else
   begin
@@ -1706,7 +1784,7 @@ end;
 
 
 
-procedure InverseStack{(Depth: Integer)};
+procedure InverseStack(Depth: Integer);
 var
   i: Integer;
 begin
@@ -1722,7 +1800,7 @@ end;
 
 
 
-procedure GenerateImportFuncStub{(EntryPoint: LongInt)};
+procedure GenerateImportFuncStub(EntryPoint: LongInt);
 begin
 GenNew($FF); Gen($25); GenRelocDWord(EntryPoint, IMPORTRELOC);                           // jmp ds:EntryPoint  ; relocatable
 end;
@@ -1730,7 +1808,7 @@ end;
 
 
 
-procedure GenerateCall{(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer)};
+procedure GenerateCall(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer);
 const
   StaticLinkAddr = 2 * 4;
 var
@@ -1763,7 +1841,7 @@ end;
 
 
 
-procedure GenerateIndirectCall{(NumParam: Integer)};
+procedure GenerateIndirectCall(NumParam: Integer);
 begin
 GenNew($8B); Gen($B4); Gen($24); GenDWord(SizeOf(LongInt) * NumParam);       // mov esi, dword ptr [esp + 4 * NumParam]
 GenNew($FF); Gen($16);                                                       // call [esi]
@@ -1773,7 +1851,7 @@ end;
 
 
 
-procedure GenerateReturn{(TotalParamsSize, Nesting: Integer)};
+procedure GenerateReturn(TotalParamsSize, Nesting: Integer);
 begin
 GenNew($C2);                                                                 // ret ... 
 if Nesting = 1 then
@@ -1797,7 +1875,7 @@ end;
 
 
 
-procedure GenerateForwardResolution{(CodePos: Integer)};
+procedure GenerateForwardResolution(CodePos: Integer);
 begin
 GenAt(CodePos, $E9); GenDWordAt(CodePos + 1, GetCodeSize - (CodePos + 5));      // jmp GetCodeSize
 end;
@@ -1896,7 +1974,7 @@ end;
 
 
 
-procedure GenerateCaseEpilog{(NumCaseStatements: Integer)};
+procedure GenerateCaseEpilog(NumCaseStatements: Integer);
 var
   i: Integer;
 begin
@@ -1907,7 +1985,7 @@ end;
 
 
 
-procedure GenerateCaseEqualityCheck{(Value: LongInt)};
+procedure GenerateCaseEqualityCheck(Value: LongInt);
 begin
 GenNew($81); Gen($F9); GenDWord(Value);                        // cmp ecx, Value
 GenNew($9F);                                                   // lahf
@@ -1917,7 +1995,7 @@ end;
 
 
 
-procedure GenerateCaseRangeCheck{(Value1, Value2: LongInt)};
+procedure GenerateCaseRangeCheck(Value1, Value2: LongInt);
 begin
 GenNew($81); Gen($F9); GenDWord(Value1);                       // cmp ecx, Value1
 GenNew($7C); Gen($0A);                                         // jl +10
@@ -2038,7 +2116,7 @@ end;
 
 
 
-procedure GenerateForEpilog{(CounterType: Integer; Down: Boolean)};
+procedure GenerateForEpilog(CounterType: Integer; Down: Boolean);
 begin
 // Increment/decrement counter variable
 if Down then
@@ -2065,7 +2143,7 @@ end;
 
 
 
-procedure GenerateGoto{(LabelIndex: Integer)};
+procedure GenerateGoto(LabelIndex: Integer);
 begin
 Inc(NumGotos);
 Gotos[NumGotos].Pos := GetCodeSize;
@@ -2098,7 +2176,7 @@ end;
 
 
 
-procedure GenerateShortCircuitProlog{(op: TTokenKind)};
+procedure GenerateShortCircuitProlog(op: TTokenKind);
 begin
 GenPopReg(EAX);                                                    // pop eax
 GenNew($85); Gen($C0);                                             // test eax, eax  
@@ -2166,7 +2244,7 @@ end;
 
 
 
-procedure GenerateStackFrameEpilog{(TotalStackStorageSize: LongInt)};
+procedure GenerateStackFrameEpilog(TotalStackStorageSize: LongInt);
 var
   CodePos: Integer;
 begin
@@ -2180,7 +2258,7 @@ end;
 
 
 
-procedure GenerateBreakProlog{(LoopNesting: Integer)};
+procedure GenerateBreakProlog(LoopNesting: Integer);
 begin
 BreakCall[LoopNesting].NumCalls := 0;
 end;
@@ -2188,7 +2266,7 @@ end;
 
 
 
-procedure GenerateBreakCall{(LoopNesting: Integer)};
+procedure GenerateBreakCall(LoopNesting: Integer);
 begin
 Inc(BreakCall[LoopNesting].NumCalls);
 BreakCall[LoopNesting].Pos[BreakCall[LoopNesting].NumCalls] := GetCodeSize;
@@ -2199,7 +2277,7 @@ end;
 
 
 
-procedure GenerateBreakEpilog{(LoopNesting: Integer)};
+procedure GenerateBreakEpilog(LoopNesting: Integer);
 var
   i: Integer;
 begin
@@ -2210,7 +2288,7 @@ end;
 
 
 
-procedure GenerateContinueProlog{(LoopNesting: Integer)};
+procedure GenerateContinueProlog(LoopNesting: Integer);
 begin
 ContinueCall[LoopNesting].NumCalls := 0;
 end;
@@ -2218,7 +2296,7 @@ end;
 
 
 
-procedure GenerateContinueCall{(LoopNesting: Integer)};
+procedure GenerateContinueCall(LoopNesting: Integer);
 begin
 Inc(ContinueCall[LoopNesting].NumCalls);
 ContinueCall[LoopNesting].Pos[ContinueCall[LoopNesting].NumCalls] := GetCodeSize;
@@ -2229,7 +2307,7 @@ end;
 
 
 
-procedure GenerateContinueEpilog{(LoopNesting: Integer)};
+procedure GenerateContinueEpilog(LoopNesting: Integer);
 var
   i: Integer;
 begin

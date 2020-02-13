@@ -1,5 +1,5 @@
 // XD Pascal - a 32-bit compiler for Windows
-// Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov
+// Copyright (c) 2009-2010, 2019-2020, Vasiliy Tereshkov
 
 {$I-}
 {$H-}
@@ -36,8 +36,8 @@ var
 
 
 procedure CompileConstExpression(var ConstVal: TConst; var ConstValType: Integer); forward;
-procedure CompileDesignator(var ValType: Integer; ForceCharToString: Boolean); forward;
-procedure CompileExpression(var ValType: Integer; ForceCharToString: Boolean); forward;
+procedure CompileDesignator(var ValType: Integer); forward;
+procedure CompileExpression(var ValType: Integer); forward;
 procedure CompileStatement(LoopNesting: Integer); forward;
 procedure CompileType(var DataType: Integer); forward;
 
@@ -45,11 +45,12 @@ procedure CompileType(var DataType: Integer); forward;
 
 
 procedure DeclareIdent(const IdentName: TString; IdentKind: TIdentKind; IdentTotalNumParams: Integer; IdentDataType: Integer; 
-                       IdentPassMethod: TPassMethod; IdentConstValue: LongInt; IdentFracConstValue: Single; 
+                       IdentPassMethod: TPassMethod; IdentConstValue: LongInt; IdentFracConstValue: Single; const IdentStrConstValue: TString; 
                        IdentPredefProc: TPredefProc; const IdentReceiverName: TString; IdentReceiverType: Integer);
 var
   i, AdditionalStackItems: Integer;
   IdentScope: TScope;
+  FictitiousTok: TToken;
   
 begin
 if BlockStack[BlockStackTop].Index = 1 then IdentScope := GLOBAL else IdentScope := LOCAL;
@@ -131,11 +132,17 @@ case IdentKind of
 
 
   CONSTANT:
-    if IdentPassMethod = VALPASSING then                                     // Untyped constant
-      if Types[IdentDataType].Kind = REALTYPE then
-        Ident[NumIdent].FracValue := IdentFracConstValue                // Real constant value
-      else
-        Ident[NumIdent].Value := IdentConstValue                        // Ordinal constant value
+    if IdentPassMethod = EMPTYPASSING then                              // Untyped constant
+      case Types[IdentDataType].Kind of
+        ARRAYTYPE:  begin
+                    Ident[NumIdent].StrValue := IdentStrConstValue;        // String constant value        
+                    FictitiousTok.Kind := STRINGLITERALTOK;
+                    DefineStaticString(FictitiousTok, IdentStrConstValue);
+                    Ident[NumIdent].Value := FictitiousTok.StrAddress;      // String constant address
+                    end;
+        REALTYPE:   Ident[NumIdent].FracValue := IdentFracConstValue;       // Real constant value
+        else        Ident[NumIdent].Value := IdentConstValue;               // Ordinal constant value
+      end    
     else                                                                // Typed constant (actually an initialized global variable)    
       begin
       with Ident[NumIdent] do
@@ -143,7 +150,7 @@ case IdentKind of
         Kind        := VARIABLE;
         Scope       := GLOBAL;
         RelocType   := INITDATARELOC;
-        PassMethod  := VALPASSING;
+        PassMethod  := EMPTYPASSING;
         end;
       
       Ident[NumIdent].Value := InitializedGlobalDataSize;               // Typed constant address (relocatable)
@@ -173,53 +180,69 @@ end; // DeclareIdent
 
 
 
+procedure DeclareType(TypeKind: TTypeKind);
+begin
+Inc(NumTypes);
+if NumTypes > MAXTYPES then
+  Error('Maximum number of types exceeded');
+
+with Types[NumTypes] do
+  begin
+  Kind := TypeKind;
+  Block := BlockStack[BlockStackTop].Index;
+  end;
+end; // DeclareType  
+
+
+
+
 procedure DeclarePredefinedIdents;
 begin
 // Constants
-DeclareIdent('TRUE',  CONSTANT, 0, BOOLEANTYPEINDEX, VALPASSING, 1, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('FALSE', CONSTANT, 0, BOOLEANTYPEINDEX, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
+DeclareIdent('TRUE',  CONSTANT, 0, BOOLEANTYPEINDEX, EMPTYPASSING, 1, 0.0, '', EMPTYPROC, '', 0);
+DeclareIdent('FALSE', CONSTANT, 0, BOOLEANTYPEINDEX, EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
 
 // Types
-DeclareIdent('INTEGER',  USERTYPE, 0, INTEGERTYPEINDEX,  VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('SMALLINT', USERTYPE, 0, SMALLINTTYPEINDEX, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('SHORTINT', USERTYPE, 0, SHORTINTTYPEINDEX, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('WORD',     USERTYPE, 0, WORDTYPEINDEX,     VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('BYTE',     USERTYPE, 0, BYTETYPEINDEX,     VALPASSING, 0, 0.0, EMPTYPROC, '', 0);  
-DeclareIdent('CHAR',     USERTYPE, 0, CHARTYPEINDEX,     VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('BOOLEAN',  USERTYPE, 0, BOOLEANTYPEINDEX,  VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('REAL',     USERTYPE, 0, REALTYPEINDEX,     VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
-DeclareIdent('POINTER',  USERTYPE, 0, POINTERTYPEINDEX,  VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
+DeclareIdent('INTEGER',  USERTYPE, 0, INTEGERTYPEINDEX,  EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
+DeclareIdent('SMALLINT', USERTYPE, 0, SMALLINTTYPEINDEX, EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
+DeclareIdent('SHORTINT', USERTYPE, 0, SHORTINTTYPEINDEX, EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
+DeclareIdent('WORD',     USERTYPE, 0, WORDTYPEINDEX,     EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
+DeclareIdent('BYTE',     USERTYPE, 0, BYTETYPEINDEX,     EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);  
+DeclareIdent('CHAR',     USERTYPE, 0, CHARTYPEINDEX,     EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
+DeclareIdent('BOOLEAN',  USERTYPE, 0, BOOLEANTYPEINDEX,  EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
+DeclareIdent('REAL',     USERTYPE, 0, REALTYPEINDEX,     EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
+DeclareIdent('POINTER',  USERTYPE, 0, POINTERTYPEINDEX,  EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
 
 // Procedures
-DeclareIdent('INC',      PROC, 0, 0, VALPASSING, 0, 0.0, INCPROC,      '', 0);
-DeclareIdent('DEC',      PROC, 0, 0, VALPASSING, 0, 0.0, DECPROC,      '', 0);
-DeclareIdent('READ',     PROC, 0, 0, VALPASSING, 0, 0.0, READPROC,     '', 0);
-DeclareIdent('WRITE',    PROC, 0, 0, VALPASSING, 0, 0.0, WRITEPROC,    '', 0);
-DeclareIdent('READLN',   PROC, 0, 0, VALPASSING, 0, 0.0, READLNPROC,   '', 0);
-DeclareIdent('WRITELN',  PROC, 0, 0, VALPASSING, 0, 0.0, WRITELNPROC,  '', 0);
-DeclareIdent('NEW',      PROC, 0, 0, VALPASSING, 0, 0.0, NEWPROC,      '', 0);
-DeclareIdent('DISPOSE',  PROC, 0, 0, VALPASSING, 0, 0.0, DISPOSEPROC,  '', 0);
-DeclareIdent('BREAK',    PROC, 0, 0, VALPASSING, 0, 0.0, BREAKPROC,    '', 0);
-DeclareIdent('CONTINUE', PROC, 0, 0, VALPASSING, 0, 0.0, CONTINUEPROC, '', 0);  
-DeclareIdent('EXIT',     PROC, 0, 0, VALPASSING, 0, 0.0, EXITPROC,     '', 0);
-DeclareIdent('HALT',     PROC, 0, 0, VALPASSING, 0, 0.0, HALTPROC,     '', 0);
+DeclareIdent('INC',      PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', INCPROC,      '', 0);
+DeclareIdent('DEC',      PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', DECPROC,      '', 0);
+DeclareIdent('READ',     PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', READPROC,     '', 0);
+DeclareIdent('WRITE',    PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', WRITEPROC,    '', 0);
+DeclareIdent('READLN',   PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', READLNPROC,   '', 0);
+DeclareIdent('WRITELN',  PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', WRITELNPROC,  '', 0);
+DeclareIdent('NEW',      PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', NEWPROC,      '', 0);
+DeclareIdent('DISPOSE',  PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', DISPOSEPROC,  '', 0);
+DeclareIdent('BREAK',    PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', BREAKPROC,    '', 0);
+DeclareIdent('CONTINUE', PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', CONTINUEPROC, '', 0);  
+DeclareIdent('EXIT',     PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', EXITPROC,     '', 0);
+DeclareIdent('HALT',     PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', HALTPROC,     '', 0);
 
 // Functions
-DeclareIdent('SIZEOF', FUNC, 0, 0, VALPASSING, 0, 0.0, SIZEOFFUNC, '', 0);
-DeclareIdent('ORD',    FUNC, 0, 0, VALPASSING, 0, 0.0, ORDFUNC,    '', 0);
-DeclareIdent('CHR',    FUNC, 0, 0, VALPASSING, 0, 0.0, CHRFUNC,    '', 0);
-DeclareIdent('PRED',   FUNC, 0, 0, VALPASSING, 0, 0.0, PREDFUNC,   '', 0);
-DeclareIdent('SUCC',   FUNC, 0, 0, VALPASSING, 0, 0.0, SUCCFUNC,   '', 0);
-DeclareIdent('ROUND',  FUNC, 0, 0, VALPASSING, 0, 0.0, ROUNDFUNC,  '', 0);
-DeclareIdent('TRUNC',  FUNC, 0, 0, VALPASSING, 0, 0.0, TRUNCFUNC,  '', 0);
-DeclareIdent('ABS',    FUNC, 0, 0, VALPASSING, 0, 0.0, ABSFUNC,    '', 0);
-DeclareIdent('SQR',    FUNC, 0, 0, VALPASSING, 0, 0.0, SQRFUNC,    '', 0);
-DeclareIdent('SIN',    FUNC, 0, 0, VALPASSING, 0, 0.0, SINFUNC,    '', 0);
-DeclareIdent('COS',    FUNC, 0, 0, VALPASSING, 0, 0.0, COSFUNC,    '', 0);
-DeclareIdent('ARCTAN', FUNC, 0, 0, VALPASSING, 0, 0.0, ARCTANFUNC, '', 0);
-DeclareIdent('EXP',    FUNC, 0, 0, VALPASSING, 0, 0.0, EXPFUNC,    '', 0);
-DeclareIdent('LN',     FUNC, 0, 0, VALPASSING, 0, 0.0, LNFUNC,     '', 0);
-DeclareIdent('SQRT',   FUNC, 0, 0, VALPASSING, 0, 0.0, SQRTFUNC,   '', 0);
+DeclareIdent('SIZEOF', FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', SIZEOFFUNC, '', 0);
+DeclareIdent('ORD',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', ORDFUNC,    '', 0);
+DeclareIdent('CHR',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', CHRFUNC,    '', 0);
+DeclareIdent('PRED',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', PREDFUNC,   '', 0);
+DeclareIdent('SUCC',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', SUCCFUNC,   '', 0);
+DeclareIdent('ROUND',  FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', ROUNDFUNC,  '', 0);
+DeclareIdent('TRUNC',  FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', TRUNCFUNC,  '', 0);
+DeclareIdent('ABS',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', ABSFUNC,    '', 0);
+DeclareIdent('SQR',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', SQRFUNC,    '', 0);
+DeclareIdent('SIN',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', SINFUNC,    '', 0);
+DeclareIdent('COS',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', COSFUNC,    '', 0);
+DeclareIdent('ARCTAN', FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', ARCTANFUNC, '', 0);
+DeclareIdent('EXP',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', EXPFUNC,    '', 0);
+DeclareIdent('LN',     FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', LNFUNC,     '', 0);
+DeclareIdent('SQRT',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', SQRTFUNC,   '', 0);
 end;// DeclarePredefinedIdents
 
 
@@ -246,15 +269,11 @@ Types[POINTERTYPEINDEX].BaseType := ANYTYPEINDEX;
 Types[FILETYPEINDEX].BaseType    := ANYTYPEINDEX;
 
 // Add new anonymous type: 1 .. MAXSTRLENGTH + 1
-Inc(NumTypes);
-if NumTypes > MAXTYPES then
-  Error('Maximum number of types exceeded');
+DeclareType(SUBRANGETYPE);
 
-Types[NumTypes].Kind     := SUBRANGETYPE;
 Types[NumTypes].BaseType := INTEGERTYPEINDEX;
 Types[NumTypes].Low      := 1;
 Types[NumTypes].High     := MAXSTRLENGTH + 1;
-Types[NumTypes].Block    := BlockStack[BlockStackTop].Index;
 
 Types[STRINGTYPEINDEX].BaseType    := CHARTYPEINDEX;
 Types[STRINGTYPEINDEX].IndexType   := NumTypes;
@@ -276,6 +295,131 @@ end; // AllocateTempStorage
 
 
 
+procedure ConvertConstIntegerToReal(DestType: Integer; var SrcType: Integer; var ConstVal: TConst);
+begin
+// Try to convert an integer (right-hand side) into a real
+if (Types[DestType].Kind = REALTYPE) and
+   ((Types[SrcType].Kind in IntegerTypes) or 
+   ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind in IntegerTypes)))
+then
+  begin
+  ConstVal.FracValue := ConstVal.Value;
+  SrcType := REALTYPEINDEX;
+  end;   
+end; // ConvertConstIntegerToReal
+
+
+
+
+procedure ConvertIntegerToReal(DestType: Integer; var SrcType: Integer; Depth: Integer);
+begin
+// Try to convert an integer (right-hand side) into a real
+if (Types[DestType].Kind = REALTYPE) and
+   ((Types[SrcType].Kind in IntegerTypes) or 
+   ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind in IntegerTypes)))
+then
+  begin
+  GenerateFloat(Depth);
+  SrcType := REALTYPEINDEX;
+  end;   
+end; // ConvertIntegerToReal
+
+
+
+
+procedure ConvertConstCharToString(DestType: Integer; var SrcType: Integer; var ConstVal: TConst);
+var
+  ch: TCharacter;
+begin
+if IsString(DestType) and 
+   ((Types[SrcType].Kind = CHARTYPE) or 
+   ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind = CHARTYPE))) 
+then
+  begin
+  ch := Char(ConstVal.Value);
+  ConstVal.StrValue := ch;
+  SrcType := STRINGTYPEINDEX;
+  end;   
+end; // ConvertConstCharToString
+
+
+
+
+procedure ConvertCharToString(DestType: Integer; var SrcType: Integer; Depth: Integer);
+var
+  TempStorageAddr: LongInt;
+begin
+// Try to convert a character (right-hand side) into a 2-character temporary string
+if IsString(DestType) and 
+   ((Types[SrcType].Kind = CHARTYPE) or 
+   ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind = CHARTYPE))) 
+then
+  begin
+  TempStorageAddr := AllocateTempStorage(2 * SizeOf(TCharacter));    
+  PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);  
+  GetCharAsTempString(Depth);    
+  SrcType := STRINGTYPEINDEX;
+  end;
+end; // ConvertCharToString
+
+
+
+
+procedure ConvertToInterface(DestType: Integer; var SrcType: Integer);
+var
+  SrcField, DestField: PField;
+  TempStorageAddr: LongInt;
+  FieldIndex, MethodIndex: Integer;
+begin
+// Try to convert a concrete or interface type to an interface type
+if (Types[DestType].Kind = INTERFACETYPE) and (DestType <> SrcType) then
+  begin
+  // Allocate new interface variable
+  TempStorageAddr := AllocateTempStorage(TypeSize(DestType));
+
+  // Set interface's Self pointer (offset 0) to the concrete/interface data
+  if Types[SrcType].Kind = INTERFACETYPE then
+    begin
+    DuplicateStackTop;
+    DerefPtr(POINTERTYPEINDEX);
+    GenerateInterfaceFieldAssignment(TempStorageAddr, TRUE, 0, UNINITDATARELOC);
+    DiscardStackTop(1);
+    end
+  else
+    GenerateInterfaceFieldAssignment(TempStorageAddr, TRUE, 0, UNINITDATARELOC);  
+
+  // Set interface's procedure pointers to the concrete/interface methods
+  for FieldIndex := 2 to Types[DestType].NumFields do
+    begin
+    DestField := Types[DestType].Field[FieldIndex];
+    
+    if Types[SrcType].Kind = INTERFACETYPE then       // Interface to interface 
+      begin
+      SrcField := Types[SrcType].Field[GetField(SrcType, DestField^.Name)];
+      CheckSignatures(Types[SrcField^.DataType].Signature, Types[DestField^.DataType].Signature, SrcField^.Name, FALSE);
+      DuplicateStackTop;
+      GetFieldPtr(SrcField^.Offset);
+      DerefPtr(POINTERTYPEINDEX);
+      GenerateInterfaceFieldAssignment(TempStorageAddr + (FieldIndex - 1) * SizeOf(Pointer), TRUE, 0, CODERELOC);
+      DiscardStackTop(1);
+      end
+    else                                              // Concrete to interface
+      begin  
+      MethodIndex := GetMethod(SrcType, DestField^.Name);
+      CheckSignatures(Ident[MethodIndex].Signature, Types[DestField^.DataType].Signature, Ident[MethodIndex].Name, FALSE);
+      GenerateInterfaceFieldAssignment(TempStorageAddr + (FieldIndex - 1) * SizeOf(Pointer), FALSE, Ident[MethodIndex].Value, CODERELOC);
+      end;
+    end; // for  
+  
+  DiscardStackTop(1);                                       // Remove source pointer
+  PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);   // Push destination pointer
+  SrcType := DestType;
+  end;
+end; // ConvertToInterface
+
+
+
+
 procedure CompileConstFactor(var ConstVal: TConst; var ConstValType: Integer);
 var
   IdentIndex: Integer;
@@ -285,16 +429,17 @@ case Tok.Kind of
     begin
     IdentIndex := GetIdent(Tok.Name);
     if Ident[IdentIndex].Kind <> CONSTANT then
-      Error('Constant expected but ' + Ident[IdentIndex].Name + ' found')
-    else
-      begin
-      ConstValType := Ident[IdentIndex].DataType;
-      if Types[ConstValType].Kind = REALTYPE then
-        ConstVal.FracValue := Ident[IdentIndex].FracValue
-      else
-        ConstVal.Value := Ident[IdentIndex].Value;
-      NextTok;
-      end;
+      Error('Constant expected but ' + Ident[IdentIndex].Name + ' found');
+
+    ConstValType := Ident[IdentIndex].DataType;
+    
+    case Types[ConstValType].Kind of
+      ARRAYTYPE: ConstVal.StrValue  := Ident[IdentIndex].StrValue; 
+      REALTYPE:  ConstVal.FracValue := Ident[IdentIndex].FracValue;
+      else       ConstVal.Value     := Ident[IdentIndex].Value;
+    end;
+  
+    NextTok;
     end;
 
 
@@ -320,9 +465,17 @@ case Tok.Kind of
     ConstValType := CHARTYPEINDEX;
     NextTok;
     end;
+    
+    
+  STRINGLITERALTOK:
+    begin
+    ConstVal.StrValue := Tok.Name;
+    ConstValType := STRINGTYPEINDEX;
+    NextTok;
+    end;    
 
 
-  OPARTOK:       // Expression in parentheses expected
+  OPARTOK:
     begin
     NextTok;
     CompileConstExpression(ConstVal, ConstValType);
@@ -334,7 +487,7 @@ case Tok.Kind of
     begin
     CompileConstFactor(ConstVal, ConstValType);
     ConstVal.Value := not ConstVal.Value;
-    end 
+    end; 
 
 else
   Error('Expression expected but ' + GetTokSpelling(Tok.Kind) + ' found');
@@ -361,24 +514,14 @@ while Tok.Kind in MultiplicativeOperators do
   CompileConstFactor(RightConstVal, RightConstValType);
 
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ConstValType, RightConstValType) then
-    begin
-    ConstVal.FracValue := ConstVal.Value;
-    ConstValType := REALTYPEINDEX;
-    end;
-  if ConversionToRealIsPossible(RightConstValType, ConstValType) then
-    begin
-    RightConstVal.FracValue := RightConstVal.Value;
-    RightConstValType := REALTYPEINDEX;
-    end;
-
+  ConvertConstIntegerToReal(RightConstValType, ConstValType, ConstVal);
+  ConvertConstIntegerToReal(ConstValType, RightConstValType, RightConstVal);
+  
   // Special case: real division of two integers
-  if (OpTok.Kind = DIVTOK) and ConversionToRealIsPossible(ConstValType, REALTYPEINDEX) and ConversionToRealIsPossible(RightConstValType, REALTYPEINDEX) then
+  if OpTok.Kind = DIVTOK then
     begin
-    ConstVal.FracValue := ConstVal.Value;
-    RightConstVal.FracValue := RightConstVal.Value;
-    ConstValType := REALTYPEINDEX;
-    RightConstValType := REALTYPEINDEX;
+    ConvertConstIntegerToReal(REALTYPEINDEX, ConstValType, ConstVal);
+    ConvertConstIntegerToReal(REALTYPEINDEX, RightConstValType, RightConstVal);
     end;
 
   ConstValType := GetCompatibleType(ConstValType, RightConstValType);
@@ -443,31 +586,37 @@ while Tok.Kind in AdditiveOperators do
   CompileConstTerm(RightConstVal, RightConstValType);
 
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ConstValType, RightConstValType) then
-    begin
-    ConstVal.FracValue := ConstVal.Value;
-    ConstValType := REALTYPEINDEX;
-    end;
-  if ConversionToRealIsPossible(RightConstValType, ConstValType) then
-    begin
-    RightConstVal.FracValue := RightConstVal.Value;
-    RightConstValType := REALTYPEINDEX;
-    end;  
-
-  ConstValType := GetCompatibleType(ConstValType, RightConstValType);
-  CheckOperator(OpTok, ConstValType);
-
-  if Types[ConstValType].Kind = REALTYPE then       // Real constants
-    case OpTok.Kind of
-      PLUSTOK:  ConstVal.FracValue := ConstVal.FracValue  +  RightConstVal.FracValue;
-      MINUSTOK: ConstVal.FracValue := ConstVal.FracValue  -  RightConstVal.FracValue;
+  ConvertConstIntegerToReal(RightConstValType, ConstValType, ConstVal);
+  ConvertConstIntegerToReal(ConstValType, RightConstValType, RightConstVal);
+  
+  // Try to convert character to string
+  ConvertConstCharToString(RightConstValType, ConstValType, ConstVal);
+  ConvertConstCharToString(ConstValType, RightConstValType, RightConstVal); 
+      
+  // Special case: string concatenation
+  if IsString(ConstValType) and IsString(RightConstValType) and (OpTok.Kind = PLUSTOK) then
+    begin 
+    ConstVal.StrValue := ConstVal.StrValue + RightConstVal.StrValue;
+    ConstValType := STRINGTYPEINDEX;
     end
-  else                                                  // Integer constants
-    case OpTok.Kind of
-      PLUSTOK:  ConstVal.Value := ConstVal.Value  +  RightConstVal.Value;
-      MINUSTOK: ConstVal.Value := ConstVal.Value  -  RightConstVal.Value;
-      ORTOK:    ConstVal.Value := ConstVal.Value  or RightConstVal.Value;
-      XORTOK:   ConstVal.Value := ConstVal.Value xor RightConstVal.Value;
+  // General rule
+  else
+    begin  
+    ConstValType := GetCompatibleType(ConstValType, RightConstValType);
+    CheckOperator(OpTok, ConstValType);
+
+    if Types[ConstValType].Kind = REALTYPE then       // Real constants
+      case OpTok.Kind of
+        PLUSTOK:  ConstVal.FracValue := ConstVal.FracValue  +  RightConstVal.FracValue;
+        MINUSTOK: ConstVal.FracValue := ConstVal.FracValue  -  RightConstVal.FracValue;
+      end
+    else                                                  // Integer constants
+      case OpTok.Kind of
+        PLUSTOK:  ConstVal.Value := ConstVal.Value  +  RightConstVal.Value;
+        MINUSTOK: ConstVal.Value := ConstVal.Value  -  RightConstVal.Value;
+        ORTOK:    ConstVal.Value := ConstVal.Value  or RightConstVal.Value;
+        XORTOK:   ConstVal.Value := ConstVal.Value xor RightConstVal.Value;
+      end;
     end;
 
   end;// while
@@ -476,7 +625,7 @@ end;// CompileSimpleConstExpression
 
 
 
-procedure CompileConstExpression{(var ConstVal: TConst; var ConstValType: Integer)};
+procedure CompileConstExpression(var ConstVal: TConst; var ConstValType: Integer);
 var
   OpTok: TToken;
   RightConstVal: TConst;
@@ -494,43 +643,57 @@ if Tok.Kind in RelationOperators then
   CompileSimpleConstExpression(RightConstVal, RightConstValType);
 
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ConstValType, RightConstValType) then
-    begin
-    ConstVal.FracValue := ConstVal.Value;
-    ConstValType := REALTYPEINDEX;
-    end;
-  if ConversionToRealIsPossible(RightConstValType, ConstValType) then
-    begin
-    RightConstVal.FracValue := RightConstVal.Value;
-    RightConstValType := REALTYPEINDEX;
-    end;
-
-  GetCompatibleType(ConstValType, RightConstValType);
-  CheckOperator(OpTok, ConstValType);
-
-  if Types[ConstValType].Kind = REALTYPE then
-    case OpTok.Kind of
-      EQTOK: Yes := ConstVal.FracValue =  RightConstVal.FracValue;
-      NETOK: Yes := ConstVal.FracValue <> RightConstVal.FracValue;
-      LTTOK: Yes := ConstVal.FracValue <  RightConstVal.FracValue;
-      LETOK: Yes := ConstVal.FracValue <= RightConstVal.FracValue;
-      GTTOK: Yes := ConstVal.FracValue >  RightConstVal.FracValue;
-      GETOK: Yes := ConstVal.FracValue >= RightConstVal.FracValue;
-    end
-  else
-    case OpTok.Kind of
-      EQTOK: Yes := ConstVal.Value =  RightConstVal.Value;
-      NETOK: Yes := ConstVal.Value <> RightConstVal.Value;
-      LTTOK: Yes := ConstVal.Value <  RightConstVal.Value;
-      LETOK: Yes := ConstVal.Value <= RightConstVal.Value;
-      GTTOK: Yes := ConstVal.Value >  RightConstVal.Value;
-      GETOK: Yes := ConstVal.Value >= RightConstVal.Value;
-    end;
-
-  if Yes then ConstVal.Value := 1 else ConstVal.Value := 0;
+  ConvertConstIntegerToReal(RightConstValType, ConstValType, ConstVal);
+  ConvertConstIntegerToReal(ConstValType, RightConstValType, RightConstVal);
   
-  ConstValType := BOOLEANTYPEINDEX;
-  end;
+  // Try to convert character to string
+  ConvertConstCharToString(RightConstValType, ConstValType, ConstVal);
+  ConvertConstCharToString(ConstValType, RightConstValType, RightConstVal);     
+    
+  // Special case: string comparison
+  if IsString(ConstValType) and IsString(RightConstValType) then
+    begin
+    case OpTok.Kind of 
+      EQTOK: Yes := ConstVal.StrValue =  RightConstVal.StrValue;
+      NETOK: Yes := ConstVal.StrValue <> RightConstVal.StrValue;
+      LTTOK: Yes := ConstVal.StrValue <  RightConstVal.StrValue;
+      LETOK: Yes := ConstVal.StrValue <= RightConstVal.StrValue;
+      GTTOK: Yes := ConstVal.StrValue >  RightConstVal.StrValue;
+      GETOK: Yes := ConstVal.StrValue >= RightConstVal.StrValue;    
+    end;
+    
+    if Yes then ConstVal.Value := 1 else ConstVal.Value := 0;    
+    ConstValType := BOOLEANTYPEINDEX;    
+    end
+  // General rule  
+  else
+    begin
+    GetCompatibleType(ConstValType, RightConstValType);
+    CheckOperator(OpTok, ConstValType);
+
+    if Types[ConstValType].Kind = REALTYPE then
+      case OpTok.Kind of
+        EQTOK: Yes := ConstVal.FracValue =  RightConstVal.FracValue;
+        NETOK: Yes := ConstVal.FracValue <> RightConstVal.FracValue;
+        LTTOK: Yes := ConstVal.FracValue <  RightConstVal.FracValue;
+        LETOK: Yes := ConstVal.FracValue <= RightConstVal.FracValue;
+        GTTOK: Yes := ConstVal.FracValue >  RightConstVal.FracValue;
+        GETOK: Yes := ConstVal.FracValue >= RightConstVal.FracValue;
+      end
+    else
+      case OpTok.Kind of
+        EQTOK: Yes := ConstVal.Value =  RightConstVal.Value;
+        NETOK: Yes := ConstVal.Value <> RightConstVal.Value;
+        LTTOK: Yes := ConstVal.Value <  RightConstVal.Value;
+        LETOK: Yes := ConstVal.Value <= RightConstVal.Value;
+        GTTOK: Yes := ConstVal.Value >  RightConstVal.Value;
+        GETOK: Yes := ConstVal.Value >= RightConstVal.Value;
+      end;
+
+    if Yes then ConstVal.Value := 1 else ConstVal.Value := 0;    
+    ConstValType := BOOLEANTYPEINDEX;
+    end;
+  end;  
 
 end;// CompileConstExpression
 
@@ -546,34 +709,34 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
   
   with Types[DataType] do
     if (Kind = INTEGERTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = INTEGERTYPE)) then
-          Result := GetIdent('READINT')                 // Integer argument
+      Result := GetIdent('READINT')                 // Integer argument
           
     else if (Kind = SMALLINTTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = SMALLINTTYPE)) then
-          Result := GetIdent('READSMALLINT')            // Small integer argument
+      Result := GetIdent('READSMALLINT')            // Small integer argument
           
     else if (Kind = SHORTINTTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = SHORTINTTYPE)) then
-          Result := GetIdent('READSHORTINT')            // Short integer argument
+      Result := GetIdent('READSHORTINT')            // Short integer argument
           
     else if (Kind = WORDTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = WORDTYPE)) then
-          Result := GetIdent('READWORD')                // Word argument
+      Result := GetIdent('READWORD')                // Word argument
 
     else if (Kind = BYTETYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = BYTETYPE)) then
-          Result := GetIdent('READBYTE')                // Byte argument
+      Result := GetIdent('READBYTE')                // Byte argument
          
     else if (Kind = BOOLEANTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = BOOLEANTYPE)) then
-          Result := GetIdent('READBOOLEAN')             // Boolean argument
+      Result := GetIdent('READBOOLEAN')             // Boolean argument
     
     else if (Kind = CHARTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = CHARTYPE)) then
-          Result := GetIdent('READCH')                  // Character argument
+      Result := GetIdent('READCH')                  // Character argument
           
     else if Kind = REALTYPE then
-          Result := GetIdent('READREAL')                // Real argument
+      Result := GetIdent('READREAL')                // Real argument
           
     else if (Kind = ARRAYTYPE) and (BaseType = CHARTYPEINDEX) then
-          Result := GetIdent('READSTRING')              // String argument
+      Result := GetIdent('READSTRING')              // String argument
           
     else
-      Error('Incompatible types');
+      Error('Cannot read ' + GetTypeSpelling(DataType));
  
   end; // GetReadProcIdent
   
@@ -585,22 +748,22 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
   
   with Types[DataType] do
     if (Kind in IntegerTypes) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind in IntegerTypes)) then
-          Result := GetIdent('WRITEINTF')                 // Integer argument
+      Result := GetIdent('WRITEINTF')                 // Integer argument
           
     else if (Kind = BOOLEANTYPE) or ((Kind = SUBRANGETYPE) and (Types[BaseType].Kind = BOOLEANTYPE)) then
-          Result := GetIdent('WRITEBOOLEANF')             // Boolean argument
+      Result := GetIdent('WRITEBOOLEANF')             // Boolean argument
           
     else if Kind = REALTYPE then
-          Result := GetIdent('WRITEREALF')                // Real argument
+      Result := GetIdent('WRITEREALF')                // Real argument
           
     else if Kind = POINTERTYPE then
-          Result := GetIdent('WRITEPOINTERF')             // Pointer argument
+      Result := GetIdent('WRITEPOINTERF')             // Pointer argument
           
     else if (Kind = ARRAYTYPE) and (BaseType = CHARTYPEINDEX) then
-          Result := GetIdent('WRITESTRINGF')              // String argument
+      Result := GetIdent('WRITESTRINGF')              // String argument
           
     else
-      Error('Incompatible types');
+      Error('Cannot write ' + GetTypeSpelling(DataType));
   
   end; // GetWriteProcIdentIndex
   
@@ -620,7 +783,7 @@ case proc of
     begin
     EatTok(OPARTOK);
     AssertIdent;
-    CompileDesignator(DesignatorType, FALSE);
+    CompileDesignator(DesignatorType);
     GetCompatibleType(DesignatorType, INTEGERTYPEINDEX);
     GenerateIncDec(proc, TypeSize(DesignatorType));
     EatTok(CPARTOK);
@@ -650,12 +813,12 @@ case proc of
         PushConst(0);
         
         // 3rd argument - designator
-        CompileDesignator(DesignatorType, FALSE);
+        CompileDesignator(DesignatorType);
 
         if Types[DesignatorType].Kind = FILETYPE then               // File handle
           begin
           if not IsFirstParam or ((proc = READLNPROC) and (Types[DesignatorType].BaseType <> ANYTYPEINDEX)) then
-            Error('Incompatible types');            
+            Error('Cannot read ' + GetTypeSpelling(DesignatorType));            
           FileVarType := DesignatorType;          
           end
         else                                                        // Any input variable
@@ -737,14 +900,19 @@ case proc of
         
         // 3rd argument - expression (for untyped/text files) or designator (for typed files)
         if (Types[FileVarType].Kind = FILETYPE) and (Types[FileVarType].BaseType <> ANYTYPEINDEX) then
-          CompileDesignator(ExpressionType, FALSE)
+          CompileDesignator(ExpressionType)
         else
-          CompileExpression(ExpressionType, TRUE);
+          begin
+          CompileExpression(ExpressionType);
+          
+          // Try to convert character to string
+          ConvertCharToString(STRINGTYPEINDEX, ExpressionType, 0);
+          end;
         
         if Types[ExpressionType].Kind = FILETYPE then           // File handle
           begin
           if not IsFirstParam or ((proc = WRITELNPROC) and (Types[ExpressionType].BaseType <> ANYTYPEINDEX)) then
-            Error('Incompatible types');
+            Error('Cannot write ' + GetTypeSpelling(ExpressionType));
           FileVarType := ExpressionType;
           end
         else                                                    // Any output expression
@@ -756,14 +924,14 @@ case proc of
               Error('Format specifiers are not allowed for typed files');
               
             NextTok;
-            CompileExpression(FormatterType, FALSE);
+            CompileExpression(FormatterType);
             GetCompatibleType(FormatterType, INTEGERTYPEINDEX);
             
             // 5th argument - number of decimal places
             if (Tok.Kind = COLONTOK) and (Types[ExpressionType].Kind = REALTYPE) then
               begin
               NextTok;
-              CompileExpression(FormatterType, FALSE);
+              CompileExpression(FormatterType);
               GetCompatibleType(FormatterType, INTEGERTYPEINDEX);
               end
             else
@@ -837,7 +1005,7 @@ case proc of
     begin
     EatTok(OPARTOK);
     AssertIdent;
-    CompileDesignator(DesignatorType, FALSE);
+    CompileDesignator(DesignatorType);
     GetCompatibleType(DesignatorType, POINTERTYPEINDEX);
     
     if proc = NEWPROC then
@@ -878,7 +1046,7 @@ case proc of
     if Tok.Kind = OPARTOK then
       begin
       NextTok;
-      CompileExpression(ExpressionType, FALSE);
+      CompileExpression(ExpressionType);
       GetCompatibleType(ExpressionType, INTEGERTYPEINDEX);
       EatTok(CPARTOK);
       end
@@ -910,9 +1078,9 @@ case func of
   SIZEOFFUNC:
     begin
     AssertIdent;
-    if FieldInsideWithFound(Tok.Name) then                // Record field inside a WITH block
+    if FieldOrMethodInsideWithFound(Tok.Name) then        // Record field inside a WITH block
       begin
-      CompileDesignator(ValType, FALSE);
+      CompileDesignator(ValType);
       DiscardStackTop(1);
       PushConst(TypeSize(ValType));      
       end
@@ -926,7 +1094,7 @@ case func of
         end
       else
         begin
-        CompileDesignator(ValType, FALSE);
+        CompileDesignator(ValType);
         DiscardStackTop(1);
         PushConst(TypeSize(ValType));
         end;
@@ -937,15 +1105,11 @@ case func of
 
   ROUNDFUNC, TRUNCFUNC:
     begin
-    CompileExpression(ValType, FALSE);
+    CompileExpression(ValType);
 
     // Try to convert integer to real
-    if ConversionToRealIsPossible(ValType, REALTYPEINDEX) then
-      begin
-      GenerateFloat(0);
-      ValType := REALTYPEINDEX;
-      end;
-
+    ConvertIntegerToReal(REALTYPEINDEX, ValType, 0);
+    
     GetCompatibleType(ValType, REALTYPEINDEX);
     GenerateRound(func = TRUNCFUNC);
     ValType := INTEGERTYPEINDEX;
@@ -954,7 +1118,7 @@ case func of
 
   ORDFUNC:
     begin
-    CompileExpression(ValType, FALSE);
+    CompileExpression(ValType);
     if not (Types[ValType].Kind in OrdinalTypes) then
       Error('Ordinal type expected');
     ValType := INTEGERTYPEINDEX;
@@ -963,7 +1127,7 @@ case func of
 
   CHRFUNC:
     begin
-    CompileExpression(ValType, FALSE);
+    CompileExpression(ValType);
     GetCompatibleType(ValType, INTEGERTYPEINDEX);
     ValType := CHARTYPEINDEX;
     end;
@@ -971,7 +1135,7 @@ case func of
 
   PREDFUNC, SUCCFUNC:
     begin
-    CompileExpression(ValType, FALSE);
+    CompileExpression(ValType);
     if not (Types[ValType].Kind in OrdinalTypes) then
       Error('Ordinal type expected');
     if func = SUCCFUNC then
@@ -984,7 +1148,7 @@ case func of
 
   ABSFUNC, SQRFUNC, SINFUNC, COSFUNC, ARCTANFUNC, EXPFUNC, LNFUNC, SQRTFUNC:
     begin
-    CompileExpression(ValType, FALSE);
+    CompileExpression(ValType);
     if (func = ABSFUNC) or (func = SQRFUNC) then                          // Abs and Sqr accept real or integer parameters
       begin
       if not ((Types[ValType].Kind in NumericTypes) or
@@ -993,14 +1157,8 @@ case func of
       end
     else
       begin
-      
       // Try to convert integer to real
-      if ConversionToRealIsPossible(ValType, REALTYPEINDEX) then
-        begin
-        GenerateFloat(0);
-        ValType := REALTYPEINDEX;
-        end;
-
+      ConvertIntegerToReal(REALTYPEINDEX, ValType, 0);
       GetCompatibleType(ValType, REALTYPEINDEX);
       end;
 
@@ -1011,33 +1169,6 @@ end;// case
 
 EatTok(CPARTOK);
 end;// CompilePredefinedFunc
-
-
-
-
-procedure CompileConcreteTypeToInterfaceTypeConversion(ConcreteType, InterfType: Integer);
-var
-  Field: PField;
-  TempStorageAddr: LongInt;
-  FieldIndex, MethodIndex: Integer;
-begin
-// Allocate new interface variable
-TempStorageAddr := AllocateTempStorage(TypeSize(InterfType));
-
-// Set interface's Self pointer (offset 0) to the concrete data
-GenerateInterfaceFieldAssignment(TempStorageAddr, TRUE, 0, UNINITDATARELOC);
-
-// Set interface's procedure pointers to the concrete methods
-for FieldIndex := 2 to Types[InterfType].NumFields do
-  begin
-  Field := Types[InterfType].Field[FieldIndex];
-  MethodIndex := GetMethod(ConcreteType, Field^.Name);
-  CheckSignatures(Ident[MethodIndex].Signature, Types[Field^.DataType].Signature, Ident[MethodIndex].Name);
-  GenerateInterfaceFieldAssignment(TempStorageAddr + (FieldIndex - 1) * SizeOf(Pointer), FALSE, Ident[MethodIndex].Value, CODERELOC);
-  end; // for  
-
-PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
-end; // CompileConcreteTypeToInterfaceTypeConversion
 
 
 
@@ -1063,13 +1194,8 @@ else
   if AllowForwardReference and ((IdentIndex = 0) or (Ident[IdentIndex].Block <> BlockStack[BlockStackTop].Index)) then
     begin
     // Add new forward-referenced type
-    Inc(NumTypes);
-    if NumTypes > MAXTYPES then
-      Error('Maximum number of types exceeded');    
-    
-    Types[NumTypes].Kind := FORWARDTYPE;
+    DeclareType(FORWARDTYPE);
     Types[NumTypes].TypeIdentName := Tok.Name;
-    Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
     DataType := NumTypes;
     end
   else
@@ -1154,23 +1280,15 @@ if Tok.Kind = OPARTOK then
       if IsOpenArrayList then
         begin
         // Add new anonymous type 0..0 for array index
-        Inc(NumTypes);
-        if NumTypes > MAXTYPES then
-          Error('Maximum number of types exceeded');
+        DeclareType(SUBRANGETYPE);
         
-        Types[NumTypes].Kind        := SUBRANGETYPE;
-        Types[NumTypes].Block       := BlockStack[BlockStackTop].Index;
         Types[NumTypes].BaseType    := INTEGERTYPEINDEX;
         Types[NumTypes].Low         := 0;
         Types[NumTypes].High        := 0;
         
         // Add new anonymous type for array itself
-        Inc(NumTypes);
-        if NumTypes > MAXTYPES then
-          Error('Maximum number of types exceeded');
+        DeclareType(ARRAYTYPE);
         
-        Types[NumTypes].Kind        := ARRAYTYPE;
-        Types[NumTypes].Block       := BlockStack[BlockStackTop].Index;
         Types[NumTypes].BaseType    := ParamType;
         Types[NumTypes].IndexType   := NumTypes - 1;
         Types[NumTypes].IsOpenArray := TRUE;
@@ -1182,11 +1300,8 @@ if Tok.Kind = OPARTOK then
       ParamType := ANYTYPEINDEX;
 
     
-    if (ListPassMethod = VALPASSING) and (Types[ParamType].Kind in StructuredTypes) then
-      Error('Structured parameters cannot be passed by value');
-      
-    if (ListPassMethod = VALPASSING) and (ParamType = ANYTYPEINDEX) then
-      Error('Untyped parameters cannot be passed by value');
+    if (ListPassMethod <> VARPASSING) and (ParamType = ANYTYPEINDEX) then
+      Error('Untyped parameters require VAR');
       
 
     // Default parameter value
@@ -1272,12 +1387,43 @@ end; // CompileFormalParametersAndResult
 
 
 procedure CompileActualParameters(var Signature: TSignature);
+
+
+  procedure CompileExpressionCopy(var ValType: Integer);
+  var
+    TempStorageAddr: Integer;
+    LibProcIdentIndex: Integer;
+    
+  begin
+  CompileExpression(ValType);
+  
+  // Copy structured parameter passed by value
+  if Types[ValType].Kind in StructuredTypes then
+    begin
+    SaveStackTopToEAX; 
+    TempStorageAddr := AllocateTempStorage(TypeSize(ValType));
+    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    RestoreStackTopFromEAX;
+    
+    if IsString(ValType) then
+      begin 
+      LibProcIdentIndex := GetIdent('ASSIGNSTR');    
+      GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);    
+      end
+    else
+      GenerateStructuredAssignment(ValType);
+
+    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    end;
+    
+  end; // CompileExpressionCopy
+    
+
 var
   NumActualParams: Integer;
   ActualParamType: Integer;
   DefaultParamIndex: Integer;
   TempStorageAddr: Integer;
-  IsRefParam: Boolean;
   CurParam: PParam;
   
 begin
@@ -1295,41 +1441,33 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
 
       CurParam := Signature.Param[NumActualParams + 1];
 
-      // Evaluate actual parameters and push them onto the stack
-      if Types[CurParam^.DataType].Kind in StructuredTypes + [ANYTYPE] then
-        IsRefParam := (CurParam^.PassMethod = CONSTPASSING) or
-                      (CurParam^.PassMethod = VARPASSING)                   // For structured parameters, CONST is equivalent to VAR
+      case CurParam^.PassMethod of
+        VALPASSING:   CompileExpressionCopy(ActualParamType);
+        CONSTPASSING: CompileExpression(ActualParamType);
+        VARPASSING:   CompileDesignator(ActualParamType);
       else
-        IsRefParam := CurParam^.PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
-
-      if IsRefParam and (CurParam^.DataType <> STRINGTYPEINDEX) then
-        CompileDesignator(ActualParamType, FALSE)
-      else
-        CompileExpression(ActualParamType, CurParam^.DataType = STRINGTYPEINDEX);
+        Error('Internal fault: Illegal parameter passing method');        
+      end;
 
       Inc(NumActualParams);
 
       // Try to convert integer to real
-      if ConversionToRealIsPossible(ActualParamType, CurParam^.DataType) and not IsRefParam then
-        begin
-        GenerateFloat(0);
-        ActualParamType := REALTYPEINDEX;
-        end;
+      if CurParam^.PassMethod <> VARPASSING then
+        ConvertIntegerToReal(CurParam^.DataType, ActualParamType, 0);
+       
+      // Try to convert character to string
+      ConvertCharToString(CurParam^.DataType, ActualParamType, 0);      
         
       // Try to convert a concrete type to an interface type
-      if (Types[CurParam^.DataType].Kind = INTERFACETYPE) and (CurParam^.DataType <> ActualParamType) then
-        begin
-        CompileConcreteTypeToInterfaceTypeConversion(ActualParamType, CurParam^.DataType);
-        ActualParamType := CurParam^.DataType;
-        end;   
+      ConvertToInterface(CurParam^.DataType, ActualParamType);
       
-      if IsRefParam then  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
-        GetCompatibleRefType(CurParam^.DataType, ActualParamType)
-      else                // Relaxed type checking for parameters passed by value      
-        GetCompatibleType(CurParam^.DataType, ActualParamType);
-        
-    if Tok.Kind <> COMMATOK then Break;
-    NextTok;
+      if CurParam^.PassMethod = VARPASSING then  
+        GetCompatibleRefType(CurParam^.DataType, ActualParamType)  // Strict type checking for parameters passed by reference, except for open array parameters and untyped parameters
+      else      
+        GetCompatibleType(CurParam^.DataType, ActualParamType);    // Relaxed type checking for parameters passed by value
+         
+      if Tok.Kind <> COMMATOK then Break;
+      NextTok;
     until FALSE;
 
   EatTok(CPARTOK);
@@ -1373,17 +1511,11 @@ end; // CompileCall
 
 
 
-procedure CompileMethodCall(ProcVarType: Integer; FunctionOnly: Boolean);
+procedure CompileMethodCall(ProcVarType: Integer);
 var
   MethodIndex: Integer;
 begin
-if Types[ProcVarType].Kind <> METHODTYPE then 
-  Error('Method expected');
-  
 MethodIndex := Types[ProcVarType].MethodIdentIndex;  
-
-if FunctionOnly and (Ident[MethodIndex].Signature.ResultType = 0) then
-  Error('Function method expected');
  
 // Self pointer has already been passed as the first (hidden) argument
 CompileActualParameters(Ident[MethodIndex].Signature);
@@ -1394,16 +1526,10 @@ end; // CompileMethodCall
 
 
 
-procedure CompileIndirectCall(ProcVarType: Integer; FunctionOnly: Boolean);
+procedure CompileIndirectCall(ProcVarType: Integer);
 var
   TotalNumParams: Integer;
 begin
-if Types[ProcVarType].Kind <> PROCEDURALTYPE then 
-  Error('Procedural variable expected');
-
-if FunctionOnly and (Types[ProcVarType].Signature.ResultType = 0) then
-  Error('Functional variable expected');
-
 TotalNumParams := Types[ProcVarType].Signature.NumParams;
 
 if Types[ProcVarType].SelfPointerOffset <> 0 then   // Interface method found
@@ -1432,14 +1558,48 @@ end; // CompileIndirectCall
 
 
 
-procedure CompileFieldInsideWith(var ValType: Integer);
+function CompileMethodOrProceduralVariableCall(var ValType: Integer; FunctionOnly, DesignatorOnly: Boolean): Boolean;
 var
-  FieldIndex: Integer;
+  ResultType: Integer;
+  
+begin
+if Types[ValType].Kind = METHODTYPE then
+  ResultType := Ident[Types[ValType].MethodIdentIndex].Signature.ResultType
+else if Types[ValType].Kind = PROCEDURALTYPE then
+  ResultType := Types[ValType].Signature.ResultType
+else
+  begin
+  ResultType := 0;
+  Error('Procedure or function expected'); 
+  end; 
+
+Result := FALSE; 
+   
+if not DesignatorOnly or ((ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes)) then 
+  begin
+  if FunctionOnly and (ResultType = 0) then
+    Error('Function expected');
+  
+  if Types[ValType].Kind = METHODTYPE then  
+    CompileMethodCall(ValType)
+  else
+    CompileIndirectCall(ValType);
+  
+  ValType := ResultType;
+  Result := TRUE; 
+  end; 
+end; // CompileMethodOrProceduralVariableCall
+
+
+
+
+procedure CompileFieldOrMethodInsideWith(var ValType: Integer);
+var
+  FieldIndex, MethodIndex: Integer;
   RecType: Integer;
   TempStorageAddr: Integer;
+  
 begin 
-ValType := 0;
-
 FieldIndex := GetFieldInsideWith(TempStorageAddr, RecType, Tok.Name);
   
 if FieldIndex <> 0 then
@@ -1449,37 +1609,122 @@ if FieldIndex <> 0 then
   
   GetFieldPtr(Types[RecType].Field[FieldIndex]^.Offset);
   ValType := Types[RecType].Field[FieldIndex]^.DataType;    
+  
+  Exit;
   end;
-end; // CompileFieldInsideWith
-
-
-
-
-procedure ConvertCharToString(var ValType: Integer; IsDesignator: Boolean);
-var
-  TempStorageAddr: LongInt;
-begin
-// Any character is converted into a 2-character temporary string
-if (Types[ValType].Kind = CHARTYPE) or ((Types[ValType].Kind = SUBRANGETYPE) and (Types[Types[ValType].BaseType].Kind = CHARTYPE)) then
+  
+MethodIndex := GetMethodInsideWith(TempStorageAddr, RecType, Tok.Name);
+  
+if MethodIndex <> 0 then
   begin
-  if IsDesignator then
-    DerefPtr(ValType);
-  
-  TempStorageAddr := AllocateTempStorage(2 * SizeOf(Char));    
   PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+  DerefPtr(POINTERTYPEINDEX);
   
-  GetCharAsTempString;    
-  ValType := STRINGTYPEINDEX;
-  end;
-end; // ConvertCharToString
+  // Add new anonymous 'method' type
+  DeclareType(METHODTYPE);
+  Types[NumTypes].MethodIdentIndex := MethodIndex; 
+  ValType := NumTypes;
+
+  Exit;   
+  end;  
+
+ValType := 0;  
+end; // CompileFieldOrMethodInsideWith
 
 
 
 
-procedure CompileSelectors(var ValType: Integer; ForceCharToString: Boolean);
+procedure CompileSetConstructor(var ValType: Integer);
+var
+  ElementType: Integer;
+  LibProcIdentIndex: Integer;
+  TempStorageAddr: Integer;
+  
+begin
+// Add new anonymous type
+DeclareType(SETTYPE);
+Types[NumTypes].BaseType := ANYTYPEINDEX;
+ValType := NumTypes;
+
+// Allocate temporary storage
+TempStorageAddr := AllocateTempStorage(TypeSize(ValType));
+PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+
+// Initialize set
+LibProcIdentIndex := GetIdent('INITSET');
+GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel); 
+
+// Compile constructor
+LibProcIdentIndex := GetIdent('ADDTOSET');
+NextTok;
+
+if Tok.Kind <> CBRACKETTOK then
+  repeat
+    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    
+    CompileExpression(ElementType);
+    
+    if Types[ValType].BaseType = ANYTYPEINDEX then
+      begin
+      if not (Types[ElementType].Kind in OrdinalTypes) then
+        Error('Ordinal type expected');        
+      Types[ValType].BaseType := ElementType;
+      end  
+    else  
+      GetCompatibleType(ElementType, Types[ValType].BaseType);
+
+    if Tok.Kind = RANGETOK then
+      begin
+      NextTok;
+      CompileExpression(ElementType);    
+      GetCompatibleType(ElementType, Types[ValType].BaseType);
+      end
+    else
+      PushConst(-1);
+      
+    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);        
+      
+    if Tok.Kind <> COMMATOK then Break;
+    NextTok;
+  until FALSE;
+  
+EatTok(CBRACKETTOK);
+
+PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+end; // CompileSetConstructor
+
+
+
+
+function DereferencePointerAsDesignator(var ValType: Integer; MustDereferenceAnyPointer: Boolean): Boolean;
+begin
+// If a pointer-type result is immediately followed by dereferencing, treat it as a designator that has the pointer's base type
+Result := FALSE;
+
+if Types[ValType].Kind = POINTERTYPE then                      
+  if Types[ValType].BaseType <> ANYTYPEINDEX then
+    begin
+    if Tok.Kind = DEREFERENCETOK then
+      begin
+      ValType := Types[ValType].BaseType;
+      Result := TRUE;
+      NextTok;
+      end
+    else if MustDereferenceAnyPointer then 
+      CheckTok(DEREFERENCETOK)
+    end    
+  else if MustDereferenceAnyPointer then
+    Error('Typed pointer expected');
+      
+end; // DereferencePointerAsDesignator
+
+
+
+
+procedure CompileSelectors(var ValType: Integer);
 var
   FieldIndex, MethodIndex: Integer;
-  ArrayIndexType, ResultType: Integer;
+  ArrayIndexType: Integer;
   Field: PField;   
 
 begin
@@ -1507,7 +1752,7 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
         if Types[ValType].Kind <> ARRAYTYPE then
           Error('Array expected');
         NextTok;
-        CompileExpression(ArrayIndexType, FALSE);     // Array index
+        CompileExpression(ArrayIndexType);            // Array index
         GetCompatibleType(ArrayIndexType, Types[ValType].IndexType);
         GetArrayElementPtr(ValType);
         ValType := Types[ValType].BaseType;
@@ -1526,16 +1771,9 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
       if MethodIndex <> 0 then
         begin
         // Add new anonymous 'method' type
-        Inc(NumTypes);
-        if NumTypes > MAXTYPES then
-          Error('Maximum number of types exceeded');    
-        
-        Types[NumTypes].Kind := METHODTYPE;
-        Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
-        Types[NumTypes].MethodIdentIndex := MethodIndex;
-       
+        DeclareType(METHODTYPE);
+        Types[NumTypes].MethodIdentIndex := MethodIndex;       
         ValType := NumTypes;
-        NextTok;
         end  
       // If unsuccessful, search for a record field  
       else
@@ -1546,51 +1784,21 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
         FieldIndex := GetField(ValType, Tok.Name);
         Field := Types[ValType].Field[FieldIndex];        
         GetFieldPtr(Field^.Offset);
-        
-        // For interfaces, save Self pointer offset from the procedural variable
-        if (Types[ValType].Kind = INTERFACETYPE) and (Types[Field^.DataType].Kind = PROCEDURALTYPE) then
-          Types[Field^.DataType].SelfPointerOffset := -Types[ValType].Field[FieldIndex]^.Offset
-        else
-          Types[Field^.DataType].SelfPointerOffset := 0;  
-        
-        ValType := Field^.DataType;
-        
-        NextTok;
+        ValType := Field^.DataType;                
         end;
-         
+        
+      NextTok;   
       end;
       
     
-    OPARTOK:                                          // Call of a method or procedural variable that returns a designator
+    OPARTOK: 
       begin
-      if Types[ValType].Kind = METHODTYPE then                                              // Method call
-        begin
-        ResultType := Ident[Types[ValType].MethodIdentIndex].Signature.ResultType;
-        if (ResultType = 0) or not (Types[ResultType].Kind in StructuredTypes) then 
-          Break;  // Not a designator
-          
-        CompileMethodCall(ValType, TRUE);
-        RestoreStackTopFromEAX;
-        ValType := ResultType;  
-        end
-        
-      else if Types[ValType].Kind = PROCEDURALTYPE then                                     // Procedural variable call
-        begin
-        ResultType := Types[ValType].Signature.ResultType;
-        if (ResultType = 0) or not (Types[ResultType].Kind in StructuredTypes) then
-          Break;  // Not a designator
-       
-        CompileIndirectCall(ValType, TRUE);
-        RestoreStackTopFromEAX;    
-        ValType := ResultType;
-        end;
-       
+      if not CompileMethodOrProceduralVariableCall(ValType, TRUE, TRUE) then Break;  // Not a designator 
+      PushFunctionResult(ValType); 
       end;
       
   end; // case
   
-  if ForceCharToString then
-    ConvertCharToString(ValType, TRUE);
   end; // while
  
 end; // CompileSelectors
@@ -1598,163 +1806,115 @@ end; // CompileSelectors
 
 
 
-procedure CompileDesignator{(var ValType: Integer; ForceCharToString: Boolean)};
+procedure CompileBasicDesignator(var ValType: Integer);
 var
+  ResultType: Integer;
   IdentIndex: Integer;  
-  IsRefParam: Boolean;
   
 begin
 // A designator always designates a memory location
-// A function call can be part of a designator only if it returns an address (i.e. a structured result), not an immediate value
+// A function call can be part of a designator only if it returns an address (i.e. a structured result or a pointer), not an immediate value
 // All other calls are part of a factor or a statement
    
 AssertIdent;
 
 // First search among records in WITH blocks
-CompileFieldInsideWith(ValType);
+CompileFieldOrMethodInsideWith(ValType);
 
-// If unsuccessful, search among ordinary variables
+// If unsuccessful, search among ordinary identifiers
 if ValType = 0 then
   begin
   IdentIndex := GetIdent(Tok.Name);
   
-  // Call of a function that returns a designator     
-  if (Ident[IdentIndex].Kind = FUNC) and (Types[Ident[IdentIndex].Signature.ResultType].Kind in StructuredTypes) then 
-    begin
-    NextTok;
-    CompileCall(IdentIndex);
-    RestoreStackTopFromEAX;
-    ValType := Ident[IdentIndex].Signature.ResultType;    
-    end
-    
-  // Designator itself
-  else if Ident[IdentIndex].Kind = VARIABLE then                                  
-    begin   
-    PushVarPtr(Ident[IdentIndex].Value, 
-               Ident[IdentIndex].Scope, 
-               BlockStackTop - Ident[IdentIndex].NestingLevel, 
-               Ident[IdentIndex].RelocType);
-    
-    ValType := Ident[IdentIndex].DataType;           
-    
-    if ForceCharToString then
-      ConvertCharToString(ValType, TRUE);
+  case Ident[IdentIndex].Kind of
+  
+    FUNC:
+      begin
+      ResultType := Ident[IdentIndex].Signature.ResultType;
 
-    if Types[Ident[IdentIndex].DataType].Kind in StructuredTypes + [ANYTYPE] then
-      IsRefParam := Ident[IdentIndex].PassMethod in [CONSTPASSING, VARPASSING]    // For structured parameters, CONST is equivalent to VAR
-    else
-      IsRefParam := Ident[IdentIndex].PassMethod = VARPASSING;                    // For scalar parameters, CONST is equivalent to passing by value
+      if not (Types[ResultType].Kind in StructuredTypes + [POINTERTYPE]) then   // Only allow a function that returns a designator
+        Error('Function must return pointer or structured result');
 
-    if IsRefParam then DerefPtr(POINTERTYPEINDEX);                                // Parameter is passed by reference
-    
-    NextTok;
-    end
+      NextTok;
+      CompileCall(IdentIndex);
+      PushFunctionResult(ResultType);        
+      ValType := ResultType;
+      
+      DereferencePointerAsDesignator(ValType, TRUE);
+      end;  
+             
+    VARIABLE:                                  
+      begin   
+      PushVarPtr(Ident[IdentIndex].Value, 
+                 Ident[IdentIndex].Scope, 
+                 BlockStackTop - Ident[IdentIndex].NestingLevel, 
+                 Ident[IdentIndex].RelocType);
+      
+      ValType := Ident[IdentIndex].DataType;          
+      
+      // Structured CONST parameters are passed by reference, scalar CONST parameters are passed by value
+      if (Ident[IdentIndex].PassMethod = VARPASSING) or 
+        ((Ident[IdentIndex].PassMethod <> EMPTYPASSING) and (Types[ValType].Kind in StructuredTypes))
+      then
+        DerefPtr(POINTERTYPEINDEX);
+     
+      NextTok;
+      end;
+      
+    USERTYPE:                                                                       // Type cast
+      begin                                                                      
+      NextTok;
+      
+      EatTok(OPARTOK);
+      CompileExpression(ValType);
+      EatTok(CPARTOK);
+
+      if not (Types[Ident[IdentIndex].DataType].Kind in StructuredTypes + [POINTERTYPE]) then   // Only allow a typecast that returns a designator
+        Error('Typecast must return pointer or structured result');      
+      
+      if (Ident[IdentIndex].DataType <> ValType) and 
+        not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and (Types[ValType].Kind in CastableTypes)) 
+      then
+        Error('Invalid typecast');            
+      
+      ValType := Ident[IdentIndex].DataType;
+      
+      DereferencePointerAsDesignator(ValType, TRUE);      
+      end  
     
   else
-    Error('Variable expected but ' + GetTokSpelling(Tok.Kind) + ' found');    
+    Error('Variable or function expected but ' + GetTokSpelling(Tok.Kind) + ' found');
+  end; // case
+    
   end
 else
-  NextTok;
+  NextTok;  
+end; // CompileBasicDesignator
 
-CompileSelectors(ValType, ForceCharToString);  
+
+
+
+procedure CompileDesignator(var ValType: Integer);
+begin
+CompileBasicDesignator(ValType);
+CompileSelectors(ValType);
 end; // CompileDesignator
 
 
 
 
-procedure CompileSetConstructor(var ValType: Integer);
-var
-  ElementType: Integer;
-  LibProcIdentIndex: Integer;
-  TempStorageAddr: Integer;
-  
-begin
-// Add new anonymous type
-Inc(NumTypes);
-if NumTypes > MAXTYPES then
-  Error('Maximum number of types exceeded');
-
-Types[NumTypes].Kind := SETTYPE;
-Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
-Types[NumTypes].BaseType := ANYTYPEINDEX;
-ValType := NumTypes;
-
-// Allocate temporary storage
-TempStorageAddr := AllocateTempStorage(TypeSize(ValType));
-PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
-
-// Initialize set
-LibProcIdentIndex := GetIdent('INITSET');
-GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel); 
-
-// Compile constructor
-LibProcIdentIndex := GetIdent('ADDTOSET');
-NextTok;
-
-if Tok.Kind <> CBRACKETTOK then
-  repeat
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
-    
-    CompileExpression(ElementType, FALSE);
-    
-    if Types[ValType].BaseType = ANYTYPEINDEX then
-      begin
-      if not (Types[ElementType].Kind in OrdinalTypes) then
-        Error('Ordinal type expected');        
-      Types[ValType].BaseType := ElementType;
-      end  
-    else  
-      GetCompatibleType(ElementType, Types[ValType].BaseType);
-
-    if Tok.Kind = RANGETOK then
-      begin
-      NextTok;
-      CompileExpression(ElementType, FALSE);    
-      GetCompatibleType(ElementType, Types[ValType].BaseType);
-      end
-    else
-      PushConst(-1);
-      
-    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);        
-      
-    if Tok.Kind <> COMMATOK then Break;
-    NextTok;
-  until FALSE;
-  
-EatTok(CBRACKETTOK);
-
-PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
-end; // CompileSetConstructor
-
-
-
-
-procedure CompileFactor(var ValType: Integer; ForceCharToString: Boolean);
+procedure CompileFactor(var ValType: Integer);
 
 
   procedure CompileDereferenceOrCall(var ValType: Integer);
   begin
   if Tok.Kind = OPARTOK then   // For method or procedural variable calls, parentheses are required even with empty parameter lists                                     
     begin
-    if Types[ValType].Kind = METHODTYPE then                          // Method call
-      begin
-      CompileMethodCall(ValType, TRUE);
-      RestoreStackTopFromEAX;
-      ValType := Ident[Types[ValType].MethodIdentIndex].Signature.ResultType;
-      end
-   
-    else if Types[ValType].Kind = PROCEDURALTYPE then                 // Procedural variable call
-      begin
-      CompileIndirectCall(ValType, TRUE);
-      RestoreStackTopFromEAX;    
-      ValType := Types[ValType].Signature.ResultType;          
-      end
-      
-    else
-      Error('Function expected');
+    CompileMethodOrProceduralVariableCall(ValType, TRUE, FALSE);
+    PushFunctionResult(ValType);
     end       
-  else                                                              // Usual variable
-    if not (Types[ValType].Kind in StructuredTypes) then // Factors of type 'array', 'record', 'set' should contain a pointer to them
+  else                         // Usual variable
+    if not (Types[ValType].Kind in StructuredTypes) then // Structured expressions are stored as pointers to them
       DerefPtr(ValType);
   end; // CompileDereferenceOrCall
   
@@ -1768,9 +1928,9 @@ begin // CompileFactor
 case Tok.Kind of
 
   IDENTTOK:
-    if FieldInsideWithFound(Tok.Name) then                                              // Record field inside a WITH block
+    if FieldOrMethodInsideWithFound(Tok.Name) then                                      // Record field or method inside a WITH block
       begin
-      CompileDesignator(ValType, ForceCharToString);
+      CompileDesignator(ValType);
       CompileDereferenceOrCall(ValType);
       end      
     else                                                                                // Ordinary identifier
@@ -1791,54 +1951,50 @@ case Tok.Kind of
           else                                                                          // User-defined function call
             begin
             NextTok;
-            CompileCall(IdentIndex);
-            RestoreStackTopFromEAX;
-            ValType := Ident[IdentIndex].Signature.ResultType; 
+            ValType := Ident[IdentIndex].Signature.ResultType;
             
-            if Types[ValType].Kind in StructuredTypes then
+            CompileCall(IdentIndex);
+            PushFunctionResult(ValType);
+            
+            if (Types[ValType].Kind in StructuredTypes) or DereferencePointerAsDesignator(ValType, FALSE) then
               begin
-              CompileSelectors(ValType, ForceCharToString);
+              CompileSelectors(ValType);
               CompileDereferenceOrCall(ValType);
-              end;
+              end; 
             end;
             
-        VARIABLE:                                                                       // Designator
+        VARIABLE:                                                                       // Variable
           begin
-          CompileDesignator(ValType, ForceCharToString);
+          CompileDesignator(ValType);
           CompileDereferenceOrCall(ValType);   
           end;
           
         CONSTANT:                                                                       // Constant
           begin
+          if IsString(Ident[IdentIndex].DataType) then
+            PushVarPtr(Ident[IdentIndex].Value, GLOBAL, 0, INITDATARELOC)
+          else            
+            PushConst(Ident[IdentIndex].Value);
+            
           ValType := Ident[IdentIndex].DataType;
-          PushConst(Ident[IdentIndex].Value);
           NextTok;
           end;
           
         USERTYPE:                                                                       // Type cast
           begin                                                                      
           NextTok;
+          EatTok(OPARTOK);
           
-          if Types[Ident[IdentIndex].DataType].Kind = INTERFACETYPE then    // Special case: concrete type to interface type
-            begin
-            EatTok(OPARTOK);
-            CompileDesignator(ValType, ForceCharToString);
-            EatTok(CPARTOK);
-            
-            CompileConcreteTypeToInterfaceTypeConversion(ValType, Ident[IdentIndex].DataType);                        
-            end
-          else                                                              // General rule
-            begin  
-            EatTok(OPARTOK);
-            CompileExpression(ValType, FALSE);
-            EatTok(CPARTOK);
+          CompileExpression(ValType);
 
-            if not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and 
-                    (Types[ValType].Kind in CastableTypes)) then
-              Error('Invalid typecast');            
-            end;
-          
-          ValType := Ident[IdentIndex].DataType;  
+          if (Ident[IdentIndex].DataType <> ValType) and 
+             not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and (Types[ValType].Kind in CastableTypes)) 
+          then
+            Error('Invalid typecast');            
+           
+          EatTok(CPARTOK);
+          ValType := Ident[IdentIndex].DataType;
+          CompileSelectors(ValType);  
           end
           
       else
@@ -1851,8 +2007,8 @@ case Tok.Kind of
     begin
     NextTok;
     
-    if FieldInsideWithFound(Tok.Name) then                  // Record field inside a WITH block
-      CompileDesignator(ValType, FALSE)
+    if FieldOrMethodInsideWithFound(Tok.Name) then         // Record field inside a WITH block
+      CompileDesignator(ValType)
     else                                                    // Ordinary identifier
       begin  
       IdentIndex := GetIdent(Tok.Name);
@@ -1866,7 +2022,7 @@ case Tok.Kind of
         NextTok;
         end
       else  
-        CompileDesignator(ValType, FALSE);
+        CompileDesignator(ValType);
       end;  
       
     ValType := POINTERTYPEINDEX;
@@ -1905,10 +2061,10 @@ case Tok.Kind of
     end;
 
 
-  OPARTOK:       // Expression in parentheses expected
+  OPARTOK:
     begin
     NextTok;
-    CompileExpression(ValType, ForceCharToString);
+    CompileExpression(ValType);
     EatTok(CPARTOK);
     end;
 
@@ -1917,7 +2073,7 @@ case Tok.Kind of
     begin
     NotOpTok := Tok;
     NextTok;
-    CompileFactor(ValType, ForceCharToString);
+    CompileFactor(ValType);
     CheckOperator(NotOpTok, ValType);
     GenerateUnaryOperator(NOTTOK, ValType);
     end;
@@ -1938,14 +2094,12 @@ else
   Error('Expression expected but ' + GetTokSpelling(Tok.Kind) + ' found');
 end;// case
 
-if ForceCharToString then
-  ConvertCharToString(ValType, FALSE);
 end;// CompileFactor
 
 
 
 
-procedure CompileTerm(var ValType: Integer; ForceCharToString: Boolean);
+procedure CompileTerm(var ValType: Integer);
 var
   OpTok: TToken;
   RightValType: Integer;
@@ -1954,7 +2108,7 @@ var
   UseShortCircuit: Boolean; 
   
 begin
-CompileFactor(ValType, ForceCharToString);
+CompileFactor(ValType);
 
 while Tok.Kind in MultiplicativeOperators do
   begin
@@ -1965,27 +2119,17 @@ while Tok.Kind in MultiplicativeOperators do
   if UseShortCircuit then 
     GenerateShortCircuitProlog(OpTok.Kind);  
   
-  CompileFactor(RightValType, ForceCharToString);
+  CompileFactor(RightValType);
 
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ValType, RightValType) then
-    begin
-    GenerateFloat(SizeOf(Single));
-    ValType := REALTYPEINDEX;
-    end;
-  if ConversionToRealIsPossible(RightValType, ValType) then
-    begin
-    GenerateFloat(0);
-    RightValType := REALTYPEINDEX;
-    end;
-
+  ConvertIntegerToReal(ValType, RightValType, 0);
+  ConvertIntegerToReal(RightValType, ValType, SizeOf(Single));
+  
   // Special case: real division of two integers
-  if (OpTok.Kind = DIVTOK) and ConversionToRealIsPossible(ValType, REALTYPEINDEX) and ConversionToRealIsPossible(RightValType, REALTYPEINDEX) then
+  if OpTok.Kind = DIVTOK then
     begin
-    GenerateFloat(SizeOf(Single));
-    GenerateFloat(0);
-    ValType := REALTYPEINDEX;
-    RightValType := REALTYPEINDEX;
+    ConvertIntegerToReal(REALTYPEINDEX, RightValType, 0);
+    ConvertIntegerToReal(REALTYPEINDEX, ValType, SizeOf(Single));
     end;
     
   // Special case: set intersection  
@@ -2020,7 +2164,7 @@ end;// CompileTerm
 
 
 
-procedure CompileSimpleExpression(var ValType: Integer; ForceCharToString: Boolean);
+procedure CompileSimpleExpression(var ValType: Integer);
 var
   UnaryOpTok, OpTok: TToken;
   RightValType: Integer;
@@ -2033,7 +2177,7 @@ UnaryOpTok := Tok;
 if UnaryOpTok.Kind in UnaryOperators then
   NextTok;
 
-CompileTerm(ValType, ForceCharToString);
+CompileTerm(ValType);
 
 if UnaryOpTok.Kind in UnaryOperators then
   CheckOperator(UnaryOpTok, ValType);
@@ -2049,22 +2193,18 @@ while Tok.Kind in AdditiveOperators do
   if UseShortCircuit then 
     GenerateShortCircuitProlog(OpTok.Kind);
   
-  CompileTerm(RightValType, ForceCharToString); 
+  CompileTerm(RightValType); 
 
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ValType, RightValType) then
-    begin
-    GenerateFloat(SizeOf(Single));
-    ValType := REALTYPEINDEX;
-    end;
-  if ConversionToRealIsPossible(RightValType, ValType) then
-    begin
-    GenerateFloat(0);
-    RightValType := REALTYPEINDEX;
-    end;
+  ConvertIntegerToReal(ValType, RightValType, 0);
+  ConvertIntegerToReal(RightValType, ValType, SizeOf(Single));
+    
+  // Try to convert character to string
+  ConvertCharToString(ValType, RightValType, 0);
+  ConvertCharToString(RightValType, ValType, SizeOf(LongInt));  
       
   // Special case: string concatenation
-  if (ValType = STRINGTYPEINDEX) and (RightValType = STRINGTYPEINDEX) and (OpTok.Kind = PLUSTOK) then
+  if IsString(ValType) and IsString(RightValType) and (OpTok.Kind = PLUSTOK) then
     begin 
     LibProcIdentIndex := GetIdent('CONCATSTR');   
 
@@ -2110,7 +2250,7 @@ end;// CompileSimpleExpression
 
 
 
-procedure CompileExpression{(var ValType: Integer; ForceCharToString: Boolean)};
+procedure CompileExpression(var ValType: Integer);
 var
   OpTok: TToken;
   RightValType: Integer;
@@ -2118,37 +2258,33 @@ var
 
   
 begin // CompileExpression
-CompileSimpleExpression(ValType, ForceCharToString);
+CompileSimpleExpression(ValType);
 
 if Tok.Kind in RelationOperators then
   begin
   OpTok := Tok;
   NextTok;
-  CompileSimpleExpression(RightValType, ForceCharToString);
+  CompileSimpleExpression(RightValType);
 
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ValType, RightValType) then
-    begin
-    GenerateFloat(SizeOf(Single));
-    ValType := REALTYPEINDEX;
-    end;
-  if ConversionToRealIsPossible(RightValType, ValType) then
-    begin
-    GenerateFloat(0);
-    RightValType := REALTYPEINDEX;
-    end;
+  ConvertIntegerToReal(ValType, RightValType, 0);
+  ConvertIntegerToReal(RightValType, ValType, SizeOf(Single));
+    
+  // Try to convert character to string
+  ConvertCharToString(ValType, RightValType, 0);
+  ConvertCharToString(RightValType, ValType, SizeOf(LongInt));     
     
   // Special case: string comparison
-  if (ValType = STRINGTYPEINDEX) and (RightValType = STRINGTYPEINDEX) then
+  if IsString(ValType) and IsString(RightValType) then
     begin 
     LibProcIdentIndex := GetIdent('COMPARESTR');
-   
-    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
-    RestoreStackTopFromEAX;
-    ValType := Ident[LibProcIdentIndex].Signature.ResultType;
     
-    PushConst(0);
+    ValType := Ident[LibProcIdentIndex].Signature.ResultType;
     RightValType := INTEGERTYPEINDEX;
+    
+    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
+    PushFunctionResult(ValType); 
+    PushConst(0);    
     end;
 
   // Special case: set comparison
@@ -2158,16 +2294,16 @@ if Tok.Kind in RelationOperators then
     
     case OpTok.Kind of
       GETOK: LibProcIdentIndex := GetIdent('TESTSUPERSET');    // Returns  1 if Val >= RightVal, -1 otherwise 
-      LETOK: LibProcIdentIndex := GetIdent('TESTSUBSET')       // Returns -1 if Val <= RightVal,  1 otherwise 
+      LETOK: LibProcIdentIndex := GetIdent('TESTSUBSET');      // Returns -1 if Val <= RightVal,  1 otherwise 
       else   LibProcIdentIndex := GetIdent('COMPARESETS');     // Returns  0 if Val  = RightVal,  1 otherwise  
-    end; 
+    end;
+ 
+    ValType := Ident[LibProcIdentIndex].Signature.ResultType;
+    RightValType := INTEGERTYPEINDEX;
     
     GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
-    RestoreStackTopFromEAX;
-    ValType := Ident[LibProcIdentIndex].Signature.ResultType;
-    
-    PushConst(0);  
-    RightValType := INTEGERTYPEINDEX;
+    PushFunctionResult(ValType);
+    PushConst(0); 
     end;  
 
   GetCompatibleType(ValType, RightValType);
@@ -2178,7 +2314,7 @@ if Tok.Kind in RelationOperators then
 else if Tok.Kind = INTOK then
   begin
   NextTok;
-  CompileSimpleExpression(RightValType, ForceCharToString);
+  CompileSimpleExpression(RightValType);
   
   if Types[RightValType].Kind <> SETTYPE then
     Error('Set expected');
@@ -2189,9 +2325,10 @@ else if Tok.Kind = INTOK then
     Error('Ordinal type expected');   
 
   LibProcIdentIndex := GetIdent('INSET');
+  ValType := Ident[LibProcIdentIndex].Signature.ResultType;
+  
   GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
-  RestoreStackTopFromEAX;
-  ValType := Ident[LibProcIdentIndex].Signature.ResultType;  
+  PushFunctionResult(ValType);    
   end;  
 
 end;// CompileExpression
@@ -2222,7 +2359,7 @@ end; // CompileCompoundStatement
 
 
 
-procedure CompileStatement{(LoopNesting: Integer)};
+procedure CompileStatement(LoopNesting: Integer);
 
 
 
@@ -2256,28 +2393,29 @@ procedure CompileStatement{(LoopNesting: Integer)};
   procedure CompileAssignment(DesignatorType: Integer);
   var
     ExpressionType: Integer;
+    LibProcIdentIndex: Integer;
   begin
   NextTok;
 
-  CompileExpression(ExpressionType, DesignatorType = STRINGTYPEINDEX);                          // General rule: right-hand side expression
-
+  CompileExpression(ExpressionType);
+  
   // Try to convert integer to real
-  if ConversionToRealIsPossible(ExpressionType, DesignatorType) then
-    begin
-    GenerateFloat(0);
-    ExpressionType := REALTYPEINDEX;
-    end;
+  ConvertIntegerToReal(DesignatorType, ExpressionType, 0);
+    
+  // Try to convert character to string
+  ConvertCharToString(DesignatorType, ExpressionType, 0);    
     
   // Try to convert a concrete type to an interface type
-  if (Types[DesignatorType].Kind = INTERFACETYPE) and (DesignatorType <> ExpressionType) then
-    begin
-    CompileConcreteTypeToInterfaceTypeConversion(ExpressionType, DesignatorType);
-    ExpressionType := DesignatorType;
-    end;       
+  ConvertToInterface(DesignatorType, ExpressionType);       
 
   GetCompatibleType(DesignatorType, ExpressionType);
 
-  if Types[DesignatorType].Kind in StructuredTypes then
+  if IsString(DesignatorType) then
+    begin 
+    LibProcIdentIndex := GetIdent('ASSIGNSTR');    
+    GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);    
+    end
+  else if Types[DesignatorType].Kind in StructuredTypes then
     GenerateStructuredAssignment(DesignatorType)
   else
     GenerateAssignment(DesignatorType);
@@ -2290,17 +2428,8 @@ procedure CompileStatement{(LoopNesting: Integer)};
   procedure CompileAssignmentOrCall(DesignatorType: Integer);
   begin
   if Tok.Kind = OPARTOK then   // For method or procedural variable calls, parentheses are required even with empty parameter lists                                     
-    begin
-    if Types[DesignatorType].Kind = METHODTYPE then                 // Method call
-      CompileMethodCall(DesignatorType, FALSE)
- 
-    else if Types[DesignatorType].Kind = PROCEDURALTYPE then        // Procedural variable call
-      CompileIndirectCall(DesignatorType, FALSE)
-      
-    else
-      Error('Procedure expected')
-    end
-  else                                                              // Assignment
+    CompileMethodOrProceduralVariableCall(DesignatorType, FALSE, FALSE)
+  else                         // Assignment
     begin  
     CheckTok(ASSIGNTOK);                               
     CompileAssignment(DesignatorType)
@@ -2317,7 +2446,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
   begin
   NextTok;
   
-  CompileExpression(ExpressionType, FALSE);
+  CompileExpression(ExpressionType);
   GetCompatibleType(ExpressionType, BOOLEANTYPEINDEX);
   
   EatTok(THENTOK);
@@ -2348,7 +2477,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
   begin
   NextTok;
   
-  CompileExpression(SelectorType, FALSE);
+  CompileExpression(SelectorType);
   if not (Types[SelectorType].Kind in OrdinalTypes) then
     Error('Ordinal variable expected as CASE selector');
   
@@ -2385,19 +2514,19 @@ procedure CompileStatement{(LoopNesting: Integer)};
     GenerateCaseStatementEpilog;
 
     Inc(NumCaseStatements);
-
-    if Tok.Kind <> SEMICOLONTOK then
-      begin
-      if Tok.Kind = ELSETOK then              // Default statements
-        begin
-        NextTok;
-        CompileStatementList(LoopNesting);
-        end;          
-      Break;
-      end;
-
+    
+    if (Tok.Kind = ELSETOK) or (Tok.Kind = ENDTOK) then Break;
+    
+    CheckTok(SEMICOLONTOK);
     NextTok;
-  until Tok.Kind = ENDTOK;
+  until (Tok.Kind = ELSETOK) or (Tok.Kind = ENDTOK);  
+  
+  // Default statements
+  if Tok.Kind = ELSETOK then              
+    begin
+    NextTok;
+    CompileStatementList(LoopNesting);
+    end;          
 
   EatTok(ENDTOK);
 
@@ -2415,7 +2544,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
   SaveCodePos;      // Save return address used by GenerateWhileEpilog
 
   NextTok;
-  CompileExpression(ExpressionType, FALSE);
+  CompileExpression(ExpressionType);
   GetCompatibleType(ExpressionType, BOOLEANTYPEINDEX);
   
   EatTok(DOTOK);
@@ -2451,7 +2580,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
   
   GenerateContinueEpilog(LoopNesting);
 
-  CompileExpression(ExpressionType, FALSE);
+  CompileExpression(ExpressionType);
   GetCompatibleType(ExpressionType, BOOLEANTYPEINDEX);
   
   GenerateRepeatCondition;
@@ -2476,7 +2605,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
 
   if (Ident[CounterIndex].Kind <> VARIABLE) or
     ((Ident[CounterIndex].NestingLevel <> 1) and (Ident[CounterIndex].NestingLevel <> BlockStackTop)) or
-     (Ident[CounterIndex].PassMethod <> VALPASSING) then
+     (Ident[CounterIndex].PassMethod <> EMPTYPASSING) then
     Error('Simple local variable expected as FOR loop counter');
 
   if not (Types[Ident[CounterIndex].DataType].Kind in OrdinalTypes) then
@@ -2488,7 +2617,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
   EatTok(ASSIGNTOK);
   
   // Initial counter value
-  CompileExpression(ExpressionType, FALSE);
+  CompileExpression(ExpressionType);
   GetCompatibleType(ExpressionType, Ident[CounterIndex].DataType);  
 
   if not (Tok.Kind in [TOTOK, DOWNTOTOK]) then
@@ -2498,7 +2627,7 @@ procedure CompileStatement{(LoopNesting: Integer)};
   NextTok;
   
   // Final counter value
-  CompileExpression(ExpressionType, FALSE);
+  CompileExpression(ExpressionType);
   GetCompatibleType(ExpressionType, Ident[CounterIndex].DataType);
   
   // Assign initial value to the counter, compute and save the total number of iterations
@@ -2574,9 +2703,9 @@ procedure CompileStatement{(LoopNesting: Integer)};
     TempStorageAddr := AllocateTempStorage(TypeSize(POINTERTYPEINDEX));    
     PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
     
-    CompileDesignator(DesignatorType, FALSE);
-    if Types[DesignatorType].Kind <> RECORDTYPE then
-      Error('Record expected');
+    CompileDesignator(DesignatorType);
+    if not (Types[DesignatorType].Kind in [RECORDTYPE, INTERFACETYPE]) then
+      Error('Record or interface expected');
       
     GenerateAssignment(POINTERTYPEINDEX);
 
@@ -2633,9 +2762,9 @@ case Tok.Kind of
 
   IDENTTOK:
     begin   
-    if FieldInsideWithFound(Tok.Name) then                              // Record field inside a WITH block
+    if FieldOrMethodInsideWithFound(Tok.Name) then                      // Record field or method inside a WITH block
       begin
-      CompileDesignator(DesignatorType, FALSE);
+      CompileDesignator(DesignatorType);
       CompileAssignmentOrCall(DesignatorType);
       end 
     else                                                                // Ordinary identifier                                                                                
@@ -2644,9 +2773,9 @@ case Tok.Kind of
       
       case Ident[IdentIndex].Kind of
       
-        VARIABLE:                                                       // Assignment or procedural variable call
+        VARIABLE, USERTYPE:                                             // Assignment or procedural variable call
           begin
-          CompileDesignator(DesignatorType, FALSE);
+          CompileDesignator(DesignatorType);
           CompileAssignmentOrCall(DesignatorType); 
           end;
 
@@ -2684,18 +2813,18 @@ case Tok.Kind of
               
               DesignatorType := Ident[IdentIndex].Signature.ResultType;
               
-              if (Ident[IdentIndex].Kind = FUNC) and (Types[DesignatorType].Kind in StructuredTypes) and
-                 (Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK])                  
+              if (Ident[IdentIndex].Kind = FUNC) and (Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK]) and
+                 ((Types[DesignatorType].Kind in StructuredTypes) or DereferencePointerAsDesignator(DesignatorType, FALSE))                                   
               then
                 begin
-                RestoreStackTopFromEAX;
-                CompileSelectors(DesignatorType, FALSE);
+                PushFunctionResult(DesignatorType);
+                CompileSelectors(DesignatorType);
                 CompileAssignmentOrCall(DesignatorType); 
                 end;
               end;              
               
-            end  
-              
+            end;  
+                 
       else
         Error('Statement expected but ' + Ident[IdentIndex].Name + ' found');
       end // case Ident[IdentIndex].Kind
@@ -2733,7 +2862,7 @@ end;// CompileStatement
 
 
 
-procedure CompileType{(var DataType: Integer)};
+procedure CompileType(var DataType: Integer);
 
 
   procedure CompileEnumeratedType(var DataType: Integer);
@@ -2741,11 +2870,7 @@ procedure CompileType{(var DataType: Integer)};
     ConstIndex: Integer;
   begin
   // Add new anonymous type
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');
-    
-  Types[NumTypes].Kind := ENUMERATEDTYPE;
+  DeclareType(ENUMERATEDTYPE);
   DataType := NumTypes;
 
   // Compile enumeration constants
@@ -2754,7 +2879,7 @@ procedure CompileType{(var DataType: Integer)};
   
   repeat
     AssertIdent;
-    DeclareIdent(Tok.Name, CONSTANT, 0, DataType, VALPASSING, ConstIndex, 0.0, EMPTYPROC, '', 0);
+    DeclareIdent(Tok.Name, CONSTANT, 0, DataType, EMPTYPASSING, ConstIndex, 0.0, '', EMPTYPROC, '', 0);
     
     Inc(ConstIndex);
     if ConstIndex > MAXENUMELEMENTS - 1 then
@@ -2768,8 +2893,7 @@ procedure CompileType{(var DataType: Integer)};
   
   EatTok(CPARTOK);
   
-  Types[DataType].Block := BlockStack[BlockStackTop].Index;
-  Types[DataType].Low := 0;
+  Types[DataType].Low  := 0;
   Types[DataType].High := ConstIndex - 1;
   end; // CompileEnumeratedType
 
@@ -2781,11 +2905,7 @@ procedure CompileType{(var DataType: Integer)};
     NestedDataType: Integer;
   begin
   // Add new anonymous type
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');
-    
-  Types[NumTypes].Kind := POINTERTYPE;
+  DeclareType(POINTERTYPE);
   DataType := NumTypes;
 
   // Compile pointer base type
@@ -2793,7 +2913,6 @@ procedure CompileType{(var DataType: Integer)};
   CompileTypeIdent(NestedDataType, TRUE);
     
   Types[DataType].BaseType := NestedDataType;
-  Types[DataType].Block := BlockStack[BlockStackTop].Index;
   end; // CompileTypedPointerType
   
   
@@ -2810,12 +2929,7 @@ procedure CompileType{(var DataType: Integer)};
 
   repeat
     // Add new anonymous type
-    Inc(NumTypes);
-    if NumTypes > MAXTYPES then
-      Error('Maximum number of types exceeded');
-    
-    Types[NumTypes].Kind := ARRAYTYPE;
-    Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
+    DeclareType(ARRAYTYPE);
     Types[NumTypes].IsOpenArray := FALSE;
     ArrType := NumTypes;
 
@@ -2853,14 +2967,21 @@ procedure CompileType{(var DataType: Integer)};
 
     // Add new field
     Inc(Types[RecType].NumFields);
+    if Types[RecType].NumFields > MAXFIELDS then
+      Error('Too many fields');
+      
     New(Types[RecType].Field[Types[RecType].NumFields]);
     
     with Types[RecType].Field[Types[RecType].NumFields]^ do
       begin
       Name     := FieldName;
       DataType := FieldType;
-      Offset   := NextFieldOffset;
+      Offset   := NextFieldOffset;            
       end;
+      
+    // For interfaces, save Self pointer offset from the procedural field
+    if Types[RecType].Kind = INTERFACETYPE then
+      Types[FieldType].SelfPointerOffset := -NextFieldOffset;      
     
     NextFieldOffset := NextFieldOffset + TypeSize(FieldType);
     end; // DeclareField
@@ -2887,11 +3008,13 @@ procedure CompileType{(var DataType: Integer)};
         AssertIdent;
 
         Inc(NumFieldsInList);
+        if NumFieldsInList > MAXFIELDS then
+          Error('Too many fields');
+          
         FieldInListName[NumFieldsInList] := Tok.Name;
 
         NextTok;
-
-        if Tok.Kind <> COMMATOK then Break;
+        if (Tok.Kind <> COMMATOK) or IsInterfaceType then Break;
         NextTok;
       until FALSE;
 
@@ -2923,17 +3046,12 @@ procedure CompileType{(var DataType: Integer)};
   begin // CompileRecordOrInterfaceType
   NextFieldOffset := 0;
   
-  // Add new anonymous type
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');  
-  
+  // Add new anonymous type  
   if IsInterfaceType then
-    Types[NumTypes].Kind := INTERFACETYPE
+    DeclareType(INTERFACETYPE)
   else
-    Types[NumTypes].Kind := RECORDTYPE;
+    DeclareType(RECORDTYPE);
   
-  Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
   Types[NumTypes].NumFields := 0;
   DataType := NumTypes;
 
@@ -2995,12 +3113,7 @@ procedure CompileType{(var DataType: Integer)};
     NestedDataType: Integer;
   begin
   // Add new anonymous type
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');
-  
-  Types[NumTypes].Kind := SETTYPE;
-  Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
+  DeclareType(SETTYPE);
   DataType := NumTypes;
   
   NextTok;
@@ -3016,6 +3129,50 @@ procedure CompileType{(var DataType: Integer)};
   
   
   
+
+  procedure CompileStringType(var DataType: Integer);
+  var
+    LenConstVal: TConst;
+    LenType, IndexType: Integer;    
+  begin
+  NextTok;    
+  
+  if Tok.Kind = OBRACKETTOK then
+    begin
+    NextTok;
+    CompileConstExpression(LenConstVal, LenType);
+    
+    if not (Types[LenType].Kind in IntegerTypes) then
+      Error('Integer type expected'); 
+      
+    if (LenConstVal.Value <= 0) or (LenConstVal.Value > MAXSTRLENGTH) then
+      Error('Illegal string length');  
+    
+    // Add new anonymous type: 1..Len + 1
+    DeclareType(SUBRANGETYPE);
+    IndexType := NumTypes;
+
+    Types[IndexType].BaseType := LenType;
+    Types[IndexType].Low      := 1;
+    Types[IndexType].High     := LenConstVal.Value + 1;
+    
+    // Add new anonymous type: array [1..Len + 1] of Char
+    DeclareType(ARRAYTYPE);
+    DataType := NumTypes;
+
+    Types[DataType].BaseType    := CHARTYPEINDEX;
+    Types[DataType].IndexType   := IndexType;
+    Types[DataType].IsOpenArray := FALSE;
+    
+    EatTok(CBRACKETTOK);
+    end
+  else
+    DataType := STRINGTYPEINDEX;  
+
+  end; // CompileStringType
+
+
+
   
   procedure CompileFileType(var DataType: Integer);
   var
@@ -3029,15 +3186,10 @@ procedure CompileType{(var DataType: Integer)};
     CompileType(NestedDataType);
     
     if Types[NestedDataType].Kind = FILETYPE then
-      Error('Incompatible types'); 
+      Error('File of files is not allowed'); 
    
     // Add new anonymous type
-    Inc(NumTypes);
-    if NumTypes > MAXTYPES then
-      Error('Maximum number of types exceeded');
-  
-    Types[NumTypes].Kind := FILETYPE;
-    Types[NumTypes].Block := BlockStack[BlockStackTop].Index;    
+    DeclareType(FILETYPE);    
     Types[NumTypes].BaseType := NestedDataType;
     
     DataType := NumTypes;
@@ -3056,11 +3208,7 @@ procedure CompileType{(var DataType: Integer)};
     LowBoundType, HighBoundType: Integer;
   begin
   // Add new anonymous type
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');    
-  
-  Types[NumTypes].Kind := SUBRANGETYPE;
+  DeclareType(SUBRANGETYPE);
   DataType := NumTypes;
 
   CompileConstExpression(ConstVal, LowBoundType);                               // Subrange lower bound
@@ -3080,8 +3228,7 @@ procedure CompileType{(var DataType: Integer)};
   if Types[DataType].High < Types[DataType].Low then
     Error('Illegal subrange bounds');
 
-  Types[DataType].BaseType := LowBoundType;
-  Types[DataType].Block := BlockStack[BlockStackTop].Index;  
+  Types[DataType].BaseType := LowBoundType;  
   end; // CompileSubrangeType
   
   
@@ -3089,12 +3236,7 @@ procedure CompileType{(var DataType: Integer)};
   
   procedure CompileProceduralType(var DataType: Integer; IsFunction: Boolean);
   begin
-  Inc(NumTypes);
-  if NumTypes > MAXTYPES then
-    Error('Maximum number of types exceeded');    
-  
-  Types[NumTypes].Kind := PROCEDURALTYPE;
-  Types[NumTypes].Block := BlockStack[BlockStackTop].Index;
+  DeclareType(PROCEDURALTYPE);
   Types[NumTypes].MethodIdentIndex := 0;
   DataType := NumTypes;
   
@@ -3137,10 +3279,7 @@ case Tok.Kind of
     CompileSetType(DataType); 
    
   STRINGTOK:
-    begin 
-    DataType := STRINGTYPEINDEX;
-    NextTok;
-    end;
+    CompileStringType(DataType);
     
   FILETOK:
     CompileFileType(DataType);
@@ -3211,7 +3350,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   repeat
     AssertIdent;
     
-    DeclareIdent(Tok.Name, GOTOLABEL, 0, 0, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
+    DeclareIdent(Tok.Name, GOTOLABEL, 0, 0, EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
     
     NextTok;
     if Tok.Kind <> COMMATOK then Break;
@@ -3236,7 +3375,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     EatTok(EQTOK);
     
     CompileConstExpression(ConstVal, ConstValType);
-    DeclareIdent(NameTok.Name, CONSTANT, 0, ConstValType, VALPASSING, ConstVal.Value, ConstVal.FracValue, EMPTYPROC, '', 0);
+    DeclareIdent(NameTok.Name, CONSTANT, 0, ConstValType, EMPTYPASSING, ConstVal.Value, ConstVal.FracValue, ConstVal.StrValue, EMPTYPROC, '', 0);
     end; // CompileUntypedConstDeclaration;
     
     
@@ -3259,12 +3398,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
         CompileConstExpression(ConstVal, ConstValType);
 
         // Try to convert integer to real
-        if ConversionToRealIsPossible(ConstValType, ConstType) then
-          begin
-          ConstVal.FracValue := ConstVal.Value;
-          ConstValType := REALTYPEINDEX;
-          end;
-          
+        ConvertConstIntegerToReal(ConstType, ConstValType, ConstVal);          
         GetCompatibleType(ConstType, ConstValType); 
           
         if Types[ConstType].Kind = REALTYPE then
@@ -3277,7 +3411,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       else if Types[ConstType].Kind = ARRAYTYPE then
         begin
         
-        if ConstType = STRINGTYPEINDEX then         // Special case: strings
+        if IsString(ConstType) then                 // Special case: strings
           begin
           if (Tok.Kind <> CHARLITERALTOK) and (Tok.Kind <> STRINGLITERALTOK) then
             CheckTok(STRINGLITERALTOK);
@@ -3346,8 +3480,8 @@ procedure CompileBlock(BlockIdentIndex: Integer);
               
             for ElementIndex := ElementVal.Value to ElementVal2.Value do
               begin
-              ElementPtr := @InitializedGlobalData[InitializedDataOffset + ElementIndex div 8];
-              ElementPtr^ := ElementPtr^ or (1 shl (ElementIndex mod 8));
+              ElementPtr := @InitializedGlobalData[InitializedDataOffset + ElementIndex shr 3];
+              ElementPtr^ := ElementPtr^ or (1 shl (ElementIndex and 7));
               end;
   
             if Tok.Kind <> COMMATOK then Break;
@@ -3371,7 +3505,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     EatTok(COLONTOK);    
     CompileType(ConstType);
     
-    DeclareIdent(NameTok.Name, CONSTANT, 0, ConstType, VARPASSING, 0, 0.0, EMPTYPROC, '', 0);
+    DeclareIdent(NameTok.Name, CONSTANT, 0, ConstType, VARPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
     
     EatTok(EQTOK);    
     CompileTypedConstConstructor(Ident[NumIdent].Value, ConstType);   
@@ -3415,7 +3549,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     EatTok(EQTOK);
 
     CompileType(VarType);
-    DeclareIdent(NameTok.Name, USERTYPE, 0, VarType, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);   
+    DeclareIdent(NameTok.Name, USERTYPE, 0, VarType, EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);   
     
     EatTok(SEMICOLONTOK);
   until Tok.Kind <> IDENTTOK;
@@ -3438,6 +3572,9 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       AssertIdent;
 
       Inc(NumIdentInList);
+      if NumIdentInList > MAXPARAMS then
+        Error('Too many variables in one list');
+      
       IdentInListName[NumIdentInList] := Tok.Name;
 
       NextTok;
@@ -3451,7 +3588,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     CompileType(VarType);
 
     for IdentInListIndex := 1 to NumIdentInList do
-      DeclareIdent(IdentInListName[IdentInListIndex], VARIABLE, 0, VarType, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
+      DeclareIdent(IdentInListName[IdentInListIndex], VARIABLE, 0, VarType, EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
 
     EatTok(SEMICOLONTOK);
   until Tok.Kind <> IDENTTOK;
@@ -3465,9 +3602,10 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   procedure CompileProcFuncDeclarations(IsFunction: Boolean);
 
     
-    function CompileDirective: Boolean;
+    function CompileDirective(const ImportFuncName: TString): Boolean;
     var
-      ImportLibName, ImportFuncName: TString;
+      ImportLibNameConst: TConst;
+      ImportLibNameConstValType: Integer;
       
     begin
     Result := FALSE;
@@ -3480,28 +3618,19 @@ procedure CompileBlock(BlockIdentIndex: Integer);
           
         // Read import library name
         NextTok;      
-        ImportLibName := Tok.Name;
-        EatTok(STRINGLITERALTOK);      
+        CompileConstExpression(ImportLibNameConst, ImportLibNameConstValType);
+        if not IsString(ImportLibNameConstValType) then
+          Error('Library name expected');      
         
-        // Read import function name
-        if (Tok.Kind <> IDENTTOK) or (Tok.Name <> 'NAME') then
-          Error('NAME expected but ' + GetTokSpelling(Tok.Kind) + ' found');
-        NextTok;
-        ImportFuncName := Tok.Name;
-        EatTok(STRINGLITERALTOK);
-
         // Register import function
-        GenerateImportFuncStub(AddImportFunc(ImportLibName, ImportFuncName));
+        GenerateImportFuncStub(AddImportFunc(ImportLibNameConst.StrValue, ImportFuncName));
         
         EatTok(SEMICOLONTOK);
         Result := TRUE;
         end
       else if Tok.Name = 'FORWARD' then  // Forward declaration
         begin
-        Inc(NumBlocks);
-        if NumBlocks > MAXBLOCKS then
-          Error('Maximum number of blocks exceeded');
-          
+        Inc(NumBlocks);         
         Ident[NumIdent].ProcAsBlock := NumBlocks;
         Ident[NumIdent].IsUnresolvedForward := TRUE;
         GenerateForwardReference;
@@ -3524,10 +3653,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     // Procedure interface in the interface section of a unit is an implicit forward declaration
     if ParserState.IsInterfaceSection and (BlockStack[BlockStackTop].Index = 1) then
       begin 
-      Inc(NumBlocks);
-      if NumBlocks > MAXBLOCKS then
-        Error('Maximum number of blocks exceeded');
-        
+      Inc(NumBlocks);      
       Ident[NumIdent].ProcAsBlock := NumBlocks;
       Ident[NumIdent].IsUnresolvedForward := TRUE;
       GenerateForwardReference;
@@ -3543,12 +3669,14 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     ForwardIdentIndex, FieldIndex: Integer;
     ReceiverType: Integer;
     ProcOrFunc: TIdentKind;
-    ProcName, ReceiverName: TString;
+    ProcName, NonUppercaseProcName, ReceiverName: TString;
+    ForwardResolutionSignature: TSignature;
     
     
   begin // CompileProcFuncDeclarations   
   AssertIdent;
   ProcName := Tok.Name;
+  NonUppercaseProcName := Tok.NonUppercaseName;
   NextTok;
   
   // Check for method declaration
@@ -3571,7 +3699,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     if BlockStack[BlockStackTop].Index <> 1 then
       Error('Methods cannot be nested');
 
-    if Types[ReceiverType].Kind = RECORDTYPE then
+    if Types[ReceiverType].Kind in [RECORDTYPE, INTERFACETYPE] then
       begin
       FieldIndex := GetFieldUnsafe(ReceiverType, ProcName);
       if FieldIndex <> 0 then
@@ -3585,29 +3713,36 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   else
     ForwardIdentIndex := GetIdentUnsafe(ProcName);
   
+  // Possibly found an identifier of another kind or scope, or it is already resolved
   if ForwardIdentIndex <> 0 then
     if not Ident[ForwardIdentIndex].IsUnresolvedForward or
        (Ident[ForwardIdentIndex].Block <> BlockStack[BlockStackTop].Index) or
        ((Ident[ForwardIdentIndex].Kind <> PROC) and not IsFunction) or
        ((Ident[ForwardIdentIndex].Kind <> FUNC) and IsFunction) then
-     ForwardIdentIndex := 0;                                      // Found an identifier of another kind or scope, or it is already resolved
+     ForwardIdentIndex := 0;
 
-  if ForwardIdentIndex = 0 then
+  // Procedure/function signature
+  if ForwardIdentIndex <> 0 then                                      // Forward declaration resolution
     begin    
+    CompileFormalParametersAndResult(IsFunction, ForwardResolutionSignature);
+    CheckSignatures(Ident[ForwardIdentIndex].Signature, ForwardResolutionSignature, ProcName);
+    DisposeParams(ForwardResolutionSignature);
+    end
+  else                                                                // Conventional declaration
+    begin
     if IsFunction then ProcOrFunc := FUNC else ProcOrFunc := PROC;
     
-    DeclareIdent(ProcName, ProcOrFunc, 0, 0, VALPASSING, 0, 0.0, EMPTYPROC, ReceiverName, ReceiverType);
+    DeclareIdent(ProcName, ProcOrFunc, 0, 0, EMPTYPASSING, 0, 0.0, '', EMPTYPROC, ReceiverName, ReceiverType);
     CompileFormalParametersAndResult(IsFunction, Ident[NumIdent].Signature);
 
     if (ReceiverType <> 0) and Ident[NumIdent].Signature.IsStdCall then
-      Error('STDCALL is not allowed for methods');
- 
-    end; // if ForwardIdentIndex = 0  
+      Error('STDCALL is not allowed for methods'); 
+    end;           
 
   EatTok(SEMICOLONTOK);  
   
   // Procedure/function body, if any
-  if ForwardIdentIndex <> 0 then                                      // Forward declaration resolution
+  if ForwardIdentIndex <> 0 then                                                    // Forward declaration resolution
     begin
     if (ReceiverType <> 0) and (ReceiverName <> Ident[ForwardIdentIndex].ReceiverName) then
       Error('Incompatible receiver name');
@@ -3619,12 +3754,9 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     
     Ident[ForwardIdentIndex].IsUnresolvedForward := FALSE; 
     end  
-  else if not CompileDirective and not CompileInterface then          // Declaration in the interface part, external or forward declaration                                                              
+  else if not CompileDirective(NonUppercaseProcName) and not CompileInterface then  // Declaration in the interface part, external or forward declaration                                                              
     begin
-    Inc(NumBlocks);                                                   // Conventional declaration
-    if NumTypes > MAXBLOCKS then
-      Error('Maximum number of blocks exceeded');
-    
+    Inc(NumBlocks);                                                                 // Conventional declaration   
     Ident[NumIdent].ProcAsBlock := NumBlocks;
     
     CompileBlock(NumIdent);    
@@ -3660,7 +3792,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     if Ident[BlockIdentIndex].ReceiverType <> 0 then
       begin
       Inc(TotalNumParams);
-      DeclareIdent(Ident[BlockIdentIndex].ReceiverName, VARIABLE, TotalNumParams, Ident[BlockIdentIndex].ReceiverType, VARPASSING, 0, 0.0, EMPTYPROC, '', 0);
+      DeclareIdent(Ident[BlockIdentIndex].ReceiverName, VARIABLE, TotalNumParams, Ident[BlockIdentIndex].ReceiverType, VARPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
       end;
     
     // Allocate other parameters
@@ -3678,6 +3810,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
                    Ident[BlockIdentIndex].Signature.Param[StackParamIndex]^.PassMethod,
                    0,
                    0.0,
+                   '',
                    EMPTYPROC,
                    '', 
                    0);
@@ -3687,9 +3820,9 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     if Ident[BlockIdentIndex].Kind = FUNC then
       begin
       if Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes then    // For functions returning structured variables, Result is a hidden VAR parameter 
-        DeclareIdent('RESULT', VARIABLE, TotalNumParams, Ident[BlockIdentIndex].Signature.ResultType, VARPASSING, 0, 0.0, EMPTYPROC, '', 0)
-      else                                                                      // Otherwise, Result is a hidden local variable
-        DeclareIdent('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].Signature.ResultType, VALPASSING, 0, 0.0, EMPTYPROC, '', 0);
+        DeclareIdent('RESULT', VARIABLE, TotalNumParams, Ident[BlockIdentIndex].Signature.ResultType, VARPASSING, 0, 0.0, '', EMPTYPROC, '', 0)
+      else                                                                                  // Otherwise, Result is a hidden local variable
+        DeclareIdent('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].Signature.ResultType, EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
         
       Ident[BlockIdentIndex].ResultIdentIndex := NumIdent;
       end;  
@@ -3770,18 +3903,14 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   
 
 
-  procedure DeleteDeclarations;
-  var
-    ParamIndex, FieldIndex: Integer;
-    
+  procedure DeleteDeclarations;  
   begin  
-  // Delete local identifiers to save space
+  // Delete local identifiers
   while (NumIdent > 0) and (Ident[NumIdent].Block = BlockStack[BlockStackTop].Index) do
     begin 
     // If procedure or function, delete parameters first
     if Ident[NumIdent].Kind in [PROC, FUNC] then
-      for ParamIndex := 1 to Ident[NumIdent].Signature.NumParams do
-        Dispose(Ident[NumIdent].Signature.Param[ParamIndex]);
+      DisposeParams(Ident[NumIdent].Signature);
 
     // Delete identifier itself
     Dec(NumIdent);
@@ -3792,13 +3921,11 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     begin
     // If procedural type, delete parameters first
     if Types[NumTypes].Kind = PROCEDURALTYPE then
-      for ParamIndex := 1 to Types[NumTypes].Signature.NumParams do
-        Dispose(Types[NumTypes].Signature.Param[ParamIndex]); 
+      DisposeParams(Types[NumTypes].Signature) 
     
-    // If record, delete fields first
-    if Types[NumTypes].Kind in [RECORDTYPE, INTERFACETYPE] then
-      for FieldIndex := 1 to Types[NumTypes].NumFields do
-        Dispose(Types[NumTypes].Field[FieldIndex]);
+    // If record or interface, delete fields first
+    else if Types[NumTypes].Kind in [RECORDTYPE, INTERFACETYPE] then
+      DisposeFields(Types[NumTypes]);    
 
     // Delete type itself
     Dec(NumTypes);
@@ -3959,7 +4086,7 @@ end; // CompileUsesClause
 
 
 
-function CompileProgramOrUnit{(const Name: TString): Integer}; 
+function CompileProgramOrUnit(const Name: TString): Integer; 
 begin
 InitializeScanner(Name);
 
@@ -4001,7 +4128,7 @@ SetUnitStatus(ParserState.UnitStatus);
 if Tok.Kind = USESTOK then
   CompileUsesClause;
 
-WriteLn('Compiling ', Name);
+Notice('Compiling ' + Name);
 
 NumBlocks := 1;  
 CompileBlock(0);

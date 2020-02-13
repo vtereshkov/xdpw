@@ -41,16 +41,15 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 #### Differences
 * Strings are null-terminated arrays of characters (C style), but indexed from 1 for Pascal compatibility
 * The `Text` type is equivalent to `file`. It can be used for both text and untyped files
-* Calls via procedural variables require parentheses even for empty parameter lists
+* Method calls and procedural variable calls require parentheses even for empty parameter lists
 
 #### Limitations
 * No "classical" object-oriented programming
 * Units cannot be compiled separately
-* No `Double` and `Extended` types
-* Arrays, records and sets cannot serve as untyped constants. Typed constants should be used instead
-* Arrays, records and sets cannot be passed to subroutines without `const` or `var`
+* `Real`, `Double` and `Extended` types are equivalent to `Single`
+* Arrays (except strings), records and sets cannot be untyped constants. Use typed constants instead
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
-* Statement labels cannot be numerical
+* Statement labels cannot be numerical 
 
 #### Formal grammar
 ```
@@ -94,10 +93,10 @@ ProcFuncDeclarations = ("procedure" | "function") Ident
 
 Receiver = "for" Ident ":" TypeIdent .
 
-Directive = "forward" | ("external" StringLiteral "name" StringLiteral) .         
+Directive = "forward" | "external" ConstExpression .         
 
 ActualParams = "(" [ (Expression | Designator) |
-              {"," (Expression | Designator)} ] ")" .
+                {"," (Expression | Designator)} ] ")" .
 
 FormalParams = "(" FormalParamList {";" FormalParamList} ")" .
               
@@ -115,6 +114,7 @@ Type = "(" Ident {"," Ident} ")" |
           {";" ConstExpression {"," ConstExpression} ":" "(" Fields ")"}] [";"] "end" |
        ["packed"] "interface" Fields [";"] "end" |
        ["packed"] "set" "of" Type |
+       ["packed"] "string" [ "[" ConstExpression "]" ] |
        ["packed"] "file" ["of" Type] |
        ConstExpression ".." ConstExpression |
        ("procedure" | "function") [FormalParams] [":" TypeIdent] ["stdcall"] |
@@ -124,7 +124,11 @@ Fields = IdentList ":" Type {";" IdentList ":" Type} .
        
 TypeIdent = "string" | "file" | Ident .       
 
-Designator = Ident {Selector} .
+Designator = BasicDesignator {Selector} .
+
+BasicDesignator = Ident |
+                  Ident [ActualParams] |
+                  Ident "(" Expression ")" .
 
 Selector = "^" | 
            "[" Expression {"," Expression} "]" | 
@@ -151,7 +155,7 @@ CompoundStatement = "begin" StatementList "end" .
 IfStatement = "if" Expression "then" Statement ["else" Statement] .
 
 CaseStatement = "case" Expression "of" CaseElement {";" CaseElement} 
-                    ["else" StatementList] [";"] "end" .
+                    [";"] ["else" StatementList] [";"] "end" .
                     
 WhileStatement = "while" Expression "do" Statement .
 
@@ -185,7 +189,7 @@ Factor = (Designator | Ident) [ActualParams] {Selector} |
          "not" Factor |
          SetConstructor |
          "nil" |
-         Ident "(" Expression ")" .
+         Ident "(" Expression ")" {Selector} .
          
 SetConstructor = "[" [Expression [".." Expression] 
                      {"," Expression [".." Expression]}] "]" .         
@@ -249,7 +253,9 @@ function Ln(x: Real): Real;
 function SqRt(x: Real): Real;
 ```
 
-### System library
+### Standard library
+
+#### System unit
 ```pascal
 function Timer: Integer;
 procedure Randomize;
@@ -268,7 +274,7 @@ function IOResult: Integer;
 function Length(const s: string): Integer;
 procedure AppendStr(var Dest: string; const Source: string);
 function CompareStr(const s1, s2: string): Integer;
-procedure Move(const Source; var Dest; Count: Integer);
+procedure Move(var Source; var Dest; Count: Integer);
 procedure FillChar(var Data; Count: Integer; Value: Char);
 function ParamCount: Integer;
 function ParamStr(Index: Integer): string;
@@ -277,6 +283,19 @@ procedure Str(Number: Real; var s: string[; DecPlaces: Integer]);
 procedure IVal(const s: string; var Number: Integer; var Code: Integer);
 procedure IStr(Number: Integer; var s: string);
 function UpCase(ch: Char): Char;
+```
+
+#### SysUtils unit
+```pascal
+function IntToStr(n: Integer): string;
+function StrToInt(const s: string): Integer;
+function FloatToStr(x: Real): string;
+function FloatToStrF(x: Real; Format: TFloatFormat; Precision, Digits: Integer): string;
+function StrToFloat(const s: string): Real;
+function StrToPChar(const s: string): PChar;
+function PCharToStr(p: PChar): string;
+function StrToPWideChar(const s: string): PWideChar;
+function PWideCharToStr(p: PWideChar): string;
 ```
 
 ### Samples

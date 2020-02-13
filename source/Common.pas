@@ -1,5 +1,5 @@
 // XD Pascal - a 32-bit compiler for Windows
-// Copyright (c) 2009-2010, 2019, Vasiliy Tereshkov
+// Copyright (c) 2009-2010, 2019-2020, Vasiliy Tereshkov
 
 {$I-}
 {$H-}
@@ -12,8 +12,7 @@ interface
 
 
 const
-  VERSIONMAJOR              = 0;
-  VERSIONMINOR              = 10;
+  VERSION                   = '0.11';
   
   NUMKEYWORDS               = 43;          
   MAXSTRLENGTH              = 255;
@@ -22,9 +21,8 @@ const
   MAXIDENTS                 = 1000;
   MAXTYPES                  = 1000;
   MAXUNITS                  = 100;
-  MAXBLOCKS                 = 1000;
   MAXBLOCKNESTING           = 10;
-  MAXPARAMS                 = 20;
+  MAXPARAMS                 = 30;
   MAXFIELDS                 = 100;
   MAXWITHNESTING            = 20;
 
@@ -35,9 +33,15 @@ const
 
 
 type
-  TString  = string;  
+  TCharacter     = Char;
+  PCharacter     = PChar;
+  TString        = string;  
+  TShortString   = string;
+  TGenericString = string;
   
-  TInFile = file;  
+  PLongInt = ^LongInt;
+  
+  TInFile  = file;  
   TOutFile = file;  
   
   TTokenKind =
@@ -123,8 +127,9 @@ type
     
   TToken = record
     Name: TString;
-  case Kind: TTokenKind of  
-    INTNUMBERTOK:     (Value: LongInt);       // For all ordinal types
+  case Kind: TTokenKind of
+    IDENTTOK:         (NonUppercaseName: TShortString);  
+    INTNUMBERTOK:     (Value: LongInt);                   // For all ordinal types
     FRACNUMBERTOK:    (FracValue: Single);
     STRINGLITERALTOK: (StrAddress: Integer;
                        StrLength: Integer);
@@ -147,9 +152,9 @@ const
   CHARTYPEINDEX         = 7;
   BOOLEANTYPEINDEX      = 8;
   REALTYPEINDEX         = 9;
-  POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other
+  POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other pointers
   FILETYPEINDEX         = 11;     // Untyped file, compatible with text files
-  STRINGTYPEINDEX       = 12;
+  STRINGTYPEINDEX       = 12;     // String of maximum allowed length
 
 
 
@@ -157,7 +162,8 @@ type
   TConst = record
   case Kind: TTypeKind of
     INTEGERTYPE: (Value: LongInt);            // For all ordinal types 
-    REALTYPE:    (FracValue: Single);    
+    REALTYPE:    (FracValue: Single);
+    ARRAYTYPE:   (StrValue: TShortString);    
   end;   
   
   TPassMethod = (EMPTYPASSING, VALPASSING, CONSTPASSING, VARPASSING); 
@@ -227,23 +233,24 @@ type
     Kind: TIdentKind;
     Name: TString;
     UnitIndex: Integer;
-    Block: Integer;                       // Index of a block in which the identifier is defined
+    Block: Integer;                             // Index of a block in which the identifier is defined
     NestingLevel: Byte;
-    ReceiverName: TString;                // Receiver variable name for a method    
-    ReceiverType: Integer;                // Receiver type for a method
+    ReceiverName: TString;                      // Receiver variable name for a method    
+    ReceiverType: Integer;                      // Receiver type for a method
     Scope: TScope;
     RelocType: TRelocType;
-    PassMethod: TPassMethod;              // Value, CONST or VAR parameter status
+    PassMethod: TPassMethod;                    // Value, CONST or VAR parameter status
     Signature: TSignature;
     ResultIdentIndex: Integer;
     ProcAsBlock: Integer;
     PredefProc: TPredefProc;
     IsUnresolvedForward: Boolean;
     IsExported: Boolean;
-    ForLoopNesting: Integer;              // Number of nested FOR loops where the label is defined
+    ForLoopNesting: Integer;                    // Number of nested FOR loops where the label is defined
+    StrValue: TString;                          // Value of a string constant
   case DataType: Integer of
-    INTEGERTYPEINDEX: (Value: LongInt);   // Value for an ordinal constant, address for a label, variable, procedure or function
-    REALTYPEINDEX:    (FracValue: Single);// Value for a real constant
+    INTEGERTYPEINDEX: (Value: LongInt);         // Value of an ordinal constant, address of a label, string constant, variable, procedure or function
+    REALTYPEINDEX:    (FracValue: Single);      // Value of a real constant
   end;
 
   TField = record
@@ -272,7 +279,7 @@ type
     
     METHODTYPE:                (MethodIdentIndex: Integer);   // For static methods as temporary results
   
-    FORWARDTYPE:               (TypeIdentName: TString);   
+    FORWARDTYPE:               (TypeIdentName: TShortString);   
   end;
   
   TBlock = record
@@ -294,14 +301,14 @@ type
     DataType: Integer;
   end;
   
-  TErrorProc = procedure (const Msg: TString);
+  TWriteProc = procedure (const Msg: TString);
   
   
 
 var
   Ident: array [1..MAXIDENTS] of TIdentifier;
   Types: array [1..MAXTYPES] of TType;
-  InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of Char;
+  InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of TCharacter;
   Units: array [1..MAXUNITS] of TUnit;
   BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
   WithStack: array [1..MAXWITHNESTING] of TWithDesignator;
@@ -322,18 +329,22 @@ var
 
 procedure InitializeCommon;
 procedure FinalizeCommon;
+procedure DisposeParams(var Signature: TSignature);
+procedure DisposeFields(var DataType: TType);
 function GetTokSpelling(TokKind: TTokenKind): TString;
-procedure SetErrorProc(Err: TErrorProc);
+function GetTypeSpelling(DataType: Integer): TString;
+procedure SetWriteProcs(NewNoticeProc, NewErrorProc: TWriteProc);
+procedure Notice(const Msg: TString);
 procedure Error(const Msg: TString);
 procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
+function IsString(DataType: Integer): Boolean;
 function LowBound(DataType: Integer): Integer;
 function HighBound(DataType: Integer): Integer;
 function TypeSize(DataType: Integer): Integer;
 function GetCompatibleType(LeftType, RightType: Integer): Integer;
 function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
-function ConversionToRealIsPossible(SrcType, DestType: Integer): Boolean;
 procedure CheckOperator(const Tok: TToken; DataType: Integer);
-procedure CheckSignatures(var Signature1, Signature2: TSignature; const Name: TString); 
+procedure CheckSignatures(var Signature1, Signature2: TSignature; const Name: TString; CheckParamNames: Boolean = TRUE); 
 procedure SetUnitStatus(var NewUnitStatus: TUnitStatus);
 function GetUnitUnsafe(const UnitName: TString): Integer;
 function GetUnit(const UnitName: TString): Integer;
@@ -343,9 +354,10 @@ function GetIdent(const IdentName: TString; AllowForwardReference: Boolean = FAL
 function GetFieldUnsafe(RecType: Integer; const FieldName: TString): Integer;
 function GetField(RecType: Integer; const FieldName: TString): Integer;
 function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer;
-function FieldInsideWithFound(const FieldName: TString): Boolean;
 function GetMethodUnsafe(RecType: Integer; const MethodName: TString): Integer;
 function GetMethod(RecType: Integer; const MethodName: TString): Integer;
+function GetMethodInsideWith(var RecPointer: Integer; var RecType: Integer; const MethodName: TString): Integer;
+function FieldOrMethodInsideWithFound(const Name: TString): Boolean;
 
 
 
@@ -402,7 +414,7 @@ const
 
 
 var
-  ErrorProc: TErrorProc;
+  NoticeProc, ErrorProc: TWriteProc;
   UnitStatus: TUnitStatus;
   
   
@@ -431,7 +443,7 @@ UnsignedTypes    := [WORDTYPE, BYTETYPE, CHARTYPE];
 NumericTypes     := IntegerTypes + [REALTYPE];
 StructuredTypes  := [ARRAYTYPE, RECORDTYPE, INTERFACETYPE, SETTYPE, FILETYPE];
 CastableTypes    := OrdinalTypes + [POINTERTYPE, PROCEDURALTYPE];
-end; 
+end;
 
 
 
@@ -467,32 +479,50 @@ end;
 
 procedure FinalizeCommon;
 var
-  i, j: Integer;
+  i: Integer;
   
 begin
 // Dispose of dynamically allocated parameter data
 for i := 1 to NumIdent do
   if (Ident[i].Kind = PROC) or (Ident[i].Kind = FUNC) then
-    for j := 1 to Ident[i].Signature.NumParams do
-      Dispose(Ident[i].Signature.Param[j]);
+    DisposeParams(Ident[i].Signature);
 
 // Dispose of dynamically allocated parameter and field data
 for i := 1 to NumTypes do
   begin
   if Types[i].Kind = PROCEDURALTYPE then
-    for j := 1 to Types[i].Signature.NumParams do
-      Dispose(Types[i].Signature.Param[j]);
-  
-  if Types[i].Kind in [RECORDTYPE, INTERFACETYPE] then
-    for j := 1 to Types[i].NumFields do
-      Dispose(Types[i].Field[j]);
+    DisposeParams(Types[i].Signature) 
+  else if Types[i].Kind in [RECORDTYPE, INTERFACETYPE] then
+    DisposeFields(Types[i]);
   end;
 end;
 
 
 
 
-function GetTokSpelling{(TokKind: TTokenKind): TString};
+procedure DisposeParams(var Signature: TSignature);
+var
+  i: Integer;
+begin
+for i := 1 to Signature.NumParams do
+  Dispose(Signature.Param[i]);
+end; 
+
+
+
+
+procedure DisposeFields(var DataType: TType);
+var
+  i: Integer;
+begin
+for i := 1 to DataType.NumFields do
+  Dispose(DataType.Field[i]);
+end; 
+
+
+
+
+function GetTokSpelling(TokKind: TTokenKind): TString;
 begin
 case TokKind of
   EMPTYTOK:                          Result := 'no token';
@@ -531,15 +561,62 @@ end;
 
 
 
-procedure SetErrorProc{(Err: TErrorProc)};
+function GetTypeSpelling(DataType: Integer): TString;
 begin
-ErrorProc := Err;
+case Types[DataType].Kind of
+  EMPTYTYPE:      Result := 'no type';
+  ANYTYPE:        Result := 'any type';
+  INTEGERTYPE:    Result := 'integer';
+  SMALLINTTYPE:   Result := 'small integer';
+  SHORTINTTYPE:   Result := 'short integer';
+  WORDTYPE:       Result := 'word';
+  BYTETYPE:       Result := 'byte';
+  CHARTYPE:       Result := 'character';
+  BOOLEANTYPE:    Result := 'Boolean';
+  REALTYPE:       Result := 'real';
+  POINTERTYPE:    begin
+                  Result := 'pointer';
+                  if Types[Types[DataType].BaseType].Kind <> ANYTYPE then
+                    Result := Result + ' to ' + GetTypeSpelling(Types[DataType].BaseType);
+                  end;  
+  FILETYPE:       begin
+                  Result := 'file';
+                  if Types[Types[DataType].BaseType].Kind <> ANYTYPE then
+                    Result := Result + ' of ' + GetTypeSpelling(Types[DataType].BaseType);
+                  end;  
+  ARRAYTYPE:      Result := 'array of ' + GetTypeSpelling(Types[DataType].BaseType); 
+  RECORDTYPE:     Result := 'record';
+  INTERFACETYPE:  Result := 'interface';
+  SETTYPE:        Result := 'set of ' + GetTypeSpelling(Types[DataType].BaseType);
+  ENUMERATEDTYPE: Result := 'enumeration';
+  SUBRANGETYPE:   Result := 'subrange of ' + GetTypeSpelling(Types[DataType].BaseType); 
+  PROCEDURALTYPE: Result := 'procedural type';
+else
+  Result := 'unknown type';
+end; //case
+end;
+
+
+
+
+procedure SetWriteProcs(NewNoticeProc, NewErrorProc: TWriteProc);
+begin
+NoticeProc := NewNoticeProc;
+ErrorProc := NewErrorProc;
+end;
+
+
+
+
+procedure Notice(const Msg: TString);
+begin
+NoticeProc(Msg);
 end;
 
 
 
   
-procedure Error{(const Msg: TString)};
+procedure Error(const Msg: TString);
 begin
 ErrorProc(Msg);
 end;
@@ -547,7 +624,7 @@ end;
 
 
 
-procedure DefineStaticString{(var Tok: TToken; const StrValue: TString)};
+procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
 var
   i: Integer;
 begin
@@ -570,7 +647,15 @@ end;
 
 
 
-function LowBound{(DataType: Integer): Integer};
+function IsString(DataType: Integer): Boolean;
+begin
+Result := (Types[DataType].Kind = ARRAYTYPE) and (Types[Types[DataType].BaseType].Kind = CHARTYPE);
+end;
+
+
+
+
+function LowBound(DataType: Integer): Integer;
 begin
 Result := 0;
 case Types[DataType].Kind of
@@ -591,7 +676,7 @@ end;
 
 
 
-function HighBound{(DataType: Integer): Integer};
+function HighBound(DataType: Integer): Integer;
 begin
 Result := 0;
 case Types[DataType].Kind of
@@ -612,7 +697,7 @@ end;
 
 
 
-function TypeSize{(DataType: Integer): Integer};
+function TypeSize(DataType: Integer): Integer;
 var
   CurSize: Integer;
   i: Integer;
@@ -624,7 +709,7 @@ case Types[DataType].Kind of
   SHORTINTTYPE:             Result := SizeOf(ShortInt);
   WORDTYPE:                 Result := SizeOf(Word);
   BYTETYPE:                 Result := SizeOf(Byte);  
-  CHARTYPE:                 Result := SizeOf(Char);
+  CHARTYPE:                 Result := SizeOf(TCharacter);
   BOOLEANTYPE:              Result := SizeOf(Boolean);
   REALTYPE:                 Result := SizeOf(Single);
   POINTERTYPE:              Result := SizeOf(Pointer);
@@ -650,7 +735,7 @@ end;
 
 
 
-function GetCompatibleType{(LeftType, RightType: Integer): Integer};
+function GetCompatibleType(LeftType, RightType: Integer): Integer;
 begin
 Result := 0;
 
@@ -671,6 +756,10 @@ else                                         // Special cases
       Result := LeftType;
       end;
     end;
+    
+  // Strings are compatible with any other strings
+  if IsString(LeftType) and IsString(RightType) then
+    Result := LeftType;  
     
   // Untyped pointers are compatible with any other pointers
   if (Types[LeftType].Kind = POINTERTYPE) and (Types[RightType].Kind = POINTERTYPE) and
@@ -704,13 +793,13 @@ else                                         // Special cases
   end; // if
 
 if Result = 0 then
-  Error('Incompatible types');  
+  Error('Incompatible types: ' + GetTypeSpelling(LeftType) + ' and ' + GetTypeSpelling(RightType));  
 end;
 
 
 
 
-function GetCompatibleRefType{(LeftType, RightType: Integer): Integer};
+function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
 begin
 // This function is asymmetric and implies Variable(LeftType) := Variable(RightType)
 Result := 0;
@@ -743,24 +832,13 @@ else                                         // Special cases
   end; // if  
 
 if Result = 0 then
-  Error('Incompatible types');  
+  Error('Incompatible types: ' + GetTypeSpelling(LeftType) + ' and ' + GetTypeSpelling(RightType));  
 end;
 
 
 
 
-function ConversionToRealIsPossible{(SrcType, DestType: Integer): Boolean};
-begin
-// Implicit type conversion is possible if DestType is real and SrcType is integer or a subrange of integer
-Result := (Types[DestType].Kind = REALTYPE) and
-          ((Types[SrcType].Kind in IntegerTypes) or
-           ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind in IntegerTypes)));
-end;
-
-
-
-
-procedure CheckOperator{(const Tok: TToken; DataType: Integer)}; 
+procedure CheckOperator(const Tok: TToken; DataType: Integer); 
 begin
 with Types[DataType] do
   if Kind = SUBRANGETYPE then
@@ -768,7 +846,7 @@ with Types[DataType] do
   else 
     begin
     if not (Kind in OrdinalTypes) and (Kind <> REALTYPE) and (Kind <> POINTERTYPE) and (Kind <> PROCEDURALTYPE) then
-      Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
+      Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable to ' + GetTypeSpelling(DataType));
      
     if ((Kind in IntegerTypes)  and not (Tok.Kind in OperatorsForIntegers)) or
        ((Kind = REALTYPE)       and not (Tok.Kind in OperatorsForReals)) or   
@@ -778,14 +856,14 @@ with Types[DataType] do
        ((Kind = ENUMERATEDTYPE) and not (Tok.Kind in RelationOperators)) or
        ((Kind = PROCEDURALTYPE) and not (Tok.Kind in RelationOperators)) 
     then
-      Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable');
+      Error('Operator ' + GetTokSpelling(Tok.Kind) + ' is not applicable to ' + GetTypeSpelling(DataType));
     end;  
 end;
 
 
 
 
-procedure CheckSignatures{(var Signature1, Signature2: TSignature; const Name: TString)};
+procedure CheckSignatures(var Signature1, Signature2: TSignature; const Name: TString; CheckParamNames: Boolean = TRUE);
 var
   i: Integer;
 begin
@@ -797,8 +875,14 @@ if Signature1.NumDefaultParams <> Signature2.NumDefaultParams then
   
 for i := 1 to Signature1.NumParams do
   begin
+  if (Signature1.Param[i]^.Name <> Signature2.Param[i]^.Name) and CheckParamNames then
+    Error('Incompatible parameter names in ' + Name);
+  
   if Signature1.Param[i]^.DataType <> Signature2.Param[i]^.DataType then
-    Error('Incompatible types in ' + Name);
+    if not Types[Signature1.Param[i]^.DataType].IsOpenArray or not Types[Signature2.Param[i]^.DataType].IsOpenArray or
+       (Types[Signature1.Param[i]^.DataType].BaseType <> Types[Signature2.Param[i]^.DataType].BaseType) 
+    then 
+      Error('Incompatible parameter types in ' + Name + ': ' + GetTypeSpelling(Signature1.Param[i]^.DataType) + ' and ' + GetTypeSpelling(Signature2.Param[i]^.DataType));
     
   if Signature1.Param[i]^.PassMethod <> Signature2.Param[i]^.PassMethod then
     Error('Incompatible CONST/VAR modifiers in ' + Name);
@@ -808,7 +892,7 @@ for i := 1 to Signature1.NumParams do
   end; // if
 
 if Signature1.ResultType <> Signature2.ResultType then
-  Error('Incompatible result type in ' + Name);
+  Error('Incompatible result types in ' + Name + ': ' + GetTypeSpelling(Signature1.ResultType) + ' and ' + GetTypeSpelling(Signature2.ResultType));
   
 if Signature1.IsStdCall <> Signature2.IsStdCall then
   Error('STDCALL is incompatible with non-STDCALL in ' + Name);
@@ -818,7 +902,7 @@ end;
 
 
 
-procedure SetUnitStatus{(var NewUnitStatus: TUnitStatus)};
+procedure SetUnitStatus(var NewUnitStatus: TUnitStatus);
 begin 
 UnitStatus := NewUnitStatus;
 end;
@@ -826,7 +910,7 @@ end;
 
 
 
-function GetUnitUnsafe{(const UnitName: TString): Integer};
+function GetUnitUnsafe(const UnitName: TString): Integer;
 var
   UnitIndex: Integer;
 begin
@@ -843,7 +927,7 @@ end;
 
 
 
-function GetUnit{(const UnitName: TString): Integer};
+function GetUnit(const UnitName: TString): Integer;
 begin
 Result := GetUnitUnsafe(UnitName);
 if Result = 0 then
@@ -853,7 +937,7 @@ end;
 
 
 
-function GetKeyword{(const KeywordName: TString): TTokenKind};
+function GetKeyword(const KeywordName: TString): TTokenKind;
 var
   Max, Mid, Min: Integer;
   Found: Boolean;
@@ -879,33 +963,21 @@ end;
 
 
 
-function GetIdentUnsafe{(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer};
+function GetIdentUnsafe(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer;
 var
-  IdentIndex, BlockStackIndex: Integer;
+  IdentIndex: Integer;
 begin
-// First search the current unit 
-for BlockStackIndex := BlockStackTop downto 1 do
-  for IdentIndex := NumIdent downto 1 do
-    with Ident[IdentIndex] do
-      if (Name = IdentName) and (UnitIndex = UnitStatus.Index) and (Block = BlockStack[BlockStackIndex].Index) and       
-         (AllowForwardReference or (Kind <> USERTYPE) or (Types[DataType].Kind <> FORWARDTYPE)) and
-         (ReceiverType = RecType)  // Receiver type for methods, 0 otherwise
-      then 
-        begin
-        Result := IdentIndex;
-        Exit;
-        end;          
-
-// If unsuccessful, search other used units
 for IdentIndex := NumIdent downto 1 do
-  with Ident[IdentIndex] do  
-    if (Name = IdentName) and (UnitIndex <> UnitStatus.Index) and IsExported and (UnitIndex in UnitStatus.UsedUnits) and
-       (ReceiverType = RecType)  // Receiver type for methods, 0 otherwise
+  with Ident[IdentIndex] do
+    if ((UnitIndex = UnitStatus.Index) or (IsExported and (UnitIndex in UnitStatus.UsedUnits))) and       
+       (AllowForwardReference or (Kind <> USERTYPE) or (Types[DataType].Kind <> FORWARDTYPE)) and
+       (ReceiverType = RecType) and  // Receiver type for methods, 0 otherwise
+       (Name = IdentName)
     then 
       begin
       Result := IdentIndex;
       Exit;
-      end; 
+      end;          
      
 Result := 0;
 end;
@@ -913,7 +985,7 @@ end;
 
 
 
-function GetIdent{(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer};
+function GetIdent(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer;
 begin
 Result := GetIdentUnsafe(IdentName, AllowForwardReference, RecType);
 if Result = 0 then
@@ -923,7 +995,7 @@ end;
 
 
 
-function GetFieldUnsafe{(RecType: Integer; const FieldName: TString): Integer};
+function GetFieldUnsafe(RecType: Integer; const FieldName: TString): Integer;
 var
   FieldIndex: Integer;
 begin
@@ -940,7 +1012,7 @@ end;
 
 
 
-function GetField{(RecType: Integer; const FieldName: TString): Integer};
+function GetField(RecType: Integer; const FieldName: TString): Integer;
 begin
 Result := GetFieldUnsafe(RecType, FieldName);
 if Result = 0 then
@@ -950,7 +1022,7 @@ end;
 
 
 
-function GetFieldInsideWith{(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer};
+function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer;
 var
   FieldIndex, WithIndex: Integer;
 begin 
@@ -973,18 +1045,7 @@ end;
 
 
 
-function FieldInsideWithFound{(const FieldName: TString): Boolean};
-var
-  RecPointer: Integer; 
-  RecType: Integer;        
-begin
-Result := GetFieldInsideWith(RecPointer, RecType, FieldName) <> 0;
-end;
-
-
-
-
-function GetMethodUnsafe{(RecType: Integer; const MethodName: TString): Integer};
+function GetMethodUnsafe(RecType: Integer; const MethodName: TString): Integer;
 begin
 Result := GetIdentUnsafe(MethodName, FALSE, RecType);
 end;
@@ -992,12 +1053,47 @@ end;
 
 
 
-function GetMethod{(RecType: Integer; const MethodName: TString): Integer};
+function GetMethod(RecType: Integer; const MethodName: TString): Integer;
 begin
 Result := GetIdent(MethodName, FALSE, RecType);
 if (Ident[Result].Kind <> PROC) and (Ident[Result].Kind <> FUNC) then
   Error('Method expected');
 end;
+
+
+
+
+function GetMethodInsideWith(var RecPointer: Integer; var RecType: Integer; const MethodName: TString): Integer;
+var
+  MethodIndex, WithIndex: Integer;
+begin 
+for WithIndex := WithNesting downto 1 do
+  begin
+  RecType := WithStack[WithIndex].DataType;
+  MethodIndex := GetMethodUnsafe(RecType, MethodName);
+  
+  if MethodIndex <> 0 then
+    begin
+    RecPointer := WithStack[WithIndex].TempPointer;
+    Result := MethodIndex;
+    Exit;
+    end;
+  end;
+
+Result := 0;  
+end;
+
+
+
+
+function FieldOrMethodInsideWithFound(const Name: TString): Boolean;
+var
+  RecPointer: Integer; 
+  RecType: Integer;        
+begin
+Result := (GetFieldInsideWith(RecPointer, RecType, Name) <> 0) or (GetMethodInsideWith(RecPointer, RecType, Name) <> 0);
+end;
+
 
 
 end.
