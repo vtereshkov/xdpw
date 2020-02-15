@@ -2008,7 +2008,11 @@ case Tok.Kind of
     NextTok;
     
     if FieldOrMethodInsideWithFound(Tok.Name) then         // Record field inside a WITH block
-      CompileDesignator(ValType)
+      begin
+      CompileDesignator(ValType);
+      DeclareType(POINTERTYPE);
+      Types[NumTypes].BaseType := ValType;
+      end      
     else                                                    // Ordinary identifier
       begin  
       IdentIndex := GetIdent(Tok.Name);
@@ -2018,14 +2022,22 @@ case Tok.Kind of
         if (Ident[IdentIndex].PredefProc <> EMPTYPROC) or (Ident[IdentIndex].Block <> 1) then
           Error('Procedure or function cannot be predefined or nested');
           
-        PushRelocConst(Ident[IdentIndex].Value, CODERELOC); // To be resolved later when code section origin is known        
+        PushRelocConst(Ident[IdentIndex].Value, CODERELOC); // To be resolved later when the code section origin is known        
         NextTok;
+        
+        DeclareType(PROCEDURALTYPE);
+        Types[NumTypes].Signature := Ident[IdentIndex].Signature;
+        CopyParams(Types[NumTypes].Signature, Ident[IdentIndex].Signature);
         end
-      else  
+      else
+        begin  
         CompileDesignator(ValType);
+        DeclareType(POINTERTYPE);
+        Types[NumTypes].BaseType := ValType;
+        end;
       end;  
-      
-    ValType := POINTERTYPEINDEX;
+    
+    ValType := NumTypes;  
     end;
 
 
@@ -3332,8 +3344,9 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       DataType := Ident[TypeIdentIndex].DataType;
       
       Types[TypeIndex] := Types[DataType];
+      Types[TypeIndex].AliasType := DataType;
       
-      if Types[DataType].Kind = RECORDTYPE then
+      if Types[DataType].Kind in [RECORDTYPE, INTERFACETYPE] then
         for FieldIndex := 1 to Types[DataType].NumFields do
           begin
           New(Types[TypeIndex].Field[FieldIndex]);

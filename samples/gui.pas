@@ -100,7 +100,7 @@ StrToChars('GUI Demo', WindowText);
 with wc do
   begin
   style         := 0;
-  lpfnWndProc   := @WindowProc;
+  lpfnWndProc   := Pointer(@WindowProc);
   cbClsExtra    := 0;
   cbWndExtra    := 0;
   hInstance     := hInst;
@@ -108,14 +108,14 @@ with wc do
   hCursor       := LoadCursorA(0, Pointer(IDC_ARROW));
   hbrBackground := 0;
   lpszMenuName  := nil;
-  lpszClassName := @ClassName;
+  lpszClassName := @ClassName[0];
   end;  
 
 RegisterClassA(wc);
 
 hWnd := CreateWindowExA(0,                      // optional styles
-                        @ClassName,             // class
-                        @WindowText,            // text
+                        @ClassName[0],          // class
+                        @WindowText[0],         // text
                         WS_OVERLAPPEDWINDOW,    // style
                         100,                    // position X
                         100,                    // position Y

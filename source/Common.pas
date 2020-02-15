@@ -264,6 +264,7 @@ type
   TType = record    
     Block: Integer;
     BaseType: Integer;
+    AliasType: Integer;
     
   case Kind: TTypeKind of     
     SUBRANGETYPE:              (Low, High: Integer);
@@ -308,7 +309,7 @@ type
 var
   Ident: array [1..MAXIDENTS] of TIdentifier;
   Types: array [1..MAXTYPES] of TType;
-  InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of TCharacter;
+  InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of Byte;
   Units: array [1..MAXUNITS] of TUnit;
   BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
   WithStack: array [1..MAXWITHNESTING] of TWithDesignator;
@@ -329,6 +330,7 @@ var
 
 procedure InitializeCommon;
 procedure FinalizeCommon;
+procedure CopyParams(var LeftSignature, RightSignature: TSignature);
 procedure DisposeParams(var Signature: TSignature);
 procedure DisposeFields(var DataType: TType);
 function GetTokSpelling(TokKind: TTokenKind): TString;
@@ -500,6 +502,20 @@ end;
 
 
 
+procedure CopyParams(var LeftSignature, RightSignature: TSignature);
+var
+  i: Integer;
+begin
+for i := 1 to RightSignature.NumParams do
+  begin
+  New(LeftSignature.Param[i]);
+  LeftSignature.Param[i]^ := RightSignature.Param[i]^;
+  end;
+end;
+
+
+
+
 procedure DisposeParams(var Signature: TSignature);
 var
   i: Integer;
@@ -633,14 +649,14 @@ Tok.StrLength := Length(StrValue);
 
 for i := 1 to Length(StrValue) do
   begin
-  InitializedGlobalData[InitializedGlobalDataSize] := StrValue[i];
+  InitializedGlobalData[InitializedGlobalDataSize] := Ord(StrValue[i]);
   Inc(InitializedGlobalDataSize);
   if InitializedGlobalDataSize > MAXINITIALIZEDDATASIZE - 1 then
     Error('Maximum string data size exceeded');
   end;
 
 // Add string termination character
-InitializedGlobalData[InitializedGlobalDataSize] := #0;
+InitializedGlobalData[InitializedGlobalDataSize] := 0;
 Inc(InitializedGlobalDataSize);
 end;
 
@@ -739,58 +755,72 @@ function GetCompatibleType(LeftType, RightType: Integer): Integer;
 begin
 Result := 0;
 
-if LeftType = RightType then                 // General rule
+// General rule
+if LeftType = RightType then                 
   Result := LeftType
-else                                         // Special cases
+
+// Special cases
+// All types are compatible with their aliases
+else if Types[LeftType].AliasType <> 0 then
+  Result := GetCompatibleType(Types[LeftType].AliasType, RightType)
+else if Types[RightType].AliasType <> 0 then
+  Result := GetCompatibleType(LeftType, Types[RightType].AliasType)
+
+// Sets are compatible with other sets having a compatible base type, or with an empty set constructor
+else if (Types[LeftType].Kind = SETTYPE) and (Types[RightType].Kind = SETTYPE) then
   begin
-  // Sets are compatible with other sets having a compatible base type, or with an empty set constructor
-  if (Types[LeftType].Kind = SETTYPE) and (Types[RightType].Kind = SETTYPE) then
-    begin
-    if Types[RightType].BaseType = ANYTYPEINDEX then
-      Result := LeftType
-    else if Types[LeftType].BaseType = ANYTYPEINDEX then
-      Result := RightType
-    else
-      begin  
-      GetCompatibleType(Types[LeftType].BaseType, Types[RightType].BaseType);
-      Result := LeftType;
-      end;
+  if Types[RightType].BaseType = ANYTYPEINDEX then
+    Result := LeftType
+  else if Types[LeftType].BaseType = ANYTYPEINDEX then
+    Result := RightType
+  else
+    begin  
+    GetCompatibleType(Types[LeftType].BaseType, Types[RightType].BaseType);
+    Result := LeftType;
     end;
+  end
+  
+// Strings are compatible with any other strings
+else if IsString(LeftType) and IsString(RightType) then
+  Result := LeftType
+
+// Untyped pointers are compatible with any pointers or procedural types
+else if (Types[LeftType].Kind = POINTERTYPE) and (Types[LeftType].BaseType = ANYTYPEINDEX) and
+        (Types[RightType].Kind in [POINTERTYPE, PROCEDURALTYPE]) then
+  Result := LeftType
+else if (Types[RightType].Kind = POINTERTYPE) and (Types[RightType].BaseType = ANYTYPEINDEX) and
+        (Types[LeftType].Kind in [POINTERTYPE, PROCEDURALTYPE]) then
+  Result := RightType   
+  
+// Typed pointers are compatible with any pointers to a reference-compatible type
+else if (Types[LeftType].Kind = POINTERTYPE) and (Types[RightType].Kind = POINTERTYPE) then
+  Result := GetCompatibleRefType(Types[LeftType].BaseType, Types[RightType].BaseType)
     
-  // Strings are compatible with any other strings
-  if IsString(LeftType) and IsString(RightType) then
-    Result := LeftType;  
-    
-  // Untyped pointers are compatible with any other pointers
-  if (Types[LeftType].Kind = POINTERTYPE) and (Types[RightType].Kind = POINTERTYPE) and
-     ((Types[LeftType].BaseType = ANYTYPEINDEX) or (Types[RightType].BaseType = ANYTYPEINDEX)) then
-    Result := LeftType;
-    
-  // Procedural types are compatible with any untyped pointers
-  if ((Types[LeftType].Kind = PROCEDURALTYPE) and (Types[RightType].Kind = POINTERTYPE) and (Types[RightType].BaseType = ANYTYPEINDEX)) or
-     ((Types[LeftType].Kind = POINTERTYPE) and (Types[LeftType].BaseType = ANYTYPEINDEX) and (Types[RightType].Kind = PROCEDURALTYPE)) then
-    Result := RightType;    
+// Procedural types are compatible if their Self pointer offsets are equal and their signatures are compatible
+else if (Types[LeftType].Kind = PROCEDURALTYPE) and (Types[RightType].Kind = PROCEDURALTYPE) and
+        (Types[LeftType].SelfPointerOffset = Types[RightType].SelfPointerOffset) then
+  begin
+  CheckSignatures(Types[LeftType].Signature, Types[RightType].Signature, 'procedural variable', FALSE);
+  Result := LeftType; 
+  end
+  
+// Subranges are compatible with their host types
+else if Types[LeftType].Kind = SUBRANGETYPE then
+  Result := GetCompatibleType(Types[LeftType].BaseType, RightType)
+else if Types[RightType].Kind = SUBRANGETYPE then
+  Result := GetCompatibleType(LeftType, Types[RightType].BaseType)
 
-  // Subranges are compatible with their host types
-  if Types[LeftType].Kind = SUBRANGETYPE then
-    Result := GetCompatibleType(Types[LeftType].BaseType, RightType);
-  if Types[RightType].Kind = SUBRANGETYPE then
-    Result := GetCompatibleType(LeftType, Types[RightType].BaseType);
+// Integers
+else if (Types[LeftType].Kind in IntegerTypes) and (Types[RightType].Kind in IntegerTypes) then
+  Result := LeftType
 
-  // Integers
-  if (Types[LeftType].Kind in IntegerTypes) and (Types[RightType].Kind in IntegerTypes) then
-    Result := LeftType;
+// Booleans
+else if (Types[LeftType].Kind = BOOLEANTYPE) and (Types[RightType].Kind = BOOLEANTYPE) then
+  Result := LeftType
 
-  // Booleans
-  if (Types[LeftType].Kind = BOOLEANTYPE) and
-     (Types[RightType].Kind = BOOLEANTYPE) then
-    Result := LeftType;
-
-  // Characters
-  if (Types[LeftType].Kind = CHARTYPE) and
-     (Types[RightType].Kind = CHARTYPE) then
-    Result := LeftType;
-  end; // if
+// Characters
+else if (Types[LeftType].Kind = CHARTYPE) and  (Types[RightType].Kind = CHARTYPE) then
+  Result := LeftType;
 
 if Result = 0 then
   Error('Incompatible types: ' + GetTypeSpelling(LeftType) + ' and ' + GetTypeSpelling(RightType));  
@@ -804,32 +834,35 @@ begin
 // This function is asymmetric and implies Variable(LeftType) := Variable(RightType)
 Result := 0;
 
-if LeftType = RightType then                 // General rule
+// General rule
+if LeftType = RightType then                 
   Result := RightType
-else                                         // Special cases
-  begin
-  // Open arrays are compatible with any other arrays of the same base type
-  if (Types[LeftType].Kind = ARRAYTYPE) and (Types[RightType].Kind = ARRAYTYPE) and 
-      Types[LeftType].IsOpenArray and (Types[LeftType].BaseType = Types[RightType].BaseType) 
-  then       
-    Result := RightType;
+  
+// Special cases
+// All types are compatible with their aliases  
+else if Types[LeftType].AliasType <> 0 then
+  Result := GetCompatibleRefType(Types[LeftType].AliasType, RightType)
+else if Types[RightType].AliasType <> 0 then
+  Result := GetCompatibleRefType(LeftType, Types[RightType].AliasType)
 
-  // Untyped pointers are compatible with any other pointers 
-  if (Types[LeftType].Kind = POINTERTYPE) and (Types[RightType].Kind = POINTERTYPE) and
-     (Types[LeftType].BaseType = ANYTYPEINDEX) 
-  then  
-    Result := RightType;
-    
-  // Untyped files are compatible with any other files 
-  if (Types[LeftType].Kind = FILETYPE) and (Types[RightType].Kind = FILETYPE) and
-     (Types[LeftType].BaseType = ANYTYPEINDEX) 
-  then  
-    Result := RightType;    
-    
-  // Untyped parameters are compatible with any type
-  if Types[LeftType].Kind = ANYTYPE then
-    Result := RightType;
-  end; // if  
+// Open arrays are compatible with any other arrays of the same base type
+else if (Types[LeftType].Kind = ARRAYTYPE) and (Types[RightType].Kind = ARRAYTYPE) and 
+         Types[LeftType].IsOpenArray and (Types[LeftType].BaseType = Types[RightType].BaseType) then       
+  Result := RightType
+
+// Untyped pointers are compatible with any other pointers 
+else if (Types[LeftType].Kind = POINTERTYPE) and (Types[RightType].Kind = POINTERTYPE) and
+       ((Types[LeftType].BaseType = Types[RightType].BaseType) or (Types[LeftType].BaseType = ANYTYPEINDEX)) then  
+  Result := RightType
+  
+// Untyped files are compatible with any other files 
+else if (Types[LeftType].Kind = FILETYPE) and (Types[RightType].Kind = FILETYPE) and
+        (Types[LeftType].BaseType = ANYTYPEINDEX) then  
+  Result := RightType   
+  
+// Untyped parameters are compatible with any type
+else if Types[LeftType].Kind = ANYTYPE then
+  Result := RightType;
 
 if Result = 0 then
   Error('Incompatible types: ' + GetTypeSpelling(LeftType) + ' and ' + GetTypeSpelling(RightType));  

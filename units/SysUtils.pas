@@ -128,7 +128,7 @@ repeat
   Inc(i);
   WideStringBuf[i] := Ord(s[i]);
 until s[i] = #0;
-Result := @WideStringBuf;  
+Result := @WideStringBuf[1];  
 end;
 
 
