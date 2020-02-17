@@ -376,8 +376,6 @@ end;
 
 
 function Copy(const S: string; Index, Count: Integer): string;
-var
-  i: Integer;
 begin
 Move(S[Index], Result, Count);
 Result[Count + 1] := #0;  
@@ -403,7 +401,6 @@ function ParseCmdLine(Index: Integer; var Str: string): Integer;
 var
   CmdLine: string;
   CmdLinePtr: ^string;
-  Param: string;
   ParamPtr: array [0..7] of ^string;
   i, NumParam, CmdLineLen: Integer;
 

@@ -244,6 +244,7 @@ type
     ResultIdentIndex: Integer;
     ProcAsBlock: Integer;
     PredefProc: TPredefProc;
+    IsUsed: Boolean;
     IsUnresolvedForward: Boolean;
     IsExported: Boolean;
     ForLoopNesting: Integer;                    // Number of nested FOR loops where the label is defined
@@ -335,8 +336,9 @@ procedure DisposeParams(var Signature: TSignature);
 procedure DisposeFields(var DataType: TType);
 function GetTokSpelling(TokKind: TTokenKind): TString;
 function GetTypeSpelling(DataType: Integer): TString;
-procedure SetWriteProcs(NewNoticeProc, NewErrorProc: TWriteProc);
+procedure SetWriteProcs(NewNoticeProc, NewWarningProc, NewErrorProc: TWriteProc);
 procedure Notice(const Msg: TString);
+procedure Warning(const Msg: TString);
 procedure Error(const Msg: TString);
 procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
 function IsString(DataType: Integer): Boolean;
@@ -416,7 +418,7 @@ const
 
 
 var
-  NoticeProc, ErrorProc: TWriteProc;
+  NoticeProc, WarningProc, ErrorProc: TWriteProc;
   UnitStatus: TUnitStatus;
   
   
@@ -615,10 +617,11 @@ end;
 
 
 
-procedure SetWriteProcs(NewNoticeProc, NewErrorProc: TWriteProc);
+procedure SetWriteProcs(NewNoticeProc, NewWarningProc, NewErrorProc: TWriteProc);
 begin
-NoticeProc := NewNoticeProc;
-ErrorProc := NewErrorProc;
+NoticeProc  := NewNoticeProc;
+WarningProc := NewWarningProc;
+ErrorProc   := NewErrorProc;
 end;
 
 
@@ -627,6 +630,14 @@ end;
 procedure Notice(const Msg: TString);
 begin
 NoticeProc(Msg);
+end;
+
+
+
+
+procedure Warning(const Msg: TString);
+begin
+WarningProc(Msg);
 end;
 
 

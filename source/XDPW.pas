@@ -56,6 +56,17 @@ end;
 
 
 
+procedure WarningProc(const Msg: TString);
+begin
+if NumUnits >= 1 then
+  Notice('Warning ' + ScannerFileName + ' ' + IntToStr(ScannerLine) + ': ' + Msg)
+else
+  Notice('Warning: ' + Msg);  
+end;
+
+
+
+
 procedure ErrorProc(const Msg: TString);
 begin
 if NumUnits >= 1 then
@@ -77,7 +88,7 @@ var
 
 
 begin
-SetWriteProcs(@NoticeProc, @ErrorProc);
+SetWriteProcs(@NoticeProc, @WarningProc, @ErrorProc);
 
 Notice('XD Pascal for Windows ' + VERSION);
 Notice('Copyright (c) 2009-2010, 2019-2020, Vasiliy Tereshkov');
