@@ -77,6 +77,10 @@ var
 
 function GetCommandLineA: Pointer stdcall; external 'KERNEL32.DLL';
 
+function GetModuleFileNameA(hModule: LongInt; 
+                            var lpFilename: string;
+                            nSize: LongInt): LongInt stdcall; external 'KERNEL32.DLL';
+
 function GetProcessHeap: LongInt stdcall; external 'KERNEL32.DLL';
 
 function HeapAlloc(hHeap,
@@ -446,10 +450,11 @@ end;
 
 
 function ParamStr(Index: Integer): string;
-var
-  NumParam: Integer;
-begin  
-NumParam := ParseCmdLine(Index, Result);
+begin
+if Index = 0 then
+  GetModuleFileNameA(0, Result, SizeOf(Result))
+else  
+  ParseCmdLine(Index, Result);
 end;   
 
 
