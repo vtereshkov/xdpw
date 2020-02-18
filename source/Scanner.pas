@@ -279,7 +279,7 @@ end;
 
 procedure ReadHexadecimalNumber;
 var
-  Num: Integer;
+  Num, Digit: Integer;
   NumFound: Boolean;
 begin
 with ScannerState do
@@ -289,10 +289,15 @@ with ScannerState do
   NumFound := FALSE;
   while ch in HexDigits do
     begin
+    if Num and $F0000000 <> 0 then
+      Error('Numeric constant is too large');
+    
     if ch in Digits then
-      Num := 16 * Num + Ord(ch) - Ord('0')
+      Digit := Ord(ch) - Ord('0')
     else
-      Num := 16 * Num + Ord(ch) - Ord('A') + 10;
+      Digit := Ord(ch) - Ord('A') + 10;
+      
+    Num := Num shl 4 or Digit;  
     NumFound := TRUE;
     ReadUppercaseChar(ch);
     end;
@@ -310,7 +315,7 @@ end;
 
 procedure ReadDecimalNumber;
 var
-  Num, Expon: Integer;
+  Num, Expon, Digit: Integer;
   Frac, FracWeight: Single;
   NegExpon, RangeFound, ExponFound: Boolean;
 begin
@@ -323,7 +328,12 @@ with ScannerState do
 
   while ch in Digits do
     begin
-    Num := 10 * Num + Ord(ch) - Ord('0');
+    Digit := Ord(ch) - Ord('0'); 
+   
+    if Num > (HighBound(INTEGERTYPEINDEX) - Digit) div 10 then
+      Error('Numeric constant is too large');
+      
+    Num := 10 * Num + Digit;
     ReadUppercaseChar(ch);
     end;
 
@@ -360,7 +370,8 @@ with ScannerState do
 
         while ch in Digits do
           begin
-          Frac := Frac + FracWeight * (Ord(ch) - Ord('0'));
+          Digit := Ord(ch) - Ord('0');
+          Frac := Frac + FracWeight * Digit;
           FracWeight := FracWeight / 10;
           ReadUppercaseChar(ch);
           end;
@@ -383,7 +394,8 @@ with ScannerState do
         ExponFound := FALSE;
         while ch in Digits do
           begin
-          Expon := 10 * Expon + Ord(ch) - Ord('0');
+          Digit := Ord(ch) - Ord('0');
+          Expon := 10 * Expon + Digit;
           ReadUppercaseChar(ch);
           ExponFound := TRUE;
           end;
