@@ -3381,11 +3381,15 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     
     if IsString(ConstType) then                 // Special case: strings
       begin
-      if (Tok.Kind <> CHARLITERALTOK) and (Tok.Kind <> STRINGLITERALTOK) then
-        CheckTok(STRINGLITERALTOK);
+      CompileConstExpression(ConstVal, ConstValType);
+      ConvertConstCharToString(ConstType, ConstValType, ConstVal);
+      GetCompatibleType(ConstType, ConstValType);
+      
+      if Length(ConstVal.StrValue) > TypeSize(ConstType) - 1 then
+        Error('String is too long');
         
-      Move(InitializedGlobalData[Tok.StrAddress], InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
-      NextTok;
+      Move(ConstVal.StrValue[1], InitializedGlobalData[InitializedDataOffset], Length(ConstVal.StrValue));
+      InitializedGlobalData[InitializedDataOffset + Length(ConstVal.StrValue)] := 0;      // Add string termination character
       end
     else                                        // General rule
       begin
