@@ -3,7 +3,6 @@
 
 {$I-}
 {$H-}
-{$J+}
 
 unit CodeGen;
 

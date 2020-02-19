@@ -63,14 +63,10 @@ type
 
 
 
-const
-  DecimalSeparator: Char = '.';
-  
-  
-
-var 
+var
   StdInputFile, StdOutputFile: file;  
-  
+  DecimalSeparator: Char = '.';   
+
 
 
 // Windows API functions
@@ -211,8 +207,8 @@ implementation
 var
   RandSeed: Integer;  
   Heap: LongInt;  
-  IOError: Integer;
-  LastReadChar: Char;  
+  IOError: Integer = 0;
+  LastReadChar: Char = ' ';  
   StdInputHandle, StdOutputHandle: LongInt;
   
   
@@ -239,8 +235,6 @@ FileRecPtr := PFileRec(@StdOutputFile);
 FileRecPtr^.Handle := StdOutputHandle;
 
 SetConsoleMode(StdInputHandle, $02F5);                      // set all flags except ENABLE_LINE_INPUT and ENABLE_WINDOW_INPUT 
-
-IOError := 0;
 end;
 
 

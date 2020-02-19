@@ -3,7 +3,6 @@
 
 {$I-}
 {$H-}
-{$J+}
 
 unit Scanner;
 
@@ -59,11 +58,10 @@ const
 var
   ScannerState: TScannerState;
   ScannerStack: array [1..SCANNERSTACKSIZE] of TScannerState;
+  ScannerStackTop: Integer = 0;
   
     
 const
-  ScannerStackTop: Integer = 0;
- 
   Digits:    set of TCharacter = ['0'..'9'];
   HexDigits: set of TCharacter = ['0'..'9', 'A'..'F'];
   Spaces:    set of TCharacter = [#1..#31, ' '];
@@ -442,8 +440,8 @@ with ScannerState do
 
   ReadNumber;
 
-  if Token.Kind = FRACNUMBERTOK then
-    Error('Integer character code expected');
+  if (Token.Kind = FRACNUMBERTOK) or (Token.Value < 0) or (Token.Value > 255) then
+    Error('Illegal character code');
 
   Token.Kind := CHARLITERALTOK;
   end;

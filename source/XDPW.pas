@@ -4,7 +4,6 @@
 {$APPTYPE CONSOLE}
 {$I-}
 {$H-}
-{$J+}
 
 program XDPW;
 

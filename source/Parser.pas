@@ -3,7 +3,6 @@
 
 {$I-}
 {$H-}
-{$J+}
 
 unit Parser;
 
@@ -136,7 +135,7 @@ case IdentKind of
     if IdentPassMethod = EMPTYPASSING then                              // Untyped constant
       case Types[IdentDataType].Kind of
         ARRAYTYPE:  begin
-                    Ident[NumIdent].StrValue := IdentStrConstValue;        // String constant value        
+                    Ident[NumIdent].StrValue := IdentStrConstValue;         // String constant value        
                     FictitiousTok.Kind := STRINGLITERALTOK;
                     DefineStaticString(FictitiousTok, IdentStrConstValue);
                     Ident[NumIdent].Value := FictitiousTok.StrAddress;      // String constant address
@@ -3348,7 +3347,122 @@ procedure CompileBlock(BlockIdentIndex: Integer);
           Types[TypeIndex].Field[FieldIndex]^ := Types[DataType].Field[FieldIndex]^;
           end;
       end; // if    
-  end; // ResolveForwardReferences    
+  end; // ResolveForwardReferences
+
+
+
+
+  procedure CompileInitializer(InitializedDataOffset: LongInt; ConstType: Integer);
+  var
+    ConstVal, ElementVal, ElementVal2: TConst;
+    ConstValType, ElementValType: Integer;
+    NumElements, ElementIndex, FieldIndex: Integer;
+    ElementPtr: ^Byte;
+    
+  begin
+  // Numbers
+  if Types[ConstType].Kind in OrdinalTypes + [REALTYPE] then
+    begin
+    CompileConstExpression(ConstVal, ConstValType);
+
+    // Try to convert integer to real
+    ConvertConstIntegerToReal(ConstType, ConstValType, ConstVal);          
+    GetCompatibleType(ConstType, ConstValType); 
+      
+    if Types[ConstType].Kind = REALTYPE then
+      Move(ConstVal.FracValue, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType))
+    else
+      Move(ConstVal.Value, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
+    end
+    
+  // Arrays
+  else if Types[ConstType].Kind = ARRAYTYPE then
+    begin
+    
+    if IsString(ConstType) then                 // Special case: strings
+      begin
+      if (Tok.Kind <> CHARLITERALTOK) and (Tok.Kind <> STRINGLITERALTOK) then
+        CheckTok(STRINGLITERALTOK);
+        
+      Move(InitializedGlobalData[Tok.StrAddress], InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
+      NextTok;
+      end
+    else                                        // General rule
+      begin
+      EatTok(OPARTOK);
+      
+      NumElements := HighBound(Types[ConstType].IndexType) - LowBound(Types[ConstType].IndexType) + 1;
+      for ElementIndex := 1 to NumElements do
+        begin
+        CompileInitializer(InitializedDataOffset, Types[ConstType].BaseType);
+        InitializedDataOffset := InitializedDataOffset + TypeSize(Types[ConstType].BaseType);
+        
+        if ElementIndex < NumElements then 
+          EatTok(COMMATOK)
+        else
+          EatTok(CPARTOK);  
+        end; // for
+      end; // else
+
+    end
+    
+  // Records
+  else if Types[ConstType].Kind = RECORDTYPE then
+    begin
+    EatTok(OPARTOK);
+    
+    repeat
+      AssertIdent;
+      FieldIndex := GetField(ConstType, Tok.Name);
+      
+      NextTok;
+      EatTok(COLONTOK);
+      
+      CompileInitializer(InitializedDataOffset + Types[ConstType].Field[FieldIndex]^.Offset, Types[ConstType].Field[FieldIndex]^.DataType);          
+      
+      if Tok.Kind <> SEMICOLONTOK then Break;
+      NextTok; 
+    until FALSE;
+    
+    EatTok(CPARTOK);
+    end
+    
+  // Sets
+  else if Types[ConstType].Kind = SETTYPE then
+    begin
+    EatTok(OBRACKETTOK);
+    
+    if Tok.Kind <> CBRACKETTOK then
+      repeat      
+        CompileConstExpression(ElementVal, ElementValType);            
+        GetCompatibleType(ElementValType, Types[ConstType].BaseType);
+
+        if Tok.Kind = RANGETOK then
+          begin
+          NextTok;
+          CompileConstExpression(ElementVal2, ElementValType);    
+          GetCompatibleType(ElementValType, Types[ConstType].BaseType);
+          end
+        else
+          ElementVal2 := ElementVal;
+          
+        for ElementIndex := ElementVal.Value to ElementVal2.Value do
+          begin
+          ElementPtr := @InitializedGlobalData[InitializedDataOffset + ElementIndex shr 3];
+          ElementPtr^ := ElementPtr^ or (1 shl (ElementIndex and 7));
+          end;
+
+        if Tok.Kind <> COMMATOK then Break;
+        NextTok;
+      until FALSE;
+    
+    EatTok(CBRACKETTOK);
+    end        
+ 
+  else
+    Error('Illegal type');         
+
+  end; // CompileInitializer    
 
 
 
@@ -3374,154 +3488,29 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   procedure CompileConstDeclarations;
   
   
-  
     procedure CompileUntypedConstDeclaration(var NameTok: TToken);
     var
       ConstVal: TConst;
       ConstValType: Integer;    
     begin
-    EatTok(EQTOK);
-    
+    EatTok(EQTOK);    
     CompileConstExpression(ConstVal, ConstValType);
     DeclareIdent(NameTok.Name, CONSTANT, 0, ConstValType, EMPTYPASSING, ConstVal.Value, ConstVal.FracValue, ConstVal.StrValue, EMPTYPROC, '', 0);
     end; // CompileUntypedConstDeclaration;
-    
-    
-    
+   
     
     procedure CompileTypedConstDeclaration(var NameTok: TToken);
-    
-    
-      procedure CompileTypedConstConstructor(InitializedDataOffset: LongInt; ConstType: Integer);
-      var
-        ConstVal, ElementVal, ElementVal2: TConst;
-        ConstValType, ElementValType: Integer;
-        NumElements, ElementIndex, FieldIndex: Integer;
-        ElementPtr: ^Byte;
-        
-      begin
-      // Numbers
-      if Types[ConstType].Kind in OrdinalTypes + [REALTYPE] then
-        begin
-        CompileConstExpression(ConstVal, ConstValType);
-
-        // Try to convert integer to real
-        ConvertConstIntegerToReal(ConstType, ConstValType, ConstVal);          
-        GetCompatibleType(ConstType, ConstValType); 
-          
-        if Types[ConstType].Kind = REALTYPE then
-          Move(ConstVal.FracValue, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType))
-        else
-          Move(ConstVal.Value, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
-        end
-        
-      // Arrays
-      else if Types[ConstType].Kind = ARRAYTYPE then
-        begin
-        
-        if IsString(ConstType) then                 // Special case: strings
-          begin
-          if (Tok.Kind <> CHARLITERALTOK) and (Tok.Kind <> STRINGLITERALTOK) then
-            CheckTok(STRINGLITERALTOK);
-            
-          Move(InitializedGlobalData[Tok.StrAddress], InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
-          NextTok;
-          end
-        else                                        // General rule
-          begin
-          EatTok(OPARTOK);
-          
-          NumElements := HighBound(Types[ConstType].IndexType) - LowBound(Types[ConstType].IndexType) + 1;
-          for ElementIndex := 1 to NumElements do
-            begin
-            CompileTypedConstConstructor(InitializedDataOffset, Types[ConstType].BaseType);
-            InitializedDataOffset := InitializedDataOffset + TypeSize(Types[ConstType].BaseType);
-            
-            if ElementIndex < NumElements then 
-              EatTok(COMMATOK)
-            else
-              EatTok(CPARTOK);  
-            end; // for
-          end; // else
- 
-        end
-        
-      // Records
-      else if Types[ConstType].Kind = RECORDTYPE then
-        begin
-        EatTok(OPARTOK);
-        
-        repeat
-          AssertIdent;
-          FieldIndex := GetField(ConstType, Tok.Name);
-          
-          NextTok;
-          EatTok(COLONTOK);
-          
-          CompileTypedConstConstructor(InitializedDataOffset + Types[ConstType].Field[FieldIndex]^.Offset, Types[ConstType].Field[FieldIndex]^.DataType);          
-          
-          if Tok.Kind <> SEMICOLONTOK then Break;
-          NextTok; 
-        until FALSE;
-        
-        EatTok(CPARTOK);
-        end
-        
-      // Sets
-      else if Types[ConstType].Kind = SETTYPE then
-        begin
-        EatTok(OBRACKETTOK);
-        
-        if Tok.Kind <> CBRACKETTOK then
-          repeat      
-            CompileConstExpression(ElementVal, ElementValType);            
-            GetCompatibleType(ElementValType, Types[ConstType].BaseType);
-
-            if Tok.Kind = RANGETOK then
-              begin
-              NextTok;
-              CompileConstExpression(ElementVal2, ElementValType);    
-              GetCompatibleType(ElementValType, Types[ConstType].BaseType);
-              end
-            else
-              ElementVal2 := ElementVal;
-              
-            for ElementIndex := ElementVal.Value to ElementVal2.Value do
-              begin
-              ElementPtr := @InitializedGlobalData[InitializedDataOffset + ElementIndex shr 3];
-              ElementPtr^ := ElementPtr^ or (1 shl (ElementIndex and 7));
-              end;
-  
-            if Tok.Kind <> COMMATOK then Break;
-            NextTok;
-          until FALSE;
-        
-        EatTok(CBRACKETTOK);
-        end        
-     
-      else
-        Error('Illegal type');         
- 
-      end; // CompileTypedConstConstructor  
-    
-    
     var
-      ConstType: Integer;
-      
-      
-    begin // CompileTypedConstDeclaration
+      ConstType: Integer;    
+    begin
     EatTok(COLONTOK);    
-    CompileType(ConstType);
-    
-    DeclareIdent(NameTok.Name, CONSTANT, 0, ConstType, VARPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
-    
+    CompileType(ConstType);    
+    DeclareIdent(NameTok.Name, CONSTANT, 0, ConstType, VARPASSING, 0, 0.0, '', EMPTYPROC, '', 0);    
     EatTok(EQTOK);    
-    CompileTypedConstConstructor(Ident[NumIdent].Value, ConstType);   
+    CompileInitializer(Ident[NumIdent].Value, ConstType);   
     end; // CompileTypedConstDeclaration    
 
 
-
-  
   var
     NameTok: TToken; 
    
@@ -3595,9 +3584,22 @@ procedure CompileBlock(BlockIdentIndex: Integer);
 
     CompileType(VarType);
 
-    for IdentInListIndex := 1 to NumIdentInList do
-      DeclareIdent(IdentInListName[IdentInListIndex], VARIABLE, 0, VarType, EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
-
+    if Tok.Kind = EQTOK then                                     // Initialized variable (equivalent to a typed constant)
+      begin
+      if BlockStack[BlockStackTop].Index <> 1 then
+        Error('Local variables cannot be initialized');
+        
+      if NumIdentInList <> 1 then
+        Error('Multiple variables cannot be initialized');
+        
+      NextTok;
+      DeclareIdent(IdentInListName[1], CONSTANT, 0, VarType, VARPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
+      CompileInitializer(Ident[NumIdent].Value, VarType);      
+      end
+    else                                                         // Uninitialized variables   
+      for IdentInListIndex := 1 to NumIdentInList do
+        DeclareIdent(IdentInListName[IdentInListIndex], VARIABLE, 0, VarType, EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);  
+      
     EatTok(SEMICOLONTOK);
   until Tok.Kind <> IDENTTOK;
 
