@@ -63,19 +63,19 @@ type
 
 
 
-const
-  DecimalSeparator: Char = '.';
-  
-  
-
-var 
+var
   StdInputFile, StdOutputFile: file;  
-  
+  DecimalSeparator: Char = '.';   
+
 
 
 // Windows API functions
 
 function GetCommandLineA: Pointer stdcall; external 'KERNEL32.DLL';
+
+function GetModuleFileNameA(hModule: LongInt; 
+                            var lpFilename: string;
+                            nSize: LongInt): LongInt stdcall; external 'KERNEL32.DLL';
 
 function GetProcessHeap: LongInt stdcall; external 'KERNEL32.DLL';
 
@@ -207,8 +207,8 @@ implementation
 var
   RandSeed: Integer;  
   Heap: LongInt;  
-  IOError: Integer;
-  LastReadChar: Char;  
+  IOError: Integer = 0;
+  LastReadChar: Char = ' ';  
   StdInputHandle, StdOutputHandle: LongInt;
   
   
@@ -227,16 +227,14 @@ begin
 Heap := GetProcessHeap;
 
 StdInputHandle := GetStdHandle(STD_INPUT_HANDLE);
-FileRecPtr := @StdInputFile;
+FileRecPtr := PFileRec(@StdInputFile);
 FileRecPtr^.Handle := StdInputHandle;
 
 StdOutputHandle := GetStdHandle(STD_OUTPUT_HANDLE);
-FileRecPtr := @StdOutputFile;
+FileRecPtr := PFileRec(@StdOutputFile);
 FileRecPtr^.Handle := StdOutputHandle;
 
 SetConsoleMode(StdInputHandle, $02F5);                      // set all flags except ENABLE_LINE_INPUT and ENABLE_WINDOW_INPUT 
-
-IOError := 0;
 end;
 
 
@@ -376,8 +374,6 @@ end;
 
 
 function Copy(const S: string; Index, Count: Integer): string;
-var
-  i: Integer;
 begin
 Move(S[Index], Result, Count);
 Result[Count + 1] := #0;  
@@ -403,7 +399,6 @@ function ParseCmdLine(Index: Integer; var Str: string): Integer;
 var
   CmdLine: string;
   CmdLinePtr: ^string;
-  Param: string;
   ParamPtr: array [0..7] of ^string;
   i, NumParam, CmdLineLen: Integer;
 
@@ -423,7 +418,7 @@ for i := 1 to CmdLineLen do
   if (i > 1) and (CmdLine[i] > ' ') and (CmdLine[i - 1] = #0) then
     begin
     Inc(NumParam);
-    ParamPtr[NumParam - 1] := @CmdLine[i];
+    ParamPtr[NumParam - 1] := Pointer(@CmdLine[i]);
     end;
   end;
   
@@ -449,10 +444,11 @@ end;
 
 
 function ParamStr(Index: Integer): string;
-var
-  NumParam: Integer;
-begin  
-NumParam := ParseCmdLine(Index, Result);
+begin
+if Index = 0 then
+  GetModuleFileNameA(0, Result, SizeOf(Result))
+else  
+  ParseCmdLine(Index, Result);
 end;   
 
 
@@ -466,7 +462,7 @@ procedure Assign(var F: file; const Name: string);
 var
   FileRecPtr: PFileRec;
 begin
-FileRecPtr := @F;
+FileRecPtr := PFileRec(@F);
 FileRecPtr^.Name := Name;
 end;
 
@@ -477,7 +473,7 @@ procedure Rewrite(var F: file; BlockSize: Integer = 1);
 var
   FileRecPtr: PFileRec;
 begin
-FileRecPtr := @F;
+FileRecPtr := PFileRec(@F);
 FileRecPtr^.Handle := CreateFileA(FileRecPtr^.Name, GENERIC_WRITE, 0, nil, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
 if FileRecPtr^.Handle = INVALID_HANDLE_VALUE then IOError := -2;
 end;
@@ -489,7 +485,7 @@ procedure Reset(var F: file; BlockSize: Integer = 1);
 var
   FileRecPtr: PFileRec;
 begin
-FileRecPtr := @F;
+FileRecPtr := PFileRec(@F);
 FileRecPtr^.Handle := CreateFileA(FileRecPtr^.Name, GENERIC_READ or GENERIC_WRITE, 0, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 if FileRecPtr^.Handle = INVALID_HANDLE_VALUE then IOError := -2;
 end;
@@ -501,7 +497,7 @@ procedure Close(var F: file);
 var
   FileRecPtr: PFileRec;
 begin
-FileRecPtr := @F;
+FileRecPtr := PFileRec(@F);
 CloseHandle(FileRecPtr^.Handle);
 end;
 
@@ -513,7 +509,7 @@ var
   FileRecPtr: PFileRec;
   LenWritten: Integer;
 begin
-FileRecPtr := @F;
+FileRecPtr := PFileRec(@F);
 WriteFile(FileRecPtr^.Handle, @Buf, Len, LenWritten, 0);
 end;
 
@@ -524,7 +520,7 @@ procedure BlockRead(var F: file; var Buf; Len: Integer; var LenRead: Integer);
 var
   FileRecPtr: PFileRec;
 begin
-FileRecPtr := @F;
+FileRecPtr := PFileRec(@F);
 ReadFile(FileRecPtr^.Handle, @Buf, Len, LenRead, 0);
 if LenRead < Len then IOError := -1;
 end;
@@ -536,7 +532,7 @@ procedure Seek(var F: file; Pos: Integer);
 var
   FileRecPtr: PFileRec;
 begin
-FileRecPtr := @F;
+FileRecPtr := PFileRec(@F);
 Pos := SetFilePointer(FileRecPtr^.Handle, Pos, nil, FILE_BEGIN);
 end;
 
@@ -547,7 +543,7 @@ function FileSize(var F: file): Integer;
 var
   FileRecPtr: PFileRec;
 begin
-FileRecPtr := @F;
+FileRecPtr := PFileRec(@F);
 Result := GetFileSize(FileRecPtr^.Handle, nil);
 end;
 
@@ -558,7 +554,7 @@ function FilePos(var F: file): Integer;
 var
   FileRecPtr: PFileRec;
 begin
-FileRecPtr := @F;
+FileRecPtr := PFileRec(@F);
 Result := SetFilePointer(FileRecPtr^.Handle, 0, nil, FILE_CURRENT);
 end;
 
@@ -569,7 +565,7 @@ function EOF(var F: file): Boolean;
 var
   FileRecPtr: PFileRec;
 begin
-FileRecPtr := @F;
+FileRecPtr := PFileRec(@F);
 if (FileRecPtr^.Handle = StdInputHandle) or (FileRecPtr^.Handle = StdOutputHandle) then
   Result := FALSE
 else
@@ -877,7 +873,7 @@ if P <> nil then                                      // String stream input
   end
 else
   begin
-  FileRecPtr := @F;
+  FileRecPtr := PFileRec(@F);
   BlockRead(F, ch, 1, Len); 
  
   if FileRecPtr^.Handle = StdInputHandle then         // Console input
@@ -1098,7 +1094,7 @@ procedure Val(const s: string; var Number: Real; var Code: Integer);
 var
   Stream: TStream;
 begin
-Stream.Data := @s;
+Stream.Data := PChar(@s);
 Stream.Index := 0;
 
 ReadReal(StdInputFile, @Stream, Number);
@@ -1113,7 +1109,7 @@ procedure Str(Number: Real; var s: string; DecPlaces: Integer = 0);
 var
   Stream: TStream;
 begin
-Stream.Data := @s;
+Stream.Data := PChar(@s);
 Stream.Index := 0;
 
 WriteReal(StdOutputFile, @Stream, Number, DecPlaces);
@@ -1127,7 +1123,7 @@ procedure IVal(const s: string; var Number: Integer; var Code: Integer);
 var
   Stream: TStream;
 begin
-Stream.Data := @s;
+Stream.Data := PChar(@s);
 Stream.Index := 0;
 
 ReadInt(StdInputFile, @Stream, Number);
@@ -1142,7 +1138,7 @@ procedure IStr(Number: Integer; var s: string);
 var
   Stream: TStream;
 begin
-Stream.Data := @s;
+Stream.Data := PChar(@s);
 Stream.Index := 0;
 
 WriteInt(StdOutputFile, @Stream, Number);
@@ -1156,7 +1152,7 @@ procedure PtrStr(Number: Integer; var s: string);
 var
   Stream: TStream;
 begin
-Stream.Data := @s;
+Stream.Data := PChar(@s);
 Stream.Index := 0;
 
 WritePointer(StdOutputFile, @Stream, Number);

@@ -13,6 +13,7 @@ XD Pascal is a small educational self-hosting compiler for a Pascal language dia
 * Support for both console and GUI applications
 * No external assembler or linker needed
 * Floating-point arithmetic using the x87 FPU
+* Seamless integration with Geany IDE
 * Compiler source for Delphi 6/7, Free Pascal and XD Pascal itself 
 
 ## Detailed description
@@ -67,6 +68,12 @@ DeclarationSection = LabelDeclarations |
                      TypeDeclarations |
                      VarDeclarations |
                      ProcFuncDeclarations .
+                     
+Initializer = ConstExpression |
+              StringLiteral |
+              "(" Initializer {"," Initializer} ")" |
+              "(" Ident ":" Initializer {";" Ident ":" Initializer} ")" |
+              SetConstructor .                     
                
 LabelDeclarations = "label" Ident {"," Ident} ";"               
              
@@ -75,17 +82,12 @@ ConstDeclarations = (UntypedConstDeclaration | TypedConstDeclaration)
 
 UntypedConstDeclaration = "const" Ident "=" ConstExpression .
                                  
-TypedConstDeclaration = "const" Ident ":" Type "=" TypedConstConstr .
-
-TypedConstConstr = ConstExpression |
-                   StringLiteral |
-                   "(" TypedConstConstr {"," TypedConstConstr} ")" |
-                   "(" Ident ":" TypedConstConstr {";" Ident ":" TypedConstConstr} ")" |
-                   SetConstructor .
+TypedConstDeclaration = "const" Ident ":" Type "=" Initializer .
 
 TypeDeclarations = "type" Ident "=" Type ";" {Ident "=" Type ";"} .
 
-VarDeclarations = "var" IdentList ":" Type ";" {IdentList ":" Type ";"} .
+VarDeclarations = "var" IdentList ":" Type ["=" Initializer] ";" 
+                       {IdentList ":" Type ["=" Initializer] ";"} .
 
 ProcFuncDeclarations = ("procedure" | "function") Ident 
                        [Receiver] [FormalParams] [":" TypeIdent] 
@@ -313,4 +315,4 @@ function PWideCharToStr(p: PWideChar): string;
 
 ### Known issues
 
-The Windows Defender is known to give false positive results on some programs compiled with XD Pascal.
+Windows Defender antivirus is known to give false positive results on some programs compiled with XD Pascal.

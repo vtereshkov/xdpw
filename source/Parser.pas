@@ -3,7 +3,6 @@
 
 {$I-}
 {$H-}
-{$J+}
 
 unit Parser;
 
@@ -79,6 +78,7 @@ with Ident[NumIdent] do
   Signature.NumParams := 0;
   Signature.IsStdCall := FALSE;
   PassMethod          := IdentPassMethod;
+  IsUsed              := FALSE;
   IsUnresolvedForward := FALSE;
   IsExported          := ParserState.IsInterfaceSection and (IdentScope = GLOBAL);
   ForLoopNesting      := 0;
@@ -135,7 +135,7 @@ case IdentKind of
     if IdentPassMethod = EMPTYPASSING then                              // Untyped constant
       case Types[IdentDataType].Kind of
         ARRAYTYPE:  begin
-                    Ident[NumIdent].StrValue := IdentStrConstValue;        // String constant value        
+                    Ident[NumIdent].StrValue := IdentStrConstValue;         // String constant value        
                     FictitiousTok.Kind := STRINGLITERALTOK;
                     DefineStaticString(FictitiousTok, IdentStrConstValue);
                     Ident[NumIdent].Value := FictitiousTok.StrAddress;      // String constant address
@@ -295,6 +295,23 @@ end; // AllocateTempStorage
 
 
 
+procedure PushTempStoragePtr(Addr: Integer);
+begin
+PushVarPtr(Addr, LOCAL, 0, UNINITDATARELOC);
+end; // PushTempStoragePtr
+
+
+
+
+procedure PushVarIdentPtr(IdentIndex: Integer);
+begin
+PushVarPtr(Ident[IdentIndex].Value, Ident[IdentIndex].Scope, BlockStackTop - Ident[IdentIndex].NestingLevel, Ident[IdentIndex].RelocType);
+Ident[IdentIndex].IsUsed := TRUE;
+end; // PushVarIdentPtr
+
+
+
+
 procedure ConvertConstIntegerToReal(DestType: Integer; var SrcType: Integer; var ConstVal: TConst);
 begin
 // Try to convert an integer (right-hand side) into a real
@@ -356,7 +373,7 @@ if IsString(DestType) and
 then
   begin
   TempStorageAddr := AllocateTempStorage(2 * SizeOf(TCharacter));    
-  PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);  
+  PushTempStoragePtr(TempStorageAddr);  
   GetCharAsTempString(Depth);    
   SrcType := STRINGTYPEINDEX;
   end;
@@ -412,7 +429,7 @@ if (Types[DestType].Kind = INTERFACETYPE) and (DestType <> SrcType) then
     end; // for  
   
   DiscardStackTop(1);                                       // Remove source pointer
-  PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);   // Push destination pointer
+  PushTempStoragePtr(TempStorageAddr);   // Push destination pointer
   SrcType := DestType;
   end;
 end; // ConvertToInterface
@@ -804,10 +821,7 @@ case proc of
         if FileVarType <> ANYTYPEINDEX then
           DuplicateStackTop
         else
-          PushVarPtr(Ident[ConsoleIndex].Value, 
-                     Ident[ConsoleIndex].Scope, 
-                     BlockStackTop - Ident[ConsoleIndex].NestingLevel, 
-                     Ident[ConsoleIndex].RelocType);
+          PushVarIdentPtr(ConsoleIndex);
 
         // 2nd argument - stream handle
         PushConst(0);
@@ -857,10 +871,7 @@ case proc of
       if FileVarType <> ANYTYPEINDEX then
         DuplicateStackTop
       else
-        PushVarPtr(Ident[ConsoleIndex].Value, 
-                   Ident[ConsoleIndex].Scope, 
-                   BlockStackTop - Ident[ConsoleIndex].NestingLevel, 
-                   Ident[ConsoleIndex].RelocType);
+        PushVarIdentPtr(ConsoleIndex);
         
       // 2nd argument - stream handle
       PushConst(0);  
@@ -890,10 +901,7 @@ case proc of
         if FileVarType <> ANYTYPEINDEX then
           DuplicateStackTop
         else
-          PushVarPtr(Ident[ConsoleIndex].Value, 
-                     Ident[ConsoleIndex].Scope, 
-                     BlockStackTop - Ident[ConsoleIndex].NestingLevel, 
-                     Ident[ConsoleIndex].RelocType);
+          PushVarIdentPtr(ConsoleIndex);
 
         // 2nd argument - stream handle
         PushConst(0);
@@ -983,10 +991,7 @@ case proc of
       if FileVarType <> ANYTYPEINDEX then
         DuplicateStackTop
       else
-        PushVarPtr(Ident[ConsoleIndex].Value, 
-                   Ident[ConsoleIndex].Scope, 
-                   BlockStackTop - Ident[ConsoleIndex].NestingLevel, 
-                   Ident[ConsoleIndex].RelocType);
+        PushVarIdentPtr(ConsoleIndex);
         
       // 2nd argument - stream handle
       PushConst(0);         
@@ -1402,7 +1407,7 @@ procedure CompileActualParameters(var Signature: TSignature);
     begin
     SaveStackTopToEAX; 
     TempStorageAddr := AllocateTempStorage(TypeSize(ValType));
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    PushTempStoragePtr(TempStorageAddr);
     RestoreStackTopFromEAX;
     
     if IsString(ValType) then
@@ -1413,7 +1418,7 @@ procedure CompileActualParameters(var Signature: TSignature);
     else
       GenerateStructuredAssignment(ValType);
 
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    PushTempStoragePtr(TempStorageAddr);
     end;
     
   end; // CompileExpressionCopy
@@ -1491,7 +1496,7 @@ if Signature.ResultType <> 0 then
   if Types[Signature.ResultType].Kind in StructuredTypes then
     begin
     TempStorageAddr := AllocateTempStorage(TypeSize(Signature.ResultType));
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    PushTempStoragePtr(TempStorageAddr);
     end;
 end;// CompileActualParameters
 
@@ -1604,7 +1609,7 @@ FieldIndex := GetFieldInsideWith(TempStorageAddr, RecType, Tok.Name);
   
 if FieldIndex <> 0 then
   begin
-  PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+  PushTempStoragePtr(TempStorageAddr);
   DerefPtr(POINTERTYPEINDEX);
   
   GetFieldPtr(Types[RecType].Field[FieldIndex]^.Offset);
@@ -1617,7 +1622,7 @@ MethodIndex := GetMethodInsideWith(TempStorageAddr, RecType, Tok.Name);
   
 if MethodIndex <> 0 then
   begin
-  PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+  PushTempStoragePtr(TempStorageAddr);
   DerefPtr(POINTERTYPEINDEX);
   
   // Add new anonymous 'method' type
@@ -1648,7 +1653,7 @@ ValType := NumTypes;
 
 // Allocate temporary storage
 TempStorageAddr := AllocateTempStorage(TypeSize(ValType));
-PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+PushTempStoragePtr(TempStorageAddr);
 
 // Initialize set
 LibProcIdentIndex := GetIdent('INITSET');
@@ -1660,7 +1665,7 @@ NextTok;
 
 if Tok.Kind <> CBRACKETTOK then
   repeat
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    PushTempStoragePtr(TempStorageAddr);
     
     CompileExpression(ElementType);
     
@@ -1690,7 +1695,7 @@ if Tok.Kind <> CBRACKETTOK then
   
 EatTok(CBRACKETTOK);
 
-PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+PushTempStoragePtr(TempStorageAddr);
 end; // CompileSetConstructor
 
 
@@ -1845,11 +1850,7 @@ if ValType = 0 then
              
     VARIABLE:                                  
       begin   
-      PushVarPtr(Ident[IdentIndex].Value, 
-                 Ident[IdentIndex].Scope, 
-                 BlockStackTop - Ident[IdentIndex].NestingLevel, 
-                 Ident[IdentIndex].RelocType);
-      
+      PushVarIdentPtr(IdentIndex);      
       ValType := Ident[IdentIndex].DataType;          
       
       // Structured CONST parameters are passed by reference, scalar CONST parameters are passed by value
@@ -2008,7 +2009,11 @@ case Tok.Kind of
     NextTok;
     
     if FieldOrMethodInsideWithFound(Tok.Name) then         // Record field inside a WITH block
-      CompileDesignator(ValType)
+      begin
+      CompileDesignator(ValType);
+      DeclareType(POINTERTYPE);
+      Types[NumTypes].BaseType := ValType;
+      end      
     else                                                    // Ordinary identifier
       begin  
       IdentIndex := GetIdent(Tok.Name);
@@ -2018,14 +2023,22 @@ case Tok.Kind of
         if (Ident[IdentIndex].PredefProc <> EMPTYPROC) or (Ident[IdentIndex].Block <> 1) then
           Error('Procedure or function cannot be predefined or nested');
           
-        PushRelocConst(Ident[IdentIndex].Value, CODERELOC); // To be resolved later when code section origin is known        
+        PushRelocConst(Ident[IdentIndex].Value, CODERELOC); // To be resolved later when the code section origin is known        
         NextTok;
+        
+        DeclareType(PROCEDURALTYPE);
+        Types[NumTypes].Signature := Ident[IdentIndex].Signature;
+        CopyParams(Types[NumTypes].Signature, Ident[IdentIndex].Signature);
         end
-      else  
+      else
+        begin  
         CompileDesignator(ValType);
+        DeclareType(POINTERTYPE);
+        Types[NumTypes].BaseType := ValType;
+        end;
       end;  
-      
-    ValType := POINTERTYPEINDEX;
+    
+    ValType := NumTypes;  
     end;
 
 
@@ -2140,10 +2153,10 @@ while Tok.Kind in MultiplicativeOperators do
     LibProcIdentIndex := GetIdent('SETINTERSECTION');
       
     TempStorageAddr := AllocateTempStorage(TypeSize(ValType));    
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    PushTempStoragePtr(TempStorageAddr);
 
     GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);    
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    PushTempStoragePtr(TempStorageAddr);
     end
   // General rule  
   else
@@ -2209,10 +2222,10 @@ while Tok.Kind in AdditiveOperators do
     LibProcIdentIndex := GetIdent('CONCATSTR');   
 
     TempStorageAddr := AllocateTempStorage(TypeSize(STRINGTYPEINDEX));    
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    PushTempStoragePtr(TempStorageAddr);
     
     GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);    
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    PushTempStoragePtr(TempStorageAddr);
     ValType := STRINGTYPEINDEX;
     end
   // Special case: set union or difference  
@@ -2226,10 +2239,10 @@ while Tok.Kind in AdditiveOperators do
       LibProcIdentIndex := GetIdent('SETDIFFERENCE');
       
     TempStorageAddr := AllocateTempStorage(TypeSize(ValType));    
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    PushTempStoragePtr(TempStorageAddr);
 
     GenerateCall(Ident[LibProcIdentIndex].Value, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);    
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    PushTempStoragePtr(TempStorageAddr);
     end  
   // General rule
   else
@@ -2611,7 +2624,7 @@ procedure CompileStatement(LoopNesting: Integer);
   if not (Types[Ident[CounterIndex].DataType].Kind in OrdinalTypes) then
     Error('Ordinal variable expected as FOR loop counter');
     
-  PushVarPtr(Ident[CounterIndex].Value, Ident[CounterIndex].Scope, 0, Ident[CounterIndex].RelocType);
+  PushVarIdentPtr(CounterIndex);
   
   NextTok;
   EatTok(ASSIGNTOK);
@@ -2649,12 +2662,9 @@ procedure CompileStatement(LoopNesting: Integer);
   
   GenerateContinueEpilog(LoopNesting);
   
-  PushVarPtr(Ident[CounterIndex].Value, 
-             Ident[CounterIndex].Scope, 
-             0, 
-             Ident[CounterIndex].RelocType);
-             
+  PushVarIdentPtr(CounterIndex);         
   GenerateForEpilog(Ident[CounterIndex].DataType, Down);
+  
   GenerateBreakEpilog(LoopNesting);
   
   // Pop and discard the remaining number of iterations (i.e. zero)
@@ -2701,7 +2711,7 @@ procedure CompileStatement(LoopNesting: Integer);
   repeat   
     // Save designator pointer to temporary storage
     TempStorageAddr := AllocateTempStorage(TypeSize(POINTERTYPEINDEX));    
-    PushVarPtr(TempStorageAddr, LOCAL, 0, UNINITDATARELOC);
+    PushTempStoragePtr(TempStorageAddr);
     
     CompileDesignator(DesignatorType);
     if not (Types[DesignatorType].Kind in [RECORDTYPE, INTERFACETYPE]) then
@@ -2796,11 +2806,7 @@ case Tok.Kind of
                 Error('Function name expected but ' + Ident[IdentIndex].Name + ' found');
 
               // Push pointer to Result
-              PushVarPtr(Ident[Ident[IdentIndex].ResultIdentIndex].Value, 
-                         LOCAL, 
-                         BlockStackTop - Ident[Ident[IdentIndex].ResultIdentIndex].NestingLevel, 
-                         UNINITDATARELOC);
-              
+              PushVarIdentPtr(Ident[IdentIndex].ResultIdentIndex);              
               DesignatorType := Ident[Ident[IdentIndex].ResultIdentIndex].DataType;
               if Types[DesignatorType].Kind in StructuredTypes then 
                 DerefPtr(POINTERTYPEINDEX);                        
@@ -3332,15 +3338,135 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       DataType := Ident[TypeIdentIndex].DataType;
       
       Types[TypeIndex] := Types[DataType];
+      Types[TypeIndex].AliasType := DataType;
       
-      if Types[DataType].Kind = RECORDTYPE then
+      if Types[DataType].Kind in [RECORDTYPE, INTERFACETYPE] then
         for FieldIndex := 1 to Types[DataType].NumFields do
           begin
           New(Types[TypeIndex].Field[FieldIndex]);
           Types[TypeIndex].Field[FieldIndex]^ := Types[DataType].Field[FieldIndex]^;
           end;
       end; // if    
-  end; // ResolveForwardReferences    
+  end; // ResolveForwardReferences
+
+
+
+
+  procedure CompileInitializer(InitializedDataOffset: LongInt; ConstType: Integer);
+  var
+    ConstVal, ElementVal, ElementVal2: TConst;
+    ConstValType, ElementValType: Integer;
+    NumElements, ElementIndex, FieldIndex: Integer;
+    ElementPtr: ^Byte;
+    
+  begin
+  // Numbers
+  if Types[ConstType].Kind in OrdinalTypes + [REALTYPE] then
+    begin
+    CompileConstExpression(ConstVal, ConstValType);
+
+    // Try to convert integer to real
+    ConvertConstIntegerToReal(ConstType, ConstValType, ConstVal);          
+    GetCompatibleType(ConstType, ConstValType); 
+      
+    if Types[ConstType].Kind = REALTYPE then
+      Move(ConstVal.FracValue, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType))
+    else
+      Move(ConstVal.Value, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
+    end
+    
+  // Arrays
+  else if Types[ConstType].Kind = ARRAYTYPE then
+    begin
+    
+    if IsString(ConstType) then                 // Special case: strings
+      begin
+      CompileConstExpression(ConstVal, ConstValType);
+      ConvertConstCharToString(ConstType, ConstValType, ConstVal);
+      GetCompatibleType(ConstType, ConstValType);
+      
+      if Length(ConstVal.StrValue) > TypeSize(ConstType) - 1 then
+        Error('String is too long');
+        
+      Move(ConstVal.StrValue[1], InitializedGlobalData[InitializedDataOffset], Length(ConstVal.StrValue));
+      InitializedGlobalData[InitializedDataOffset + Length(ConstVal.StrValue)] := 0;      // Add string termination character
+      end
+    else                                        // General rule
+      begin
+      EatTok(OPARTOK);
+      
+      NumElements := HighBound(Types[ConstType].IndexType) - LowBound(Types[ConstType].IndexType) + 1;
+      for ElementIndex := 1 to NumElements do
+        begin
+        CompileInitializer(InitializedDataOffset, Types[ConstType].BaseType);
+        InitializedDataOffset := InitializedDataOffset + TypeSize(Types[ConstType].BaseType);
+        
+        if ElementIndex < NumElements then 
+          EatTok(COMMATOK)
+        else
+          EatTok(CPARTOK);  
+        end; // for
+      end; // else
+
+    end
+    
+  // Records
+  else if Types[ConstType].Kind = RECORDTYPE then
+    begin
+    EatTok(OPARTOK);
+    
+    repeat
+      AssertIdent;
+      FieldIndex := GetField(ConstType, Tok.Name);
+      
+      NextTok;
+      EatTok(COLONTOK);
+      
+      CompileInitializer(InitializedDataOffset + Types[ConstType].Field[FieldIndex]^.Offset, Types[ConstType].Field[FieldIndex]^.DataType);          
+      
+      if Tok.Kind <> SEMICOLONTOK then Break;
+      NextTok; 
+    until FALSE;
+    
+    EatTok(CPARTOK);
+    end
+    
+  // Sets
+  else if Types[ConstType].Kind = SETTYPE then
+    begin
+    EatTok(OBRACKETTOK);
+    
+    if Tok.Kind <> CBRACKETTOK then
+      repeat      
+        CompileConstExpression(ElementVal, ElementValType);            
+        GetCompatibleType(ElementValType, Types[ConstType].BaseType);
+
+        if Tok.Kind = RANGETOK then
+          begin
+          NextTok;
+          CompileConstExpression(ElementVal2, ElementValType);    
+          GetCompatibleType(ElementValType, Types[ConstType].BaseType);
+          end
+        else
+          ElementVal2 := ElementVal;
+          
+        for ElementIndex := ElementVal.Value to ElementVal2.Value do
+          begin
+          ElementPtr := @InitializedGlobalData[InitializedDataOffset + ElementIndex shr 3];
+          ElementPtr^ := ElementPtr^ or (1 shl (ElementIndex and 7));
+          end;
+
+        if Tok.Kind <> COMMATOK then Break;
+        NextTok;
+      until FALSE;
+    
+    EatTok(CBRACKETTOK);
+    end        
+ 
+  else
+    Error('Illegal type');         
+
+  end; // CompileInitializer    
 
 
 
@@ -3366,154 +3492,29 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   procedure CompileConstDeclarations;
   
   
-  
     procedure CompileUntypedConstDeclaration(var NameTok: TToken);
     var
       ConstVal: TConst;
       ConstValType: Integer;    
     begin
-    EatTok(EQTOK);
-    
+    EatTok(EQTOK);    
     CompileConstExpression(ConstVal, ConstValType);
     DeclareIdent(NameTok.Name, CONSTANT, 0, ConstValType, EMPTYPASSING, ConstVal.Value, ConstVal.FracValue, ConstVal.StrValue, EMPTYPROC, '', 0);
     end; // CompileUntypedConstDeclaration;
-    
-    
-    
+   
     
     procedure CompileTypedConstDeclaration(var NameTok: TToken);
-    
-    
-      procedure CompileTypedConstConstructor(InitializedDataOffset: LongInt; ConstType: Integer);
-      var
-        ConstVal, ElementVal, ElementVal2: TConst;
-        ConstValType, ElementValType: Integer;
-        NumElements, ElementIndex, FieldIndex: Integer;
-        ElementPtr: ^Byte;
-        
-      begin
-      // Numbers
-      if Types[ConstType].Kind in OrdinalTypes + [REALTYPE] then
-        begin
-        CompileConstExpression(ConstVal, ConstValType);
-
-        // Try to convert integer to real
-        ConvertConstIntegerToReal(ConstType, ConstValType, ConstVal);          
-        GetCompatibleType(ConstType, ConstValType); 
-          
-        if Types[ConstType].Kind = REALTYPE then
-          Move(ConstVal.FracValue, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType))
-        else
-          Move(ConstVal.Value, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
-        end
-        
-      // Arrays
-      else if Types[ConstType].Kind = ARRAYTYPE then
-        begin
-        
-        if IsString(ConstType) then                 // Special case: strings
-          begin
-          if (Tok.Kind <> CHARLITERALTOK) and (Tok.Kind <> STRINGLITERALTOK) then
-            CheckTok(STRINGLITERALTOK);
-            
-          Move(InitializedGlobalData[Tok.StrAddress], InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
-          NextTok;
-          end
-        else                                        // General rule
-          begin
-          EatTok(OPARTOK);
-          
-          NumElements := HighBound(Types[ConstType].IndexType) - LowBound(Types[ConstType].IndexType) + 1;
-          for ElementIndex := 1 to NumElements do
-            begin
-            CompileTypedConstConstructor(InitializedDataOffset, Types[ConstType].BaseType);
-            InitializedDataOffset := InitializedDataOffset + TypeSize(Types[ConstType].BaseType);
-            
-            if ElementIndex < NumElements then 
-              EatTok(COMMATOK)
-            else
-              EatTok(CPARTOK);  
-            end; // for
-          end; // else
- 
-        end
-        
-      // Records
-      else if Types[ConstType].Kind = RECORDTYPE then
-        begin
-        EatTok(OPARTOK);
-        
-        repeat
-          AssertIdent;
-          FieldIndex := GetField(ConstType, Tok.Name);
-          
-          NextTok;
-          EatTok(COLONTOK);
-          
-          CompileTypedConstConstructor(InitializedDataOffset + Types[ConstType].Field[FieldIndex]^.Offset, Types[ConstType].Field[FieldIndex]^.DataType);          
-          
-          if Tok.Kind <> SEMICOLONTOK then Break;
-          NextTok; 
-        until FALSE;
-        
-        EatTok(CPARTOK);
-        end
-        
-      // Sets
-      else if Types[ConstType].Kind = SETTYPE then
-        begin
-        EatTok(OBRACKETTOK);
-        
-        if Tok.Kind <> CBRACKETTOK then
-          repeat      
-            CompileConstExpression(ElementVal, ElementValType);            
-            GetCompatibleType(ElementValType, Types[ConstType].BaseType);
-
-            if Tok.Kind = RANGETOK then
-              begin
-              NextTok;
-              CompileConstExpression(ElementVal2, ElementValType);    
-              GetCompatibleType(ElementValType, Types[ConstType].BaseType);
-              end
-            else
-              ElementVal2 := ElementVal;
-              
-            for ElementIndex := ElementVal.Value to ElementVal2.Value do
-              begin
-              ElementPtr := @InitializedGlobalData[InitializedDataOffset + ElementIndex shr 3];
-              ElementPtr^ := ElementPtr^ or (1 shl (ElementIndex and 7));
-              end;
-  
-            if Tok.Kind <> COMMATOK then Break;
-            NextTok;
-          until FALSE;
-        
-        EatTok(CBRACKETTOK);
-        end        
-     
-      else
-        Error('Illegal type');         
- 
-      end; // CompileTypedConstConstructor  
-    
-    
     var
-      ConstType: Integer;
-      
-      
-    begin // CompileTypedConstDeclaration
+      ConstType: Integer;    
+    begin
     EatTok(COLONTOK);    
-    CompileType(ConstType);
-    
-    DeclareIdent(NameTok.Name, CONSTANT, 0, ConstType, VARPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
-    
+    CompileType(ConstType);    
+    DeclareIdent(NameTok.Name, CONSTANT, 0, ConstType, VARPASSING, 0, 0.0, '', EMPTYPROC, '', 0);    
     EatTok(EQTOK);    
-    CompileTypedConstConstructor(Ident[NumIdent].Value, ConstType);   
+    CompileInitializer(Ident[NumIdent].Value, ConstType);   
     end; // CompileTypedConstDeclaration    
 
 
-
-  
   var
     NameTok: TToken; 
    
@@ -3587,9 +3588,22 @@ procedure CompileBlock(BlockIdentIndex: Integer);
 
     CompileType(VarType);
 
-    for IdentInListIndex := 1 to NumIdentInList do
-      DeclareIdent(IdentInListName[IdentInListIndex], VARIABLE, 0, VarType, EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
-
+    if Tok.Kind = EQTOK then                                     // Initialized variable (equivalent to a typed constant)
+      begin
+      if BlockStack[BlockStackTop].Index <> 1 then
+        Error('Local variables cannot be initialized');
+        
+      if NumIdentInList <> 1 then
+        Error('Multiple variables cannot be initialized');
+        
+      NextTok;
+      DeclareIdent(IdentInListName[1], CONSTANT, 0, VarType, VARPASSING, 0, 0.0, '', EMPTYPROC, '', 0);
+      CompileInitializer(Ident[NumIdent].Value, VarType);      
+      end
+    else                                                         // Uninitialized variables   
+      for IdentInListIndex := 1 to NumIdentInList do
+        DeclareIdent(IdentInListName[IdentInListIndex], VARIABLE, 0, VarType, EMPTYPASSING, 0, 0.0, '', EMPTYPROC, '', 0);  
+      
     EatTok(SEMICOLONTOK);
   until Tok.Kind <> IDENTTOK;
 
@@ -3907,7 +3921,11 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   begin  
   // Delete local identifiers
   while (NumIdent > 0) and (Ident[NumIdent].Block = BlockStack[BlockStackTop].Index) do
-    begin 
+    begin
+    // Warn if not used
+    if not Ident[NumIdent].IsUsed and (Ident[NumIdent].Kind = VARIABLE) and (Ident[NumIdent].PassMethod = EMPTYPASSING) then
+      Warning('Variable ' + Ident[NumIdent].Name + ' is not used');
+  
     // If procedure or function, delete parameters first
     if Ident[NumIdent].Kind in [PROC, FUNC] then
       DisposeParams(Ident[NumIdent].Signature);
@@ -4003,7 +4021,7 @@ else
   // If function, return Result value via the EAX register
   if (BlockStack[BlockStackTop].Index <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) then
     begin
-    PushVarPtr(Ident[Ident[BlockIdentIndex].ResultIdentIndex].Value, LOCAL, 0, UNINITDATARELOC);
+    PushVarIdentPtr(Ident[BlockIdentIndex].ResultIdentIndex);
     if Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes then
       DerefPtr(POINTERTYPEINDEX)
     else  
@@ -4032,10 +4050,9 @@ else
       Inc(TotalNumParams);                            // Deallocate space allocated for structured Result as a hidden VAR parameter
       
     GenerateReturn(TotalNumParams * SizeOf(LongInt), Ident[BlockIdentIndex].NestingLevel);
-    
-    DeleteDeclarations;
     end;
-
+    
+  DeleteDeclarations;
   end; // else    
   
 Dec(BlockStackTop);

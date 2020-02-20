@@ -4,7 +4,6 @@
 {$APPTYPE CONSOLE}
 {$I-}
 {$H-}
-{$J+}
 
 program XDPW;
 
@@ -56,10 +55,21 @@ end;
 
 
 
+procedure WarningProc(const Msg: TString);
+begin
+if NumUnits >= 1 then
+  Notice(ScannerFileName + ' (' + IntToStr(ScannerLine) + ') Warning: ' + Msg)
+else
+  Notice('Warning: ' + Msg);  
+end;
+
+
+
+
 procedure ErrorProc(const Msg: TString);
 begin
 if NumUnits >= 1 then
-  Notice('Error ' + ScannerFileName + ' ' + IntToStr(ScannerLine) + ': ' + Msg)
+  Notice(ScannerFileName + ' (' + IntToStr(ScannerLine) + ') Error: ' + Msg)
 else
   Notice('Error: ' + Msg);  
 
@@ -72,12 +82,14 @@ end;
 
 
 var
-  PasPath, PasFolder, PasName, PasExt, ExePath: TString;
+  CompilerPath, CompilerFolder, CompilerName, CompilerExt,
+  PasPath, PasFolder, PasName, PasExt,
+  ExePath: TString;
   
 
 
 begin
-SetWriteProcs(@NoticeProc, @ErrorProc);
+SetWriteProcs(@NoticeProc, @WarningProc, @ErrorProc);
 
 Notice('XD Pascal for Windows ' + VERSION);
 Notice('Copyright (c) 2009-2010, 2019-2020, Vasiliy Tereshkov');
@@ -87,6 +99,9 @@ if ParamCount < 1 then
   Notice('Usage: xdpw <file.pas>');
   Halt(1);
   end;
+  
+CompilerPath := TString(ParamStr(0));
+SplitPath(CompilerPath, CompilerFolder, CompilerName, CompilerExt);  
 
 PasPath := TString(ParamStr(1));
 SplitPath(PasPath, PasFolder, PasName, PasExt);
@@ -96,7 +111,7 @@ InitializeLinker;
 InitializeCodeGen;
 
 SourceFolder := PasFolder;
-UnitsFolder  := 'units\';
+UnitsFolder  := CompilerFolder + 'units\';
    
 CompileProgramOrUnit('system.pas');
 CompileProgramOrUnit(PasName + PasExt);
