@@ -37,6 +37,7 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Functions can be called as procedures (Delphi style)
 * Parameters can have default values (Delphi style)
 * The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
+* Global variables can be initialized (Delphi stype)
 * Single-line comments (`//`) are supported (Delphi style)
 
 #### Differences
