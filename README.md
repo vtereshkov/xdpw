@@ -309,7 +309,7 @@ function PWideCharToStr(p: PWideChar): string;
 * `inserr.pas`   - Inertial navigation system error estimation demo. Uses `kalman.pas` unit
 * `list.pas`     - Linked list operations demo
 * `gui.pas`      - GUI application demo. Uses `windows.pas` unit
-* `raytracer.pas`- Raytracer demo. Demonstrates XD Pascal methods and interfaces
+* `raytracer.pas`- Raytracer demo. Demonstrates XD Pascal methods and interfaces. Equivalent to `raytracer.go`
 
 <img src="scene.png">
 
