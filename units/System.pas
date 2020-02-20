@@ -208,9 +208,10 @@ var
   RandSeed: Integer;  
   Heap: LongInt;  
   IOError: Integer = 0;
-  LastReadChar: Char = ' ';  
   StdInputHandle, StdOutputHandle: LongInt;
-  
+  StdInputBuffer: string = '';
+  StdInputBufferPos: Integer = 1;
+  LastReadChar: Char = ' ';
   
   
 procedure PtrStr(Number: Integer; var s: string); forward;  
@@ -233,8 +234,6 @@ FileRecPtr^.Handle := StdInputHandle;
 StdOutputHandle := GetStdHandle(STD_OUTPUT_HANDLE);
 FileRecPtr := PFileRec(@StdOutputFile);
 FileRecPtr^.Handle := StdOutputHandle;
-
-SetConsoleMode(StdInputHandle, $02F5);                      // set all flags except ENABLE_LINE_INPUT and ENABLE_WINDOW_INPUT 
 end;
 
 
@@ -522,7 +521,6 @@ var
 begin
 FileRecPtr := PFileRec(@F);
 ReadFile(FileRecPtr^.Handle, @Buf, Len, LenRead, 0);
-if LenRead < Len then IOError := -1;
 end;
 
 
@@ -861,34 +859,35 @@ var
   Dest: PChar;
   FileRecPtr: PFileRec;
   
-const
-  LF: Char = #10;
-  
-begin   
-if P <> nil then                                      // String stream input
+begin
+FileRecPtr := PFileRec(@F);
+   
+if P <> nil then                                       // String stream input
   begin                      
   Dest := PChar(Integer(P^.Data) + P^.Index);
   ch := Dest^;
   Inc(P^.Index);
   end
-else
+else if FileRecPtr^.Handle = StdInputHandle then       // Console input
   begin
-  FileRecPtr := PFileRec(@F);
-  BlockRead(F, ch, 1, Len); 
- 
-  if FileRecPtr^.Handle = StdInputHandle then         // Console input
+  if StdInputBufferPos > Length(StdInputBuffer) then
     begin
-    BlockWrite(StdOutputFile, ch, 1);
-    if ch = #13 then BlockWrite(StdOutputFile, LF, 1);     
-    end 
-  else                                                // File input
-    begin
-    if ch = #10 then BlockRead(F, ch, 1, Len);
-    if Len <> 1 then ch := #0;
+    BlockRead(F, StdInputBuffer, SizeOf(StdInputBuffer) - 1, Len);
+    StdInputBuffer[Len] := #0;   // Replace LF with end-of-string
+    StdInputBufferPos := 1;
     end;
-  end;  
+  
+  ch := StdInputBuffer[StdInputBufferPos];
+  Inc(StdInputBufferPos);
+  end 
+else                                                   // File input
+  begin
+  BlockRead(F, ch, 1, Len);
+  if ch = #10 then BlockRead(F, ch, 1, Len);
+  if Len <> 1 then ch := #0;
+  end;
 
-LastReadChar := ch;                                   // Required by ReadNewLine
+LastReadChar := ch;                                    // Required by ReadNewLine
 end;
 
 
@@ -902,9 +901,11 @@ var
 begin
 Number := 0;
 
-// Read sign
-Negative := FALSE;
-ReadCh(F, P, Ch);
+// Skip spaces
+repeat ReadCh(F, P, Ch) until (Ch = #0) or (Ch > ' ');
+
+// Read sign  
+Negative := FALSE; 
 if Ch = '+' then
   ReadCh(F, P, Ch)
 else if Ch = '-' then   
@@ -992,9 +993,11 @@ begin
 Number := 0;
 Expon := 0;
 
+// Skip spaces
+repeat ReadCh(F, P, Ch) until (Ch = #0) or (Ch > ' ');
+
 // Read sign
 Negative := FALSE;
-ReadCh(F, P, Ch);
 if Ch = '+' then
   ReadCh(F, P, Ch)
 else if Ch = '-' then   
