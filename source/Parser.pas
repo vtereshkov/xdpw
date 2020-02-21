@@ -47,7 +47,7 @@ procedure DeclareIdent(const IdentName: TString; IdentKind: TIdentKind; IdentTot
                        IdentPassMethod: TPassMethod; IdentConstValue: LongInt; IdentFracConstValue: Single; const IdentStrConstValue: TString; 
                        IdentPredefProc: TPredefProc; const IdentReceiverName: TString; IdentReceiverType: Integer);
 var
-  i, AdditionalStackItems: Integer;
+  i, AdditionalStackItems, IdentTypeSize: Integer;
   IdentScope: TScope;
   FictitiousTok: TToken;
   
@@ -62,7 +62,7 @@ if (i > 0) and (Ident[i].UnitIndex = ParserState.UnitStatus.Index) and (Ident[i]
 Inc(NumIdent);
 if NumIdent > MAXIDENTS then
   Error('Maximum number of identifiers exceeded');
-
+  
 with Ident[NumIdent] do
   begin
   Name                := IdentName;  
@@ -104,8 +104,12 @@ case IdentKind of
     case IdentScope of
      GLOBAL:
        begin
+       IdentTypeSize := TypeSize(IdentDataType);
+       if IdentTypeSize > MAXUNINITIALIZEDDATASIZE - UninitializedGlobalDataSize then
+         Error('Not enough memory for global variable');
+         
        Ident[NumIdent].Value := UninitializedGlobalDataSize;                                 // Variable address (relocatable)
-       UninitializedGlobalDataSize := UninitializedGlobalDataSize + TypeSize(IdentDataType);
+       UninitializedGlobalDataSize := UninitializedGlobalDataSize + IdentTypeSize;
        end;// else
 
      LOCAL:
@@ -118,15 +122,22 @@ case IdentKind of
 
          with BlockStack[BlockStackTop] do
            begin
+           if SizeOf(LongInt) > MAXSTACKSIZE - ParamDataSize then
+             Error('Not enough memory for parameter');
+
            Ident[NumIdent].Value := (AdditionalStackItems + IdentTotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from EBP (>0)
-           ParamDataSize := ParamDataSize + SizeOf(LongInt);                                   // Parameters always occupy 4 bytes each
+           ParamDataSize := ParamDataSize + SizeOf(LongInt);                                 // Parameters always occupy 4 bytes each
            end
          end
        else
          with BlockStack[BlockStackTop] do
            begin
-           Ident[NumIdent].Value := -LocalDataSize - TypeSize(IdentDataType);                       // Local variable offset from EBP (<0)
-           LocalDataSize := LocalDataSize + TypeSize(IdentDataType);
+           IdentTypeSize := TypeSize(IdentDataType);
+           if IdentTypeSize > MAXSTACKSIZE - LocalDataSize then
+             Error('Not enough memory for local variable');
+           
+           Ident[NumIdent].Value := -LocalDataSize - IdentTypeSize;                          // Local variable offset from EBP (<0)
+           LocalDataSize := LocalDataSize + IdentTypeSize;
            end;
     end; // case
 
@@ -153,27 +164,18 @@ case IdentKind of
         PassMethod  := EMPTYPASSING;
         end;
       
+      IdentTypeSize := TypeSize(IdentDataType);
+      if IdentTypeSize > MAXINITIALIZEDDATASIZE - InitializedGlobalDataSize then
+         Error('Not enough memory for initialized global variable');
+
       Ident[NumIdent].Value := InitializedGlobalDataSize;               // Typed constant address (relocatable)
-      InitializedGlobalDataSize := InitializedGlobalDataSize + TypeSize(IdentDataType);      
+      InitializedGlobalDataSize := InitializedGlobalDataSize + IdentTypeSize;      
       end;
       
   GOTOLABEL:
     Ident[NumIdent].IsUnresolvedForward := TRUE;
 
 end;// case
-
-
-if InitializedGlobalDataSize >= MAXINITIALIZEDDATASIZE then
-  Error('Maximum initialized data size exceeded');
-
-if UninitializedGlobalDataSize >= MAXUNINITIALIZEDDATASIZE then
-  Error('Maximum uninitialized data size exceeded');
-
-if BlockStack[BlockStackTop].LocalDataSize >= MAXSTACKSIZE then
-  Error('Maximum local data size exceeded');
-
-if BlockStack[BlockStackTop].ParamDataSize >= MAXSTACKSIZE then
-  Error('Maximum parameter data size exceeded');
 
 end; // DeclareIdent
 
@@ -2965,7 +2967,7 @@ procedure CompileType(var DataType: Integer);
 
     procedure DeclareField(const FieldName: TString; RecType, FieldType: Integer; var NextFieldOffset: Integer);
     var
-      i: Integer;
+      i, FieldTypeSize: Integer;      
     begin
     for i := 1 to Types[RecType].NumFields do
       if Types[RecType].Field[i]^.Name = FieldName then
@@ -2989,7 +2991,11 @@ procedure CompileType(var DataType: Integer);
     if Types[RecType].Kind = INTERFACETYPE then
       Types[FieldType].SelfPointerOffset := -NextFieldOffset;      
     
-    NextFieldOffset := NextFieldOffset + TypeSize(FieldType);
+    FieldTypeSize := TypeSize(FieldType);
+    if FieldTypeSize > HighBound(INTEGERTYPEINDEX) - NextFieldOffset then
+      Error('Type size is too large');
+
+    NextFieldOffset := NextFieldOffset + FieldTypeSize;
     end; // DeclareField
     
     

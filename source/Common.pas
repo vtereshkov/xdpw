@@ -25,9 +25,9 @@ const
   MAXFIELDS                 = 100;
   MAXWITHNESTING            = 20;
 
-  MAXINITIALIZEDDATASIZE    =  1 * 1024 * 1024;
-  MAXUNINITIALIZEDDATASIZE  = 32 * 1024 * 1024;
-  MAXSTACKSIZE              = 16 * 1024 * 1024;  
+  MAXINITIALIZEDDATASIZE    =    1 * 1024 * 1024;
+  MAXUNINITIALIZEDDATASIZE  = 1024 * 1024 * 1024;
+  MAXSTACKSIZE              =   16 * 1024 * 1024;  
 
 
 
@@ -725,34 +725,51 @@ end;
 
 function TypeSize(DataType: Integer): Integer;
 var
-  CurSize: Integer;
-  i: Integer;
+  CurSize, BaseTypeSize, FieldTypeSize: Integer;
+  NumElements, FieldOffset, i: Integer;
 begin
 Result := 0;
 case Types[DataType].Kind of
-  INTEGERTYPE:              Result := SizeOf(Integer);
-  SMALLINTTYPE:             Result := SizeOf(SmallInt);
-  SHORTINTTYPE:             Result := SizeOf(ShortInt);
-  WORDTYPE:                 Result := SizeOf(Word);
-  BYTETYPE:                 Result := SizeOf(Byte);  
-  CHARTYPE:                 Result := SizeOf(TCharacter);
-  BOOLEANTYPE:              Result := SizeOf(Boolean);
-  REALTYPE:                 Result := SizeOf(Single);
-  POINTERTYPE:              Result := SizeOf(Pointer);
-  FILETYPE:                 Result := SizeOf(TString) + SizeOf(Integer);  // Name + Handle
-  SUBRANGETYPE:             Result := SizeOf(Integer);
-  ARRAYTYPE:                if Types[DataType].IsOpenArray then
-                              Error('Illegal type')
-                            else  
-                              Result := (HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1) * TypeSize(Types[DataType].BaseType);
-  RECORDTYPE, INTERFACETYPE:for i := 1 to Types[DataType].NumFields do
-                              begin
-                              CurSize := Types[DataType].Field[i]^.Offset + TypeSize(Types[DataType].Field[i]^.DataType);
-                              if CurSize > Result then Result := CurSize;
-                              end;  
-  SETTYPE:                  Result := MAXSETELEMENTS div 8;
-  ENUMERATEDTYPE:           Result := SizeOf(Byte);                
-  PROCEDURALTYPE:           Result := SizeOf(Pointer)               
+  INTEGERTYPE:               Result := SizeOf(Integer);
+  SMALLINTTYPE:              Result := SizeOf(SmallInt);
+  SHORTINTTYPE:              Result := SizeOf(ShortInt);
+  WORDTYPE:                  Result := SizeOf(Word);
+  BYTETYPE:                  Result := SizeOf(Byte);  
+  CHARTYPE:                  Result := SizeOf(TCharacter);
+  BOOLEANTYPE:               Result := SizeOf(Boolean);
+  REALTYPE:                  Result := SizeOf(Single);
+  POINTERTYPE:               Result := SizeOf(Pointer);
+  FILETYPE:                  Result := SizeOf(TString) + SizeOf(Integer);  // Name + Handle
+  SUBRANGETYPE:              Result := SizeOf(Integer);
+  
+  ARRAYTYPE:                 begin
+                             if Types[DataType].IsOpenArray then
+                               Error('Illegal type');
+                             
+                             NumElements := HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1;
+                             BaseTypeSize := TypeSize(Types[DataType].BaseType);
+                             
+                             if (NumElements > 0) and (BaseTypeSize > HighBound(INTEGERTYPEINDEX) div NumElements) then
+                               Error('Type size is too large');
+                               
+                             Result := NumElements * BaseTypeSize;
+                             end;
+                             
+  RECORDTYPE, INTERFACETYPE: for i := 1 to Types[DataType].NumFields do
+                               begin
+                               FieldOffset := Types[DataType].Field[i]^.Offset;
+                               FieldTypeSize := TypeSize(Types[DataType].Field[i]^.DataType);
+                               
+                               if FieldTypeSize > HighBound(INTEGERTYPEINDEX) - FieldOffset then
+                                 Error('Type size is too large');
+                               
+                               CurSize := FieldOffset + FieldTypeSize;
+                               if CurSize > Result then Result := CurSize;
+                               end;
+  
+  SETTYPE:                   Result := MAXSETELEMENTS div 8;
+  ENUMERATEDTYPE:            Result := SizeOf(Byte);                
+  PROCEDURALTYPE:            Result := SizeOf(Pointer)               
 else
   Error('Illegal type')
 end;// case
