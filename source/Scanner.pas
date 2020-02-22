@@ -173,6 +173,8 @@ end;
 
 procedure ReadChar(var ch: TCharacter);
 begin
+if ScannerState.ch = #10 then Inc(ScannerState.Line);  // End of line found
+
 ch := #0;
 with ScannerState.Buffer do
   if Pos < Size then
@@ -182,8 +184,6 @@ with ScannerState.Buffer do
     end
   else
     ScannerState.EndOfUnit := TRUE; 
-
-if ch = #10 then Inc(ScannerState.Line);  // End of line found
 end;
 
 
