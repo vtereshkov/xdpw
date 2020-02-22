@@ -14,7 +14,7 @@ XD Pascal is a small educational self-hosting compiler for a Pascal language dia
 * No external assembler or linker needed
 * Floating-point arithmetic using the x87 FPU
 * Seamless integration with Geany IDE
-* Compiler source for Delphi 6/7, Free Pascal and XD Pascal itself 
+* Compiler source for Delphi 6/7, Free Pascal and XD Pascal itself (Delphi 2009+ compatibility is straightforward) 
 
 ## Detailed description
 
@@ -27,18 +27,12 @@ The source file should be specified with its extension (.pas).
  
 ### Language
 
-XD Pascal is similar to Turbo Pascal with the following changes:
+XD Pascal is similar to Delphi 6/7 and Free Pascal with the following changes:
 
 #### Enhancements
-* The target operating system is Windows
 * The compiler is self-hosting
-* Methods and interfaces (Go style) are supported
-* Functions can return arrays, records or sets (Delphi style)
-* Functions can be called as procedures (Delphi style)
-* Parameters can have default values (Delphi style)
-* The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
-* Global variables can be initialized (Delphi stype)
-* Single-line comments (`//`) are supported (Delphi style)
+* The compiler is extremely compact (~10000 lines) and can be easily embedded into larger systems
+* Go-style methods and interfaces are supported
 
 #### Differences
 * Strings are null-terminated arrays of characters (C style), but indexed from 1 for Pascal compatibility
@@ -46,10 +40,10 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Method calls and procedural variable calls require parentheses even for empty parameter lists
 
 #### Limitations
-* No "classical" object-oriented programming
+* No classical (C++ style) object-oriented programming
+* No visual components
 * Units cannot be compiled separately
 * `Real`, `Double` and `Extended` types are equivalent to `Single`
-* Sets cannot be untyped constants. Use typed constants instead
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical 
 

@@ -1257,16 +1257,16 @@ procedure GenerateFloat(Depth: Byte);
   begin
   Result := FALSE;
 
-  // Optimization: (push Value) + (fild dword ptr [esp]) + (fstp dword ptr [esp]) -> (push FracValue)
-  if (Depth = 0) and (PrevInstrByte(0, 0) = $68) then       // Previous: push IntValue
+  // Optimization: (push OrdValue) + (fild dword ptr [esp]) + (fstp dword ptr [esp]) -> (push RealValue)
+  if (Depth = 0) and (PrevInstrByte(0, 0) = $68) then       // Previous: push OrdValue
     begin
-    ConstVal.FracValue := PrevInstrDWord(0, 1);
+    ConstVal.RealValue := PrevInstrDWord(0, 1);
     ValueRelocIndex := PrevInstrRelocDWordIndex(0, 1);
     
     if ValueRelocIndex = 0 then                             // Non-relocatable values only
       begin
-      RemovePrevInstr(0);                                   // Remove: push IntValue
-      GenNew($68); GenDWord(ConstVal.Value);                // push FracValue
+      RemovePrevInstr(0);                                   // Remove: push OrdValue
+      GenNew($68); GenDWord(ConstVal.OrdValue);             // push RealValue
       Result := TRUE;
       end;
     end;
@@ -2168,7 +2168,7 @@ for i := 1 to NumGotos do
   begin
   CodePos := Gotos[i].Pos;
   DiscardStackTopAt(CodePos, Gotos[i].ForLoopNesting - Ident[Gotos[i].LabelIndex].ForLoopNesting); // Remove the remaining numbers of iterations of all nested FOR loops
-  GenerateForwardResolutionToDestination(CodePos + 3, Ident[Gotos[i].LabelIndex].Value);
+  GenerateForwardResolutionToDestination(CodePos + 3, Ident[Gotos[i].LabelIndex].Address);
   end;
 end;
 
