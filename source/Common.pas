@@ -357,7 +357,7 @@ procedure SetWriteProcs(NewNoticeProc, NewWarningProc, NewErrorProc: TWriteProc)
 procedure Notice(const Msg: TString);
 procedure Warning(const Msg: TString);
 procedure Error(const Msg: TString);
-procedure DefineStaticString(const StrValue: TString; var Addr: LongInt);
+procedure DefineStaticString(const StrValue: TString; var Addr: LongInt; FixedAddr: LongInt = -1);
 procedure DefineStaticSet(const SetValue: TByteSet; var Addr: LongInt; FixedAddr: LongInt = -1);
 function IsString(DataType: Integer): Boolean;
 function LowBound(DataType: Integer): Integer;
@@ -638,26 +638,25 @@ end;
 
 
 
-procedure DefineStaticString(const StrValue: TString; var Addr: LongInt);
+procedure DefineStaticString(const StrValue: TString; var Addr: LongInt; FixedAddr: LongInt = -1);
 var
-  Len, i: Integer;
-  
+  Len: Integer;  
 begin
 Len := Length(StrValue);
-if Len + 1 > MAXINITIALIZEDDATASIZE - InitializedGlobalDataSize then
-  Error('Not enough memory for static string');
 
-Addr := InitializedGlobalDataSize;  // Relocatable
-
-for i := 1 to Len do
+if FixedAddr <> -1 then
+  Addr := FixedAddr
+else  
   begin
-  InitializedGlobalData[InitializedGlobalDataSize] := Ord(StrValue[i]);
-  Inc(InitializedGlobalDataSize);
-  end;
+  if Len + 1 > MAXINITIALIZEDDATASIZE - InitializedGlobalDataSize then
+    Error('Not enough memory for static string');
 
-// Add string termination character
-InitializedGlobalData[InitializedGlobalDataSize] := 0;
-Inc(InitializedGlobalDataSize);
+  Addr := InitializedGlobalDataSize;  // Relocatable
+  InitializedGlobalDataSize := InitializedGlobalDataSize + Len + 1;
+  end;
+  
+Move(StrValue[1], InitializedGlobalData[Addr], Len);
+InitializedGlobalData[Addr + Len] := 0;      // Add string termination character
 end;
 
 
@@ -666,8 +665,7 @@ end;
 procedure DefineStaticSet(const SetValue: TByteSet; var Addr: LongInt; FixedAddr: LongInt = -1);
 var
   i: Integer;
-  ElementPtr: ^Byte;
-  
+  ElementPtr: ^Byte;  
 begin
 if FixedAddr <> -1 then
   Addr := FixedAddr

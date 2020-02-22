@@ -3472,8 +3472,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       if Length(ConstVal.StrValue) > TypeSize(ConstType) - 1 then
         Error('String is too long');
         
-      Move(ConstVal.StrValue[1], InitializedGlobalData[InitializedDataOffset], Length(ConstVal.StrValue));
-      InitializedGlobalData[InitializedDataOffset + Length(ConstVal.StrValue)] := 0;      // Add string termination character
+      DefineStaticString(ConstVal.StrValue, InitializedDataOffset, InitializedDataOffset);
       end
     else                                        // General rule
       begin
