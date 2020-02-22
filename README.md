@@ -43,6 +43,7 @@ XD Pascal is similar to Delphi 6/7 and Free Pascal with the following changes:
 * No classical (C++ style) object-oriented programming
 * No visual components
 * Units cannot be compiled separately
+* Only peephole optimizations
 * `Real`, `Double` and `Extended` types are equivalent to `Single`
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical 
