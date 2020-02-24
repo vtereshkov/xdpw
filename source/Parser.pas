@@ -35,7 +35,7 @@ var
 
 
 procedure CompileConstExpression(var ConstVal: TConst; var ConstValType: Integer); forward;
-procedure CompileDesignator(var ValType: Integer); forward;
+procedure CompileDesignator(var ValType: Integer; AllowConst: Boolean = TRUE); forward;
 procedure CompileExpression(var ValType: Integer); forward;
 procedure CompileStatement(LoopNesting: Integer); forward;
 procedure CompileType(var DataType: Integer); forward;
@@ -81,6 +81,7 @@ with Ident[NumIdent] do
   IsUsed              := FALSE;
   IsUnresolvedForward := FALSE;
   IsExported          := ParserState.IsInterfaceSection and (IdentScope = GLOBAL);
+  IsTypedConst        := FALSE;
   ForLoopNesting      := 0;
   end;
 
@@ -162,10 +163,11 @@ case IdentKind of
       begin
       with Ident[NumIdent] do
         begin
-        Kind        := VARIABLE;
-        Scope       := GLOBAL;
-        RelocType   := INITDATARELOC;
-        PassMethod  := EMPTYPASSING;
+        Kind         := VARIABLE;
+        Scope        := GLOBAL;
+        RelocType    := INITDATARELOC;
+        PassMethod   := EMPTYPASSING;
+        IsTypedConst := TRUE; 
         end;
       
       IdentTypeSize := TypeSize(IdentDataType);
@@ -881,7 +883,7 @@ case proc of
     begin
     EatTok(OPARTOK);
     AssertIdent;
-    CompileDesignator(DesignatorType);
+    CompileDesignator(DesignatorType, FALSE);
     GetCompatibleType(DesignatorType, INTEGERTYPEINDEX);
     GenerateIncDec(proc, TypeSize(DesignatorType));
     EatTok(CPARTOK);
@@ -908,7 +910,7 @@ case proc of
         PushConst(0);
         
         // 3rd argument - designator
-        CompileDesignator(DesignatorType);
+        CompileDesignator(DesignatorType, FALSE);
 
         if Types[DesignatorType].Kind = FILETYPE then               // File handle
           begin
@@ -1091,7 +1093,7 @@ case proc of
     begin
     EatTok(OPARTOK);
     AssertIdent;
-    CompileDesignator(DesignatorType);
+    CompileDesignator(DesignatorType, FALSE);
     GetCompatibleType(DesignatorType, POINTERTYPEINDEX);
     
     if proc = NEWPROC then
@@ -1530,7 +1532,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       case CurParam^.PassMethod of
         VALPASSING:   CompileExpressionCopy(ActualParamType);
         CONSTPASSING: CompileExpression(ActualParamType);
-        VARPASSING:   CompileDesignator(ActualParamType);
+        VARPASSING:   CompileDesignator(ActualParamType, CurParam^.DataType = ANYTYPEINDEX);
       else
         Error('Internal fault: Illegal parameter passing method');        
       end;
@@ -1679,14 +1681,14 @@ end; // CompileMethodOrProceduralVariableCall
 
 
 
-procedure CompileFieldOrMethodInsideWith(var ValType: Integer);
+procedure CompileFieldOrMethodInsideWith(var ValType: Integer; var IsConst: Boolean);
 var
   FieldIndex, MethodIndex: Integer;
   RecType: Integer;
   TempStorageAddr: Integer;
   
 begin 
-FieldIndex := GetFieldInsideWith(TempStorageAddr, RecType, Tok.Name);
+FieldIndex := GetFieldInsideWith(TempStorageAddr, RecType, IsConst, Tok.Name);
   
 if FieldIndex <> 0 then
   begin
@@ -1699,7 +1701,7 @@ if FieldIndex <> 0 then
   Exit;
   end;
   
-MethodIndex := GetMethodInsideWith(TempStorageAddr, RecType, Tok.Name);
+MethodIndex := GetMethodInsideWith(TempStorageAddr, RecType, IsConst, Tok.Name);
   
 if MethodIndex <> 0 then
   begin
@@ -1892,7 +1894,7 @@ end; // CompileSelectors
 
 
 
-procedure CompileBasicDesignator(var ValType: Integer);
+procedure CompileBasicDesignator(var ValType: Integer; var IsConst: Boolean);
 var
   ResultType: Integer;
   IdentIndex: Integer;  
@@ -1901,11 +1903,12 @@ begin
 // A designator always designates a memory location
 // A function call can be part of a designator only if it returns an address (i.e. a structured result or a pointer), not an immediate value
 // All other calls are part of a factor or a statement
-   
+
+IsConst := FALSE;   
 AssertIdent;
 
 // First search among records in WITH blocks
-CompileFieldOrMethodInsideWith(ValType);
+CompileFieldOrMethodInsideWith(ValType, IsConst);
 
 // If unsuccessful, search among ordinary identifiers
 if ValType = 0 then
@@ -1932,7 +1935,8 @@ if ValType = 0 then
     VARIABLE:                                  
       begin   
       PushVarIdentPtr(IdentIndex);      
-      ValType := Ident[IdentIndex].DataType;          
+      ValType := Ident[IdentIndex].DataType;
+      IsConst := Ident[IdentIndex].IsTypedConst or (Ident[IdentIndex].PassMethod = CONSTPASSING);         
       
       // Structured CONST parameters are passed by reference, scalar CONST parameters are passed by value
       if (Ident[IdentIndex].PassMethod = VARPASSING) or 
@@ -1976,9 +1980,15 @@ end; // CompileBasicDesignator
 
 
 
-procedure CompileDesignator(var ValType: Integer);
+procedure CompileDesignator(var ValType: Integer; AllowConst: Boolean = TRUE);
+var
+  IsConst: Boolean;
 begin
-CompileBasicDesignator(ValType);
+CompileBasicDesignator(ValType, IsConst);
+
+if IsConst and not AllowConst then
+  Error('Constant value cannot be modified');
+  
 CompileSelectors(ValType);
 end; // CompileDesignator
 
@@ -2784,6 +2794,7 @@ procedure CompileStatement(LoopNesting: Integer);
     DesignatorType: Integer;
     DeltaWithNesting: Integer;
     TempStorageAddr: Integer;
+    IsConst: Boolean;
     
   begin
   NextTok;  
@@ -2794,7 +2805,8 @@ procedure CompileStatement(LoopNesting: Integer);
     TempStorageAddr := AllocateTempStorage(TypeSize(POINTERTYPEINDEX));    
     PushTempStoragePtr(TempStorageAddr);
     
-    CompileDesignator(DesignatorType);
+    CompileBasicDesignator(DesignatorType, IsConst);
+    CompileSelectors(DesignatorType);
     if not (Types[DesignatorType].Kind in [RECORDTYPE, INTERFACETYPE]) then
       Error('Record or interface expected');
       
@@ -2808,7 +2820,8 @@ procedure CompileStatement(LoopNesting: Integer);
       Error('Maximum WITH block nesting exceeded');
     
     WithStack[WithNesting].TempPointer := TempStorageAddr;
-    WithStack[WithNesting].DataType := DesignatorType;    
+    WithStack[WithNesting].DataType := DesignatorType;
+    WithStack[WithNesting].IsConst := IsConst;    
     
     if Tok.Kind <> COMMATOK then Break;
     NextTok;
@@ -2855,7 +2868,7 @@ case Tok.Kind of
     begin   
     if FieldOrMethodInsideWithFound(Tok.Name) then                      // Record field or method inside a WITH block
       begin
-      CompileDesignator(DesignatorType);
+      CompileDesignator(DesignatorType, FALSE);
       CompileAssignmentOrCall(DesignatorType);
       end 
     else                                                                // Ordinary identifier                                                                                
@@ -2866,7 +2879,7 @@ case Tok.Kind of
       
         VARIABLE, USERTYPE:                                             // Assignment or procedural variable call
           begin
-          CompileDesignator(DesignatorType);
+          CompileDesignator(DesignatorType, FALSE);
           CompileAssignmentOrCall(DesignatorType); 
           end;
 
@@ -3647,7 +3660,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
 
     CompileType(VarType);
 
-    if Tok.Kind = EQTOK then                                     // Initialized variable (equivalent to a typed constant)
+    if Tok.Kind = EQTOK then                                     // Initialized variable (equivalent to a typed constant, but mutable)
       begin
       if BlockStack[BlockStackTop].Index <> 1 then
         Error('Local variables cannot be initialized');
@@ -3657,6 +3670,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
         
       NextTok;
       DeclareIdent(IdentInListName[1], CONSTANT, 0, VarType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+      Ident[NumIdent].IsTypedConst := FALSE;  // Allow mutability
       CompileInitializer(Ident[NumIdent].Address, VarType);      
       end
     else                                                         // Uninitialized variables   

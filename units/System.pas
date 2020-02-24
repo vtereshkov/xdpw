@@ -186,7 +186,7 @@ procedure ReadWord(var F: file; P: PStream; var Number: Word);
 procedure ReadByte(var F: file; P: PStream; var Number: Byte);
 procedure ReadBoolean(var F: file; P: PStream; var Value: Boolean);
 procedure ReadReal(var F: file; P: PStream; var Number: Real);
-procedure ReadString(var F: file; P: PStream; const s: string);
+procedure ReadString(var F: file; P: PStream; var s: string);
 procedure ReadNewLine(var F: file; P: PStream);
 function UpCase(ch: Char): Char;
 procedure InitSet(var SetStorage: TSetStorage);
@@ -1057,7 +1057,7 @@ end;
 
 
 
-procedure ReadString(var F: file; P: PStream; const s: string);
+procedure ReadString(var F: file; P: PStream; var s: string);
 var
   i: Integer;
   Ch: Char;

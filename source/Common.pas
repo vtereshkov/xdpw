@@ -252,6 +252,7 @@ type
     IsUsed: Boolean;
     IsUnresolvedForward: Boolean;
     IsExported: Boolean;
+    IsTypedConst: Boolean;
     ForLoopNesting: Integer;                    // Number of nested FOR loops where the label is defined
   end;
 
@@ -302,6 +303,7 @@ type
   TWithDesignator = record
     TempPointer: Integer;
     DataType: Integer;
+    IsConst: Boolean;
   end;
   
   TWriteProc = procedure (const Msg: TString);
@@ -375,10 +377,10 @@ function GetIdentUnsafe(const IdentName: TString; AllowForwardReference: Boolean
 function GetIdent(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer;
 function GetFieldUnsafe(RecType: Integer; const FieldName: TString): Integer;
 function GetField(RecType: Integer; const FieldName: TString): Integer;
-function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer;
+function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; var IsConst: Boolean; const FieldName: TString): Integer;
 function GetMethodUnsafe(RecType: Integer; const MethodName: TString): Integer;
 function GetMethod(RecType: Integer; const MethodName: TString): Integer;
-function GetMethodInsideWith(var RecPointer: Integer; var RecType: Integer; const MethodName: TString): Integer;
+function GetMethodInsideWith(var RecPointer: Integer; var RecType: Integer; var IsConst: Boolean; const MethodName: TString): Integer;
 function FieldOrMethodInsideWithFound(const Name: TString): Boolean;
 
 
@@ -1098,7 +1100,7 @@ end;
 
 
 
-function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer;
+function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; var IsConst: Boolean; const FieldName: TString): Integer;
 var
   FieldIndex, WithIndex: Integer;
 begin 
@@ -1109,7 +1111,8 @@ for WithIndex := WithNesting downto 1 do
   
   if FieldIndex <> 0 then
     begin
-    RecPointer := WithStack[WithIndex].TempPointer;
+    RecPointer := WithStack[WithIndex].TempPointer;  
+    IsConst := WithStack[WithIndex].IsConst;
     Result := FieldIndex;
     Exit;
     end;
@@ -1139,7 +1142,7 @@ end;
 
 
 
-function GetMethodInsideWith(var RecPointer: Integer; var RecType: Integer; const MethodName: TString): Integer;
+function GetMethodInsideWith(var RecPointer: Integer; var RecType: Integer; var IsConst: Boolean; const MethodName: TString): Integer;
 var
   MethodIndex, WithIndex: Integer;
 begin 
@@ -1151,6 +1154,7 @@ for WithIndex := WithNesting downto 1 do
   if MethodIndex <> 0 then
     begin
     RecPointer := WithStack[WithIndex].TempPointer;
+    IsConst := WithStack[WithIndex].IsConst;
     Result := MethodIndex;
     Exit;
     end;
@@ -1165,9 +1169,10 @@ end;
 function FieldOrMethodInsideWithFound(const Name: TString): Boolean;
 var
   RecPointer: Integer; 
-  RecType: Integer;        
+  RecType: Integer;
+  IsConst: Boolean;        
 begin
-Result := (GetFieldInsideWith(RecPointer, RecType, Name) <> 0) or (GetMethodInsideWith(RecPointer, RecType, Name) <> 0);
+Result := (GetFieldInsideWith(RecPointer, RecType, IsConst, Name) <> 0) or (GetMethodInsideWith(RecPointer, RecType, IsConst, Name) <> 0);
 end;
 
 

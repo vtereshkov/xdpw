@@ -628,7 +628,7 @@ with ScannerState do
       '[': Token.Kind := OBRACKETTOK;
       ']': Token.Kind := CBRACKETTOK
     else
-      Error('Unexpected end of program');
+      Error('Unexpected character or end of file');
     end; // case
 
     ReadChar(ch);
