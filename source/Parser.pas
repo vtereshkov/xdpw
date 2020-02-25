@@ -3144,6 +3144,7 @@ procedure CompileType(var DataType: Integer);
     TagName: TString;
     TagVal: TConst;
     TagType, TagValType: Integer;
+    TagTypeIdentIndex: Integer;
     NextFieldOffset, VariantStartOffset: Integer;
     
   
@@ -3171,17 +3172,26 @@ procedure CompileType(var DataType: Integer);
     
     // Tag field
     AssertIdent;
-    TagName := Tok.Name;
-    NextTok;
-    EatTok(COLONTOK);
+    TagTypeIdentIndex := GetIdentUnsafe(Tok.Name);
     
-    CompileType(TagType);    
+    if (TagTypeIdentIndex <> 0) and (Ident[TagTypeIdentIndex].Kind = USERTYPE) then      // Type name found
+      begin
+      TagType := Ident[TagTypeIdentIndex].DataType;
+      NextTok;
+      end
+    else                                                                                 // Field name found  
+      begin
+      TagName := Tok.Name;
+      NextTok;
+      EatTok(COLONTOK);      
+      CompileType(TagType);           
+      DeclareField(TagName, DataType, TagType, NextFieldOffset);
+      end;
+      
     if not (Types[TagType].Kind in OrdinalTypes) then
       Error('Ordinal type expected');
-      
-    DeclareField(TagName, DataType, TagType, NextFieldOffset);
-    VariantStartOffset := NextFieldOffset;
-    
+  
+    VariantStartOffset := NextFieldOffset;    
     EatTok(OFTOK);
     
     // Variants

@@ -107,7 +107,7 @@ Type = "(" Ident {"," Ident} ")" |
        "^" TypeIdent |
        ["packed"] "array" "[" Type {"," Type} "]" "of" Type |
        ["packed"] "record" Fields 
-          ["case" Ident ":" Type "of" 
+          ["case" [Ident ":"] Type "of" 
                ConstExpression {"," ConstExpression} ":" "(" Fields ")"
           {";" ConstExpression {"," ConstExpression} ":" "(" Fields ")"}] [";"] "end" |
        ["packed"] "interface" Fields [";"] "end" |
