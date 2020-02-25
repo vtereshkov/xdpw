@@ -240,15 +240,7 @@ with ScannerState do
     ReadUppercaseChar(ch);
   until not (ch in AlphaNums);
 
-  if Text = '$I' then
-    begin
-    if (ch = '+') or (ch = '-') then   // I/O checking directive - ignored
-      ReadMultiLineComment
-    else
-      Error('Unknown compiler directive');
-    end
-    
-  else if Text = '$APPTYPE' then       // Console/GUI application type directive
+  if Text = '$APPTYPE' then       // Console/GUI application type directive
     begin
     Text := '';
     ReadChar(ch);
@@ -265,9 +257,8 @@ with ScannerState do
       IsConsoleProgram := FALSE
     else
       Error('Unknown application type ' + Text);
-    end
-        
-  else
+    end        
+  else                            // All other directives are ignored
     ReadMultiLineComment;
   end;  
 end;
