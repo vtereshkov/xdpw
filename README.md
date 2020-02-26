@@ -5,7 +5,7 @@
 _Dedicated to my father Mikhail Tereshkov, who instilled in me a taste for engineering_ 
 
 ## Summary
-XD Pascal is a small educational self-hosting compiler for a Pascal language dialect. Any comments, suggestions, or bug reports are appreciated. Feel free to contact the author on GitHub or by e-mail VTereshkov@mail.ru. Enjoy.
+XD Pascal is a small embeddable self-hosting compiler for a Pascal language dialect. Any comments, suggestions, or bug reports are appreciated. Feel free to contact the author on GitHub or by e-mail VTereshkov@mail.ru. Enjoy.
 
 ### Features
 * [__Go-style methods and interfaces__](https://medium.com/@vtereshkov/how-i-implemented-go-style-interfaces-in-my-own-pascal-compiler-a0f8d37cd297?source=friends_link&sk=72a20752cb866c716daac13abc1fab22)
@@ -14,7 +14,7 @@ XD Pascal is a small educational self-hosting compiler for a Pascal language dia
 * No external assembler or linker needed
 * Floating-point arithmetic using the x87 FPU
 * Seamless integration with Geany IDE
-* Compiler source for Delphi 6/7, Free Pascal and XD Pascal itself 
+* Compiler source for Delphi 6/7, Free Pascal and XD Pascal itself (Delphi 2009+ migration is [straightforward](https://github.com/vtereshkov/xdpw/issues/2#issuecomment-573929657)) 
 
 ## Detailed description
 
@@ -27,17 +27,12 @@ The source file should be specified with its extension (.pas).
  
 ### Language
 
-XD Pascal is similar to Turbo Pascal with the following changes:
+XD Pascal is similar to Delphi 6/7 and Free Pascal with the following changes:
 
 #### Enhancements
-* The target operating system is Windows
 * The compiler is self-hosting
-* Methods and interfaces (Go style) are supported
-* Functions can return arrays, records or sets (Delphi style)
-* Functions can be called as procedures (Delphi style)
-* Parameters can have default values (Delphi style)
-* The predefined `Result` variable can be used instead of the function name in assignments (Delphi style)
-* Single-line comments (`//`) are supported (Delphi style)
+* The compiler is extremely compact (~10000 lines) and can be easily embedded into larger systems
+* Go-style methods and interfaces are supported
 
 #### Differences
 * Strings are null-terminated arrays of characters (C style), but indexed from 1 for Pascal compatibility
@@ -45,10 +40,11 @@ XD Pascal is similar to Turbo Pascal with the following changes:
 * Method calls and procedural variable calls require parentheses even for empty parameter lists
 
 #### Limitations
-* No "classical" object-oriented programming
+* No classical (C++ style) object-oriented programming
+* No visual components
 * Units cannot be compiled separately
+* Only peephole optimizations
 * `Real`, `Double` and `Extended` types are equivalent to `Single`
-* Arrays (except strings), records and sets cannot be untyped constants. Use typed constants instead
 * No `High` and `Low` functions for open arrays. Open array length should be explicitly passed to a subroutine 
 * Statement labels cannot be numerical 
 
@@ -111,7 +107,7 @@ Type = "(" Ident {"," Ident} ")" |
        "^" TypeIdent |
        ["packed"] "array" "[" Type {"," Type} "]" "of" Type |
        ["packed"] "record" Fields 
-          ["case" Ident ":" Type "of" 
+          ["case" [Ident ":"] Type "of" 
                ConstExpression {"," ConstExpression} ":" "(" Fields ")"
           {";" ConstExpression {"," ConstExpression} ":" "(" Fields ")"}] [";"] "end" |
        ["packed"] "interface" Fields [";"] "end" |
@@ -274,9 +270,8 @@ function FilePos(var F: file): Integer;
 function EOF(var F: file): Boolean;
 function IOResult: Integer;
 function Length(const s: string): Integer;
-procedure AppendStr(var Dest: string; const Source: string);
-function CompareStr(const s1, s2: string): Integer;
 procedure Move(var Source; var Dest; Count: Integer);
+function Copy(const S: string; Index, Count: Integer): string;
 procedure FillChar(var Data; Count: Integer; Value: Char);
 function ParamCount: Integer;
 function ParamStr(Index: Integer): string;
@@ -309,7 +304,7 @@ function PWideCharToStr(p: PWideChar): string;
 * `inserr.pas`   - Inertial navigation system error estimation demo. Uses `kalman.pas` unit
 * `list.pas`     - Linked list operations demo
 * `gui.pas`      - GUI application demo. Uses `windows.pas` unit
-* `raytracer.pas`- Raytracer demo. Demonstrates XD Pascal methods and interfaces
+* `raytracer.pas`- Raytracer demo. Demonstrates XD Pascal methods and interfaces. Equivalent to `raytracer.go`
 
 <img src="scene.png">
 

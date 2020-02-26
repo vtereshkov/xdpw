@@ -25,9 +25,9 @@ const
   MAXFIELDS                 = 100;
   MAXWITHNESTING            = 20;
 
-  MAXINITIALIZEDDATASIZE    =  1 * 1024 * 1024;
-  MAXUNINITIALIZEDDATASIZE  = 32 * 1024 * 1024;
-  MAXSTACKSIZE              = 16 * 1024 * 1024;  
+  MAXINITIALIZEDDATASIZE    =    1 * 1024 * 1024;
+  MAXUNINITIALIZEDDATASIZE  = 1024 * 1024 * 1024;
+  MAXSTACKSIZE              =   16 * 1024 * 1024;  
 
 
 
@@ -119,7 +119,7 @@ type
     // User tokens
     IDENTTOK,
     INTNUMBERTOK,
-    FRACNUMBERTOK,
+    REALNUMBERTOK,
     CHARLITERALTOK,
     STRINGLITERALTOK    
     );
@@ -128,8 +128,8 @@ type
     Name: TString;
   case Kind: TTokenKind of
     IDENTTOK:         (NonUppercaseName: TShortString);  
-    INTNUMBERTOK:     (Value: LongInt);                   // For all ordinal types
-    FRACNUMBERTOK:    (FracValue: Single);
+    INTNUMBERTOK:     (OrdValue: LongInt);                   // For all ordinal types
+    REALNUMBERTOK:    (RealValue: Single);
     STRINGLITERALTOK: (StrAddress: Integer;
                        StrLength: Integer);
   end;
@@ -157,12 +157,15 @@ const
 
 
 
-type
-  TConst = record
+type  
+  TByteSet = set of Byte;
+
+  TConst = packed record
   case Kind: TTypeKind of
-    INTEGERTYPE: (Value: LongInt);            // For all ordinal types 
-    REALTYPE:    (FracValue: Single);
-    ARRAYTYPE:   (StrValue: TShortString);    
+    INTEGERTYPE: (OrdValue: LongInt);         // For all ordinal types 
+    REALTYPE:    (RealValue: Single);
+    ARRAYTYPE:   (StrValue: TShortString);
+    SETTYPE:     (SetValue: TByteSet);        // For all set types    
   end;   
   
   TPassMethod = (EMPTYPASSING, VALPASSING, CONSTPASSING, VARPASSING); 
@@ -231,6 +234,9 @@ type
   TIdentifier = record
     Kind: TIdentKind;
     Name: TString;
+    DataType: Integer;
+    Address: LongInt;
+    ConstVal: TConst;
     UnitIndex: Integer;
     Block: Integer;                             // Index of a block in which the identifier is defined
     NestingLevel: Byte;
@@ -246,11 +252,8 @@ type
     IsUsed: Boolean;
     IsUnresolvedForward: Boolean;
     IsExported: Boolean;
+    IsTypedConst: Boolean;
     ForLoopNesting: Integer;                    // Number of nested FOR loops where the label is defined
-    StrValue: TString;                          // Value of a string constant
-  case DataType: Integer of
-    INTEGERTYPEINDEX: (Value: LongInt);         // Value of an ordinal constant, address of a label, string constant, variable, procedure or function
-    REALTYPEINDEX:    (FracValue: Single);      // Value of a real constant
   end;
 
   TField = record
@@ -300,9 +303,31 @@ type
   TWithDesignator = record
     TempPointer: Integer;
     DataType: Integer;
+    IsConst: Boolean;
   end;
   
   TWriteProc = procedure (const Msg: TString);
+  
+  
+  
+const    
+  // Operator sets  
+  MultiplicativeOperators = [MULTOK, DIVTOK, IDIVTOK, MODTOK, SHLTOK, SHRTOK, ANDTOK];
+  AdditiveOperators       = [PLUSTOK, MINUSTOK, ORTOK, XORTOK];
+  UnaryOperators          = [PLUSTOK, MINUSTOK];
+  RelationOperators       = [EQTOK, NETOK, LTTOK, LETOK, GTTOK, GETOK];
+
+  OperatorsForIntegers    = MultiplicativeOperators - [DIVTOK] + AdditiveOperators + RelationOperators + [NOTTOK];
+  OperatorsForReals       = [MULTOK, DIVTOK, PLUSTOK, MINUSTOK] + RelationOperators;
+  OperatorsForBooleans    = [ANDTOK, ORTOK, XORTOK, NOTTOK] + RelationOperators;
+
+  // Type sets
+  IntegerTypes     = [INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE];
+  OrdinalTypes     = IntegerTypes + [CHARTYPE, BOOLEANTYPE, SUBRANGETYPE, ENUMERATEDTYPE];
+  UnsignedTypes    = [WORDTYPE, BYTETYPE, CHARTYPE];
+  NumericTypes     = IntegerTypes + [REALTYPE];
+  StructuredTypes  = [ARRAYTYPE, RECORDTYPE, INTERFACETYPE, SETTYPE, FILETYPE];
+  CastableTypes    = OrdinalTypes + [POINTERTYPE, PROCEDURALTYPE];     
   
   
 
@@ -313,11 +338,6 @@ var
   Units: array [1..MAXUNITS] of TUnit;
   BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
   WithStack: array [1..MAXWITHNESTING] of TWithDesignator;
-  
-  MultiplicativeOperators, AdditiveOperators, UnaryOperators, RelationOperators,
-  OperatorsForIntegers, OperatorsForReals, OperatorsForBooleans: set of TTokenKind;
-  
-  IntegerTypes, OrdinalTypes, UnsignedTypes, NumericTypes, StructuredTypes, CastableTypes: set of TTypeKind;
 
   NumIdent, NumTypes, NumUnits, NumBlocks, BlockStackTop, ForLoopNesting, WithNesting,
   InitializedGlobalDataSize, UninitializedGlobalDataSize: Integer;
@@ -339,7 +359,8 @@ procedure SetWriteProcs(NewNoticeProc, NewWarningProc, NewErrorProc: TWriteProc)
 procedure Notice(const Msg: TString);
 procedure Warning(const Msg: TString);
 procedure Error(const Msg: TString);
-procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
+procedure DefineStaticString(const StrValue: TString; var Addr: LongInt; FixedAddr: LongInt = -1);
+procedure DefineStaticSet(const SetValue: TByteSet; var Addr: LongInt; FixedAddr: LongInt = -1);
 function IsString(DataType: Integer): Boolean;
 function LowBound(DataType: Integer): Integer;
 function HighBound(DataType: Integer): Integer;
@@ -356,10 +377,10 @@ function GetIdentUnsafe(const IdentName: TString; AllowForwardReference: Boolean
 function GetIdent(const IdentName: TString; AllowForwardReference: Boolean = FALSE; RecType: Integer = 0): Integer;
 function GetFieldUnsafe(RecType: Integer; const FieldName: TString): Integer;
 function GetField(RecType: Integer; const FieldName: TString): Integer;
-function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer;
+function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; var IsConst: Boolean; const FieldName: TString): Integer;
 function GetMethodUnsafe(RecType: Integer; const MethodName: TString): Integer;
 function GetMethod(RecType: Integer; const MethodName: TString): Integer;
-function GetMethodInsideWith(var RecPointer: Integer; var RecType: Integer; const MethodName: TString): Integer;
+function GetMethodInsideWith(var RecPointer: Integer; var RecType: Integer; var IsConst: Boolean; const MethodName: TString): Integer;
 function FieldOrMethodInsideWithFound(const Name: TString): Boolean;
 
 
@@ -414,41 +435,13 @@ const
     'WITH',
     'XOR'
     );
+ 
 
 
 var
   NoticeProc, WarningProc, ErrorProc: TWriteProc;
   UnitStatus: TUnitStatus;
   
-  
-
-
-procedure FillOperatorSets;
-begin
-MultiplicativeOperators := [MULTOK, DIVTOK, IDIVTOK, MODTOK, SHLTOK, SHRTOK, ANDTOK];
-AdditiveOperators       := [PLUSTOK, MINUSTOK, ORTOK, XORTOK];
-UnaryOperators          := [PLUSTOK, MINUSTOK];
-RelationOperators       := [EQTOK, NETOK, LTTOK, LETOK, GTTOK, GETOK];
-
-OperatorsForIntegers    := MultiplicativeOperators - [DIVTOK] + AdditiveOperators + RelationOperators + [NOTTOK];
-OperatorsForReals       := [MULTOK, DIVTOK, PLUSTOK, MINUSTOK] + RelationOperators;
-OperatorsForBooleans    := [ANDTOK, ORTOK, XORTOK, NOTTOK] + RelationOperators;
-end;
-
-
-
-
-procedure FillTypeSets;
-begin
-IntegerTypes     := [INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE];
-OrdinalTypes     := IntegerTypes + [CHARTYPE, BOOLEANTYPE, SUBRANGETYPE, ENUMERATEDTYPE];
-UnsignedTypes    := [WORDTYPE, BYTETYPE, CHARTYPE];
-NumericTypes     := IntegerTypes + [REALTYPE];
-StructuredTypes  := [ARRAYTYPE, RECORDTYPE, INTERFACETYPE, SETTYPE, FILETYPE];
-CastableTypes    := OrdinalTypes + [POINTERTYPE, PROCEDURALTYPE];
-end;
-
-
 
 
 procedure InitializeCommon;
@@ -472,9 +465,6 @@ IsConsoleProgram            := TRUE;  // Console program by default
 
 SourceFolder                := '';
 UnitsFolder                 := ''; 
-
-FillOperatorSets;
-FillTypeSets;
 end;
 
 
@@ -567,7 +557,7 @@ case TokKind of
   DEREFERENCETOK:                    Result := '^';
   ANDTOK..XORTOK:                    Result := Keyword[Ord(TokKind) - Ord(ANDTOK) + 1];
   IDENTTOK:                          Result := 'identifier';
-  INTNUMBERTOK, FRACNUMBERTOK:       Result := 'number';
+  INTNUMBERTOK, REALNUMBERTOK:       Result := 'number';
   CHARLITERALTOK:                    Result := 'character literal';
   STRINGLITERALTOK:                  Result := 'string literal'
 else
@@ -650,24 +640,52 @@ end;
 
 
 
-procedure DefineStaticString(var Tok: TToken; const StrValue: TString);
+procedure DefineStaticString(const StrValue: TString; var Addr: LongInt; FixedAddr: LongInt = -1);
+var
+  Len: Integer;  
+begin
+Len := Length(StrValue);
+
+if FixedAddr <> -1 then
+  Addr := FixedAddr
+else  
+  begin
+  if Len + 1 > MAXINITIALIZEDDATASIZE - InitializedGlobalDataSize then
+    Error('Not enough memory for static string');
+
+  Addr := InitializedGlobalDataSize;  // Relocatable
+  InitializedGlobalDataSize := InitializedGlobalDataSize + Len + 1;
+  end;
+  
+Move(StrValue[1], InitializedGlobalData[Addr], Len);
+InitializedGlobalData[Addr + Len] := 0;      // Add string termination character
+end;
+
+
+
+
+procedure DefineStaticSet(const SetValue: TByteSet; var Addr: LongInt; FixedAddr: LongInt = -1);
 var
   i: Integer;
+  ElementPtr: ^Byte;  
 begin
-Tok.StrAddress := InitializedGlobalDataSize;  // Relocatable
-Tok.StrLength := Length(StrValue);
-
-for i := 1 to Length(StrValue) do
+if FixedAddr <> -1 then
+  Addr := FixedAddr
+else  
   begin
-  InitializedGlobalData[InitializedGlobalDataSize] := Ord(StrValue[i]);
-  Inc(InitializedGlobalDataSize);
-  if InitializedGlobalDataSize > MAXINITIALIZEDDATASIZE - 1 then
-    Error('Maximum string data size exceeded');
-  end;
+  if MAXSETELEMENTS div 8 > MAXINITIALIZEDDATASIZE - InitializedGlobalDataSize then
+    Error('Not enough memory for static set');
+  
+  Addr := InitializedGlobalDataSize;
+  InitializedGlobalDataSize := InitializedGlobalDataSize + MAXSETELEMENTS div 8;
+  end;   
 
-// Add string termination character
-InitializedGlobalData[InitializedGlobalDataSize] := 0;
-Inc(InitializedGlobalDataSize);
+for i := 0 to MAXSETELEMENTS - 1 do
+  if i in SetValue then
+    begin
+    ElementPtr := @InitializedGlobalData[Addr + i shr 3];
+    ElementPtr^ := ElementPtr^ or (1 shl (i and 7));
+    end;
 end;
 
 
@@ -725,34 +743,51 @@ end;
 
 function TypeSize(DataType: Integer): Integer;
 var
-  CurSize: Integer;
-  i: Integer;
+  CurSize, BaseTypeSize, FieldTypeSize: Integer;
+  NumElements, FieldOffset, i: Integer;
 begin
 Result := 0;
 case Types[DataType].Kind of
-  INTEGERTYPE:              Result := SizeOf(Integer);
-  SMALLINTTYPE:             Result := SizeOf(SmallInt);
-  SHORTINTTYPE:             Result := SizeOf(ShortInt);
-  WORDTYPE:                 Result := SizeOf(Word);
-  BYTETYPE:                 Result := SizeOf(Byte);  
-  CHARTYPE:                 Result := SizeOf(TCharacter);
-  BOOLEANTYPE:              Result := SizeOf(Boolean);
-  REALTYPE:                 Result := SizeOf(Single);
-  POINTERTYPE:              Result := SizeOf(Pointer);
-  FILETYPE:                 Result := SizeOf(TString) + SizeOf(Integer);  // Name + Handle
-  SUBRANGETYPE:             Result := SizeOf(Integer);
-  ARRAYTYPE:                if Types[DataType].IsOpenArray then
-                              Error('Illegal type')
-                            else  
-                              Result := (HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1) * TypeSize(Types[DataType].BaseType);
-  RECORDTYPE, INTERFACETYPE:for i := 1 to Types[DataType].NumFields do
-                              begin
-                              CurSize := Types[DataType].Field[i]^.Offset + TypeSize(Types[DataType].Field[i]^.DataType);
-                              if CurSize > Result then Result := CurSize;
-                              end;  
-  SETTYPE:                  Result := MAXSETELEMENTS div 8;
-  ENUMERATEDTYPE:           Result := SizeOf(Byte);                
-  PROCEDURALTYPE:           Result := SizeOf(Pointer)               
+  INTEGERTYPE:               Result := SizeOf(Integer);
+  SMALLINTTYPE:              Result := SizeOf(SmallInt);
+  SHORTINTTYPE:              Result := SizeOf(ShortInt);
+  WORDTYPE:                  Result := SizeOf(Word);
+  BYTETYPE:                  Result := SizeOf(Byte);  
+  CHARTYPE:                  Result := SizeOf(TCharacter);
+  BOOLEANTYPE:               Result := SizeOf(Boolean);
+  REALTYPE:                  Result := SizeOf(Single);
+  POINTERTYPE:               Result := SizeOf(Pointer);
+  FILETYPE:                  Result := SizeOf(TString) + SizeOf(Integer);  // Name + Handle
+  SUBRANGETYPE:              Result := SizeOf(Integer);
+  
+  ARRAYTYPE:                 begin
+                             if Types[DataType].IsOpenArray then
+                               Error('Illegal type');
+                             
+                             NumElements := HighBound(Types[DataType].IndexType) - LowBound(Types[DataType].IndexType) + 1;
+                             BaseTypeSize := TypeSize(Types[DataType].BaseType);
+                             
+                             if (NumElements > 0) and (BaseTypeSize > HighBound(INTEGERTYPEINDEX) div NumElements) then
+                               Error('Type size is too large');
+                               
+                             Result := NumElements * BaseTypeSize;
+                             end;
+                             
+  RECORDTYPE, INTERFACETYPE: for i := 1 to Types[DataType].NumFields do
+                               begin
+                               FieldOffset := Types[DataType].Field[i]^.Offset;
+                               FieldTypeSize := TypeSize(Types[DataType].Field[i]^.DataType);
+                               
+                               if FieldTypeSize > HighBound(INTEGERTYPEINDEX) - FieldOffset then
+                                 Error('Type size is too large');
+                               
+                               CurSize := FieldOffset + FieldTypeSize;
+                               if CurSize > Result then Result := CurSize;
+                               end;
+  
+  SETTYPE:                   Result := MAXSETELEMENTS div 8;
+  ENUMERATEDTYPE:            Result := SizeOf(Byte);                
+  PROCEDURALTYPE:            Result := SizeOf(Pointer)               
 else
   Error('Illegal type')
 end;// case
@@ -930,7 +965,7 @@ for i := 1 to Signature1.NumParams do
   if Signature1.Param[i]^.PassMethod <> Signature2.Param[i]^.PassMethod then
     Error('Incompatible CONST/VAR modifiers in ' + Name);
 
-  if Signature1.Param[i]^.Default.Value <> Signature2.Param[i]^.Default.Value then
+  if Signature1.Param[i]^.Default.OrdValue <> Signature2.Param[i]^.Default.OrdValue then
     Error('Incompatible default values in ' + Name);   
   end; // if
 
@@ -1065,7 +1100,7 @@ end;
 
 
 
-function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; const FieldName: TString): Integer;
+function GetFieldInsideWith(var RecPointer: Integer; var RecType: Integer; var IsConst: Boolean; const FieldName: TString): Integer;
 var
   FieldIndex, WithIndex: Integer;
 begin 
@@ -1076,7 +1111,8 @@ for WithIndex := WithNesting downto 1 do
   
   if FieldIndex <> 0 then
     begin
-    RecPointer := WithStack[WithIndex].TempPointer;
+    RecPointer := WithStack[WithIndex].TempPointer;  
+    IsConst := WithStack[WithIndex].IsConst;
     Result := FieldIndex;
     Exit;
     end;
@@ -1106,7 +1142,7 @@ end;
 
 
 
-function GetMethodInsideWith(var RecPointer: Integer; var RecType: Integer; const MethodName: TString): Integer;
+function GetMethodInsideWith(var RecPointer: Integer; var RecType: Integer; var IsConst: Boolean; const MethodName: TString): Integer;
 var
   MethodIndex, WithIndex: Integer;
 begin 
@@ -1118,6 +1154,7 @@ for WithIndex := WithNesting downto 1 do
   if MethodIndex <> 0 then
     begin
     RecPointer := WithStack[WithIndex].TempPointer;
+    IsConst := WithStack[WithIndex].IsConst;
     Result := MethodIndex;
     Exit;
     end;
@@ -1132,9 +1169,10 @@ end;
 function FieldOrMethodInsideWithFound(const Name: TString): Boolean;
 var
   RecPointer: Integer; 
-  RecType: Integer;        
+  RecType: Integer;
+  IsConst: Boolean;        
 begin
-Result := (GetFieldInsideWith(RecPointer, RecType, Name) <> 0) or (GetMethodInsideWith(RecPointer, RecType, Name) <> 0);
+Result := (GetFieldInsideWith(RecPointer, RecType, IsConst, Name) <> 0) or (GetMethodInsideWith(RecPointer, RecType, IsConst, Name) <> 0);
 end;
 
 

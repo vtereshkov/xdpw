@@ -173,6 +173,8 @@ end;
 
 procedure ReadChar(var ch: TCharacter);
 begin
+if ScannerState.ch = #10 then Inc(ScannerState.Line);  // End of line found
+
 ch := #0;
 with ScannerState.Buffer do
   if Pos < Size then
@@ -182,8 +184,6 @@ with ScannerState.Buffer do
     end
   else
     ScannerState.EndOfUnit := TRUE; 
-
-if ch = #10 then Inc(ScannerState.Line);  // End of line found
 end;
 
 
@@ -240,15 +240,7 @@ with ScannerState do
     ReadUppercaseChar(ch);
   until not (ch in AlphaNums);
 
-  if Text = '$I' then
-    begin
-    if (ch = '+') or (ch = '-') then   // I/O checking directive - ignored
-      ReadMultiLineComment
-    else
-      Error('Unknown compiler directive');
-    end
-    
-  else if Text = '$APPTYPE' then       // Console/GUI application type directive
+  if Text = '$APPTYPE' then       // Console/GUI application type directive
     begin
     Text := '';
     ReadChar(ch);
@@ -265,9 +257,8 @@ with ScannerState do
       IsConsoleProgram := FALSE
     else
       Error('Unknown application type ' + Text);
-    end
-        
-  else
+    end        
+  else                            // All other directives are ignored
     ReadMultiLineComment;
   end;  
 end;
@@ -304,7 +295,7 @@ with ScannerState do
     Error('Hexadecimal constant is not found');
 
   Token.Kind := INTNUMBERTOK;
-  Token.Value := Num;
+  Token.OrdValue := Num;
   end;
 end;
 
@@ -338,7 +329,7 @@ with ScannerState do
   if (ch <> '.') and (ch <> 'E') then                                   // Integer number
     begin
     Token.Kind := INTNUMBERTOK;
-    Token.Value := Num;
+    Token.OrdValue := Num;
     end
   else
     begin
@@ -351,7 +342,7 @@ with ScannerState do
       if ch2 = '.' then                                                 // Integer number followed by '..' token
         begin
         Token.Kind := INTNUMBERTOK;
-        Token.Value := Num;
+        Token.OrdValue := Num;
         RangeFound := TRUE;
         end;
       if not EndOfUnit then Dec(Buffer.Pos);
@@ -404,8 +395,8 @@ with ScannerState do
         if NegExpon then Expon := -Expon;
         end; // if ch = 'E'
 
-      Token.Kind := FRACNUMBERTOK;
-      Token.FracValue := (Num + Frac) * exp(Expon * ln(10));
+      Token.Kind := REALNUMBERTOK;
+      Token.RealValue := (Num + Frac) * exp(Expon * ln(10));
       end; // if not RangeFound
     end; // else
   end;  
@@ -440,7 +431,7 @@ with ScannerState do
 
   ReadNumber;
 
-  if (Token.Kind = FRACNUMBERTOK) or (Token.Value < 0) or (Token.Value > 255) then
+  if (Token.Kind = REALNUMBERTOK) or (Token.OrdValue < 0) or (Token.OrdValue > 255) then
     Error('Illegal character code');
 
   Token.Kind := CHARLITERALTOK;
@@ -512,13 +503,14 @@ with ScannerState do
   if Length(Text) = 1 then
     begin
     Token.Kind := CHARLITERALTOK;
-    Token.Value := Ord(Text[1]);
+    Token.OrdValue := Ord(Text[1]);
     end
   else
     begin
     Token.Kind := STRINGLITERALTOK;
     Token.Name := Text;
-    DefineStaticString(Token, Text);
+    Token.StrLength := Length(Text);
+    DefineStaticString(Text, Token.StrAddress);
     end;
 
   ReadUppercaseChar(ch);
@@ -627,7 +619,7 @@ with ScannerState do
       '[': Token.Kind := OBRACKETTOK;
       ']': Token.Kind := CBRACKETTOK
     else
-      Error('Unexpected end of program');
+      Error('Unexpected character or end of file');
     end; // case
 
     ReadChar(ch);
