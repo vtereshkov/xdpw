@@ -40,7 +40,7 @@ XD Pascal is similar to Delphi 6/7 and Free Pascal with the following changes:
 * Method calls and procedural variable calls require parentheses even for empty parameter lists
 
 #### Limitations
-* No classical (C++ style) object-oriented programming
+* No classical (C++/Delphi style) object-oriented programming
 * No visual components
 * Units cannot be compiled separately
 * Only peephole optimizations
@@ -106,11 +106,8 @@ IdentList = Ident {"," Ident} .
 Type = "(" Ident {"," Ident} ")" |
        "^" TypeIdent |
        ["packed"] "array" "[" Type {"," Type} "]" "of" Type |
-       ["packed"] "record" Fields 
-          ["case" [Ident ":"] Type "of" 
-               ConstExpression {"," ConstExpression} ":" "(" Fields ")"
-          {";" ConstExpression {"," ConstExpression} ":" "(" Fields ")"}] [";"] "end" |
-       ["packed"] "interface" Fields [";"] "end" |
+       ["packed"] "record" Fields "end" |
+       ["packed"] "interface" FixedFields "end" |
        ["packed"] "set" "of" Type |
        ["packed"] "string" [ "[" ConstExpression "]" ] |
        ["packed"] "file" ["of" Type] |
@@ -118,7 +115,12 @@ Type = "(" Ident {"," Ident} ")" |
        ("procedure" | "function") [FormalParams] [":" TypeIdent] ["stdcall"] |
        Ident .
        
-Fields = IdentList ":" Type {";" IdentList ":" Type} .       
+Fields = FixedFields 
+           ["case" [Ident ":"] Type "of" 
+               ConstExpression {"," ConstExpression} ":" "(" Fields ")"
+          {";" ConstExpression {"," ConstExpression} ":" "(" Fields ")"}] [";"] .       
+       
+FixedFields = IdentList ":" Type {";" IdentList ":" Type} .       
        
 TypeIdent = "string" | "file" | Ident .       
 

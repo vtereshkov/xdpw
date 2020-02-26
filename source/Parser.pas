@@ -2621,8 +2621,7 @@ procedure CompileStatement(LoopNesting: Integer);
     
     if (Tok.Kind = ELSETOK) or (Tok.Kind = ENDTOK) then Break;
     
-    CheckTok(SEMICOLONTOK);
-    NextTok;
+    EatTok(SEMICOLONTOK);
   until (Tok.Kind = ELSETOK) or (Tok.Kind = ENDTOK);  
   
   // Default statements
@@ -3092,18 +3091,13 @@ procedure CompileType(var DataType: Integer);
     
     
     
-    procedure CompileFields(RecType: Integer; var NextFieldOffset: Integer);
+    procedure CompileFixedFields(RecType: Integer; var NextFieldOffset: Integer);
     var
       FieldInListName: array [1..MAXFIELDS] of TString;
       NumFieldsInList, FieldInListIndex: Integer;
       FieldType: Integer;
       
-    begin
-    // Declare hidden Self pointer for interfaces
-    if IsInterfaceType then
-      DeclareField('SELF', DataType, POINTERTYPEINDEX, NextFieldOffset);
-      
-    // Declare other fields
+    begin      
     while not (Tok.Kind in [CASETOK, ENDTOK, CPARTOK]) do
       begin
       NumFieldsInList := 0;
@@ -3136,16 +3130,79 @@ procedure CompileType(var DataType: Integer);
       NextTok;
       end; // while
     
-    end; // CompileFields
+    end; // CompileFixedFields
+    
+    
+        
+    procedure CompileFields(RecType: Integer; var NextFieldOffset: Integer);    
+    var
+      TagName: TString;
+      TagVal: TConst;
+      TagType, TagValType: Integer;
+      TagTypeIdentIndex: Integer;
+      VariantStartOffset: Integer;
+    
+    begin
+    // Fixed fields
+    CompileFixedFields(DataType, NextFieldOffset);
+    
+    // Variant fields
+    if (Tok.Kind = CASETOK) and not IsInterfaceType then
+      begin   
+      NextTok;
+      
+      // Tag field
+      AssertIdent;
+      TagTypeIdentIndex := GetIdentUnsafe(Tok.Name);
+      
+      if (TagTypeIdentIndex <> 0) and (Ident[TagTypeIdentIndex].Kind = USERTYPE) then      // Type name found
+        begin
+        TagType := Ident[TagTypeIdentIndex].DataType;
+        NextTok;
+        end
+      else                                                                                 // Field name found  
+        begin
+        TagName := Tok.Name;
+        NextTok;
+        EatTok(COLONTOK);      
+        CompileType(TagType);           
+        DeclareField(TagName, DataType, TagType, NextFieldOffset);
+        end;
+        
+      if not (Types[TagType].Kind in OrdinalTypes) then
+        Error('Ordinal type expected');
+    
+      VariantStartOffset := NextFieldOffset;    
+      EatTok(OFTOK);
+      
+      // Variants
+      repeat
+        repeat
+          CompileConstExpression(TagVal, TagValType);
+          GetCompatibleType(TagType, TagValType);
+          if Tok.Kind <> COMMATOK then Break;
+          NextTok; 
+        until FALSE;
+    
+        EatTok(COLONTOK);
+        EatTok(OPARTOK);
+        
+        NextFieldOffset := VariantStartOffset;
+        CompileFields(DataType, NextFieldOffset);
+        
+        EatTok(CPARTOK);      
+        if (Tok.Kind = CPARTOK) or (Tok.Kind = ENDTOK) then Break;
+ 
+        EatTok(SEMICOLONTOK);      
+      until (Tok.Kind = CPARTOK) or (Tok.Kind = ENDTOK);
+      
+      end; // if    
+    end; // CompileFields    
     
 
   
   var
-    TagName: TString;
-    TagVal: TConst;
-    TagType, TagValType: Integer;
-    TagTypeIdentIndex: Integer;
-    NextFieldOffset, VariantStartOffset: Integer;
+    NextFieldOffset: Integer;
     
   
   begin // CompileRecordOrInterfaceType
@@ -3159,63 +3216,13 @@ procedure CompileType(var DataType: Integer);
   
   Types[NumTypes].NumFields := 0;
   DataType := NumTypes;
+  
+  // Declare hidden Self pointer for interfaces
+  if IsInterfaceType then
+    DeclareField('SELF', DataType, POINTERTYPEINDEX, NextFieldOffset);  
 
   NextTok;
-  
-  // Fixed fields
-  CompileFields(DataType, NextFieldOffset);
-  
-  // Variant fields
-  if (Tok.Kind = CASETOK) and not IsInterfaceType then
-    begin   
-    NextTok;
-    
-    // Tag field
-    AssertIdent;
-    TagTypeIdentIndex := GetIdentUnsafe(Tok.Name);
-    
-    if (TagTypeIdentIndex <> 0) and (Ident[TagTypeIdentIndex].Kind = USERTYPE) then      // Type name found
-      begin
-      TagType := Ident[TagTypeIdentIndex].DataType;
-      NextTok;
-      end
-    else                                                                                 // Field name found  
-      begin
-      TagName := Tok.Name;
-      NextTok;
-      EatTok(COLONTOK);      
-      CompileType(TagType);           
-      DeclareField(TagName, DataType, TagType, NextFieldOffset);
-      end;
-      
-    if not (Types[TagType].Kind in OrdinalTypes) then
-      Error('Ordinal type expected');
-  
-    VariantStartOffset := NextFieldOffset;    
-    EatTok(OFTOK);
-    
-    // Variants
-    repeat
-      repeat
-        CompileConstExpression(TagVal, TagValType);
-        GetCompatibleType(TagType, TagValType);
-        if Tok.Kind <> COMMATOK then Break;
-        NextTok; 
-      until FALSE;
-  
-      EatTok(COLONTOK);
-      EatTok(OPARTOK);
-      
-      NextFieldOffset := VariantStartOffset;
-      CompileFields(DataType, NextFieldOffset);
-      
-      EatTok(CPARTOK);      
-      if Tok.Kind <> SEMICOLONTOK then Break; 
-      NextTok;      
-    until Tok.Kind = ENDTOK;
-    
-    end; // if
-    
+  CompileFields(DataType, NextFieldOffset);    
   EatTok(ENDTOK);
   end; // CompileRecordOrInterfaceType
 
