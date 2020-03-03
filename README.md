@@ -260,6 +260,8 @@ function SqRt(x: Real): Real;
 #### System unit
 ```pascal
 function Timer: Integer;
+procedure GetMem(var P: Pointer; Size: Integer);
+procedure FreeMem(var P: Pointer);
 procedure Randomize;
 function Random: Real;
 procedure Assign(var F: file; const Name: string);
