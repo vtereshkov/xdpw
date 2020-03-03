@@ -37,7 +37,7 @@ procedure RestoreStackTopFromEAX;
 procedure DiscardStackTop(NumItems: Byte);
 procedure DuplicateStackTop;
 procedure SaveCodePos;
-procedure GenerateIncDec(proc: TPredefProc; Size: Byte);
+procedure GenerateIncDec(proc: TPredefProc; Size: Byte; BaseTypeSize: Integer = 0);
 procedure GenerateRound(TruncMode: Boolean);
 procedure GenerateFloat(Depth: Byte);
 procedure GenerateMathFunction(func: TPredefProc; ResultType: Integer);
@@ -1199,26 +1199,40 @@ end;
 
 
 
-procedure GenerateIncDec(proc: TPredefProc; Size: Byte);
+procedure GenerateIncDec(proc: TPredefProc; Size: Byte; BaseTypeSize: Integer = 0);
 begin
 GenPopReg(ESI);                                                       // pop esi
 
-case Size of
-  1: begin
-     GenNew($FE);                                                     // ... byte ptr ...
-     end;
-  2: begin
-     GenNew($66); Gen($FF);                                           // ... word ptr ...
-     end;
-  4: begin
-     GenNew($FF);                                                     // ... dword ptr ...
-     end;
+if BaseTypeSize <> 0 then                // Special case: typed pointer
+  begin
+  GenNew($81);                                                          // ... dword ptr  ...
+ 
+  case proc of
+    INCPROC: Gen($06);                                                  // add ... [esi], ...
+    DECPROC: Gen($2E);                                                  // sub ... [esi], ...
   end;
+  
+  GenDWord(BaseTypeSize);                                               // ... BaseTypeSize
+  end
+else                                     // General rule
+  begin  
+  case Size of
+    1: begin
+       GenNew($FE);                                                     // ... byte ptr ...
+       end;
+    2: begin
+       GenNew($66); Gen($FF);                                           // ... word ptr ...
+       end;
+    4: begin
+       GenNew($FF);                                                     // ... dword ptr ...
+       end;
+    end;
 
-case proc of
-  INCPROC: Gen($06);                                                  // inc ... [esi]
-  DECPROC: Gen($0E);                                                  // dec ... [esi]
-  end;
+  case proc of
+    INCPROC: Gen($06);                                                  // inc ... [esi]
+    DECPROC: Gen($0E);                                                  // dec ... [esi]
+    end;
+  end;  
 end;
 
 

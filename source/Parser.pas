@@ -884,10 +884,16 @@ case proc of
   INCPROC, DECPROC:
     begin
     EatTok(OPARTOK);
-    AssertIdent;
     CompileDesignator(DesignatorType, FALSE);
-    GetCompatibleType(DesignatorType, INTEGERTYPEINDEX);
-    GenerateIncDec(proc, TypeSize(DesignatorType));
+    
+    if (Types[DesignatorType].Kind = POINTERTYPE) and (Types[DesignatorType].BaseType <> ANYTYPEINDEX) then     // Special case: typed pointer
+      GenerateIncDec(proc, TypeSize(DesignatorType), TypeSize(Types[DesignatorType].BaseType))
+    else                                                                                                        // General rule
+      begin  
+      GetCompatibleType(DesignatorType, INTEGERTYPEINDEX);
+      GenerateIncDec(proc, TypeSize(DesignatorType));
+      end;
+      
     EatTok(CPARTOK);
     end;
 
@@ -1094,7 +1100,6 @@ case proc of
   NEWPROC, DISPOSEPROC:
     begin
     EatTok(OPARTOK);
-    AssertIdent;
     CompileDesignator(DesignatorType, FALSE);
     GetCompatibleType(DesignatorType, POINTERTYPEINDEX);
     
@@ -1168,26 +1173,17 @@ case func of
   SIZEOFFUNC:
     begin
     AssertIdent;
-    if FieldOrMethodInsideWithFound(Tok.Name) then        // Record field inside a WITH block
+    IdentIndex := GetIdentUnsafe(Tok.Name);
+    if (IdentIndex <> 0) and (Ident[IdentIndex].Kind = USERTYPE) then   // Type name
+      begin
+      NextTok;
+      PushConst(TypeSize(Ident[IdentIndex].DataType));
+      end
+    else                                                                // Variable name
       begin
       CompileDesignator(ValType);
       DiscardStackTop(1);
-      PushConst(TypeSize(ValType));      
-      end
-    else                                                  // Ordinary identifier
-      begin  
-      IdentIndex := GetIdent(Tok.Name);
-      if Ident[IdentIndex].Kind = USERTYPE then
-        begin
-        NextTok;
-        PushConst(TypeSize(Ident[IdentIndex].DataType));
-        end
-      else
-        begin
-        CompileDesignator(ValType);
-        DiscardStackTop(1);
-        PushConst(TypeSize(ValType));
-        end;
+      PushConst(TypeSize(ValType));
       end;
     ValType := INTEGERTYPEINDEX;
     end;
@@ -1226,24 +1222,16 @@ case func of
   LOWFUNC, HIGHFUNC:
     begin
     AssertIdent;
-    if FieldOrMethodInsideWithFound(Tok.Name) then        // Record field inside a WITH block
+    IdentIndex := GetIdentUnsafe(Tok.Name);
+    if (IdentIndex <> 0) and (Ident[IdentIndex].Kind = USERTYPE) then   // Type name
+      begin
+      NextTok;
+      ValType := Ident[IdentIndex].DataType;
+      end
+    else                                                                // Variable name
       begin
       CompileDesignator(ValType);
-      DiscardStackTop(1);     
-      end
-    else                                                  // Ordinary identifier
-      begin  
-      IdentIndex := GetIdent(Tok.Name);
-      if Ident[IdentIndex].Kind = USERTYPE then
-        begin
-        NextTok;
-        ValType := Ident[IdentIndex].DataType;
-        end
-      else
-        begin
-        CompileDesignator(ValType);
-        DiscardStackTop(1);
-        end;
+      DiscardStackTop(1);
       end;
           
     if (Types[ValType].Kind = ARRAYTYPE) and not Types[ValType].IsOpenArray then
@@ -1721,7 +1709,8 @@ var
   RecType: Integer;
   TempStorageAddr: Integer;
   
-begin 
+begin
+AssertIdent; 
 FieldIndex := GetFieldInsideWith(TempStorageAddr, RecType, IsConst, Tok.Name);
   
 if FieldIndex <> 0 then

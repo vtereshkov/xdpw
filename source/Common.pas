@@ -760,7 +760,7 @@ case Types[DataType].Kind of
   REALTYPE:                  Result := SizeOf(Single);
   POINTERTYPE:               Result := SizeOf(Pointer);
   FILETYPE:                  Result := SizeOf(TString) + SizeOf(Integer);  // Name + Handle
-  SUBRANGETYPE:              Result := SizeOf(Integer);
+  SUBRANGETYPE:              Result := TypeSize(Types[DataType].BaseType);
   
   ARRAYTYPE:                 begin
                              if Types[DataType].IsOpenArray then
