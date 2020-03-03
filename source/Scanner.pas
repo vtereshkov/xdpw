@@ -153,7 +153,7 @@ ScannerState.EndOfUnit := TRUE;
 with ScannerState.Buffer do
   if Ptr <> nil then
     begin
-    FreeMem(Ptr, Size);
+    FreeMem(Ptr);
     Ptr := nil;
     end;
 end;

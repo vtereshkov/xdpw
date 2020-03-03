@@ -140,7 +140,7 @@ procedure ExitProcess(uExitCode: Integer) stdcall; external 'KERNEL32.DLL';
 procedure InitSystem;
 function Timer: LongInt;
 procedure GetMem(var P: Pointer; Size: Integer);
-procedure FreeMem(var P: Pointer; Size: Integer);
+procedure FreeMem(var P: Pointer);
 procedure Randomize;
 function Random: Real;
 function Length(const s: string): Integer;
@@ -260,7 +260,7 @@ end;
 
 
 
-procedure FreeMem(var P: Pointer; Size: Integer);
+procedure FreeMem(var P: Pointer);
 begin
 HeapFree(Heap, 0, P);
 end;

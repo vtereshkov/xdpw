@@ -1104,12 +1104,13 @@ case proc of
     GetCompatibleType(DesignatorType, POINTERTYPEINDEX);
     
     if proc = NEWPROC then
-      LibProcIdentIndex := GetIdent('GETMEM')
+      begin
+      PushConst(TypeSize(Types[DesignatorType].BaseType));
+      LibProcIdentIndex := GetIdent('GETMEM');
+      end
     else
       LibProcIdentIndex := GetIdent('FREEMEM');
-      
-    PushConst(TypeSize(Types[DesignatorType].BaseType));
-    
+ 
     GenerateCall(Ident[LibProcIdentIndex].Address, BlockStackTop - 1, Ident[LibProcIdentIndex].NestingLevel);
     
     EatTok(CPARTOK);
