@@ -209,6 +209,8 @@ type
     SIZEOFFUNC,
     ORDFUNC,
     CHRFUNC,
+    LOWFUNC,
+    HIGHFUNC,
     PREDFUNC,
     SUCCFUNC,
     ROUNDFUNC,

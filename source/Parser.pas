@@ -239,6 +239,8 @@ DeclareIdent('HALT',     PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], HALTPROC,    
 DeclareIdent('SIZEOF', FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], SIZEOFFUNC, '', 0);
 DeclareIdent('ORD',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], ORDFUNC,    '', 0);
 DeclareIdent('CHR',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], CHRFUNC,    '', 0);
+DeclareIdent('LOW',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], LOWFUNC,    '', 0);
+DeclareIdent('HIGH',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], HIGHFUNC,   '', 0);
 DeclareIdent('PRED',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], PREDFUNC,   '', 0);
 DeclareIdent('SUCC',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], SUCCFUNC,   '', 0);
 DeclareIdent('ROUND',  FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], ROUNDFUNC,  '', 0);
@@ -1218,8 +1220,40 @@ case func of
     CompileExpression(ValType);
     GetCompatibleType(ValType, INTEGERTYPEINDEX);
     ValType := CHARTYPEINDEX;
+    end;    
+
+
+  LOWFUNC, HIGHFUNC:
+    begin
+    AssertIdent;
+    if FieldOrMethodInsideWithFound(Tok.Name) then        // Record field inside a WITH block
+      begin
+      CompileDesignator(ValType);
+      DiscardStackTop(1);     
+      end
+    else                                                  // Ordinary identifier
+      begin  
+      IdentIndex := GetIdent(Tok.Name);
+      if Ident[IdentIndex].Kind = USERTYPE then
+        begin
+        NextTok;
+        ValType := Ident[IdentIndex].DataType;
+        end
+      else
+        begin
+        CompileDesignator(ValType);
+        DiscardStackTop(1);
+        end;
+      end;
+          
+    if (Types[ValType].Kind = ARRAYTYPE) and not Types[ValType].IsOpenArray then
+      ValType := Types[ValType].IndexType;
+    if func = HIGHFUNC then  
+      PushConst(HighBound(ValType))
+    else
+      PushConst(LowBound(ValType)); 
     end;
-    
+
 
   PREDFUNC, SUCCFUNC:
     begin

@@ -240,6 +240,8 @@ procedure Halt[(const error: Integer)];
 function SizeOf(var x | T): Integer;
 function Ord(x: T): Integer;
 function Chr(x: Integer): Char;
+function Low(var x: T | T): T;
+function High(var x: T | T): T;
 function Pred(x: T): T;
 function Succ(x: T): T;
 function Round(x: Real): Integer;
