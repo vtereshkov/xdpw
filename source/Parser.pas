@@ -1493,7 +1493,7 @@ end; // CompileFormalParametersAndResult
 
 
 
-procedure CompileActualParameters(var Signature: TSignature);
+procedure CompileActualParameters(var Signature: TSignature; var StructuredResultAddr: LongInt);
 
 
   procedure CompileExpressionCopy(var ValType: Integer);
@@ -1530,16 +1530,17 @@ var
   NumActualParams: Integer;
   ActualParamType: Integer;
   DefaultParamIndex: Integer;
-  TempStorageAddr: Integer;
   CurParam: PParam;
   
 begin
 // Allocate space for structured Result as a hidden VAR parameter
 if (Signature.ResultType <> 0) and (Types[Signature.ResultType].Kind in StructuredTypes) then
   begin
-  TempStorageAddr := AllocateTempStorage(TypeSize(Signature.ResultType));
-  PushTempStoragePtr(TempStorageAddr);
-  end;
+  StructuredResultAddr := AllocateTempStorage(TypeSize(Signature.ResultType));
+  PushTempStoragePtr(StructuredResultAddr);
+  end
+else
+  StructuredResultAddr := 0;  
 
 NumActualParams := 0;
 
@@ -1607,6 +1608,8 @@ procedure CompileCall(IdentIndex: Integer);
 var
   TotalNumParams: Integer;
   ResultType: Integer;
+  StructuredResultAddr: LongInt;
+  
 begin
 TotalNumParams := Ident[IdentIndex].Signature.NumParams;
 ResultType := Ident[IdentIndex].Signature.ResultType;
@@ -1615,12 +1618,19 @@ ResultType := Ident[IdentIndex].Signature.ResultType;
 if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) then
   Inc(TotalNumParams); 
 
-CompileActualParameters(Ident[IdentIndex].Signature);
+CompileActualParameters(Ident[IdentIndex].Signature, StructuredResultAddr);
 
 if Ident[IdentIndex].Signature.IsStdCall then
   InverseStack(TotalNumParams);
   
 GenerateCall(Ident[IdentIndex].Address, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
+
+// Save structured result pointer to EAX (not all external functions do it themselves)
+if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and Ident[IdentIndex].Signature.IsStdCall then
+  begin
+  PushTempStoragePtr(StructuredResultAddr);
+  SaveStackTopToEAX;
+  end;
 end; // CompileCall
 
 
@@ -1629,11 +1639,13 @@ end; // CompileCall
 procedure CompileMethodCall(ProcVarType: Integer);
 var
   MethodIndex: Integer;
+  StructuredResultAddr: LongInt;
+  
 begin
 MethodIndex := Types[ProcVarType].MethodIdentIndex;  
  
 // Self pointer has already been passed as the first (hidden) argument
-CompileActualParameters(Ident[MethodIndex].Signature);
+CompileActualParameters(Ident[MethodIndex].Signature, StructuredResultAddr);
 
 GenerateCall(Ident[MethodIndex].Address, BlockStackTop - 1, Ident[MethodIndex].NestingLevel);
 end; // CompileMethodCall
@@ -1645,6 +1657,8 @@ procedure CompileIndirectCall(ProcVarType: Integer);
 var
   TotalNumParams: Integer;
   ResultType: Integer;
+  StructuredResultAddr: LongInt;
+  
 begin
 TotalNumParams := Types[ProcVarType].Signature.NumParams;
 ResultType := Types[ProcVarType].Signature.ResultType;
@@ -1665,12 +1679,19 @@ if Types[ProcVarType].SelfPointerOffset <> 0 then   // Interface method found
 if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) then
   Inc(TotalNumParams);  
   
-CompileActualParameters(Types[ProcVarType].Signature);
+CompileActualParameters(Types[ProcVarType].Signature, StructuredResultAddr);
 
 if Types[ProcVarType].Signature.IsStdCall then
   InverseStack(TotalNumParams);
 
 GenerateIndirectCall(TotalNumParams);
+
+// Save structured result pointer to EAX (not all external functions do it themselves)
+if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and Types[ProcVarType].Signature.IsStdCall then
+  begin
+  PushTempStoragePtr(StructuredResultAddr);
+  SaveStackTopToEAX;
+  end;
 end; // CompileIndirectCall
 
 
@@ -3909,6 +3930,18 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     ParamIndex, StackParamIndex: Integer;
     TotalNumParams: Integer;
     NestedProcsFound: Boolean;
+    
+    
+    procedure DeclareResult;
+    begin
+    if Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes then    // For functions returning structured variables, Result is a hidden VAR parameter 
+      DeclareIdent('RESULT', VARIABLE, TotalNumParams, Ident[BlockIdentIndex].Signature.ResultType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0)
+    else                                                                                  // Otherwise, Result is a hidden local variable
+      DeclareIdent('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].Signature.ResultType, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+      
+    Ident[BlockIdentIndex].ResultIdentIndex := NumIdent;
+    end; // DeclareResult
+
    
   begin  
   NestedProcsFound := FALSE; 
@@ -3934,16 +3967,9 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     if Ident[BlockIdentIndex].ReceiverType <> 0 then
       DeclareIdent(Ident[BlockIdentIndex].ReceiverName, VARIABLE, TotalNumParams, Ident[BlockIdentIndex].ReceiverType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
              
-    // Declare Result
-    if Ident[BlockIdentIndex].Kind = FUNC then
-      begin
-      if Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes then    // For functions returning structured variables, Result is a hidden VAR parameter 
-        DeclareIdent('RESULT', VARIABLE, TotalNumParams, Ident[BlockIdentIndex].Signature.ResultType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0)
-      else                                                                                  // Otherwise, Result is a hidden local variable
-        DeclareIdent('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].Signature.ResultType, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
-        
-      Ident[BlockIdentIndex].ResultIdentIndex := NumIdent;
-      end;              
+    // Declare Result (default calling convention)
+    if (Ident[BlockIdentIndex].Kind = FUNC) and not Ident[BlockIdentIndex].Signature.IsStdCall then
+      DeclareResult;              
     
     // Allocate and declare other parameters
     for ParamIndex := 1 to Ident[BlockIdentIndex].Signature.NumParams do
@@ -3965,7 +3991,12 @@ procedure CompileBlock(BlockIdentIndex: Integer);
                    EMPTYPROC,
                    '', 
                    0);
-      end;             
+      end;
+
+    // Declare Result (STDCALL calling convention)
+    if (Ident[BlockIdentIndex].Kind = FUNC) and Ident[BlockIdentIndex].Signature.IsStdCall then
+      DeclareResult;
+              
     end; // if
 
   
@@ -4118,7 +4149,7 @@ else
   if BlockStack[BlockStackTop].Index = 1 then
     SetProgramEntryPoint;
 
-  GenerateStackFrameProlog;
+  GenerateStackFrameProlog(Ident[BlockIdentIndex].Signature.IsStdCall);
 
   if BlockStack[BlockStackTop].Index = 1 then          // Main program
     begin
@@ -4163,7 +4194,8 @@ else
     GenerateCall(Ident[LibProcIdentIndex].Address, 1, 1);
     end;
 
-  GenerateStackFrameEpilog(BlockStack[BlockStackTop].LocalDataSize + BlockStack[BlockStackTop].TempDataSize);
+  GenerateStackFrameEpilog(BlockStack[BlockStackTop].LocalDataSize + BlockStack[BlockStackTop].TempDataSize, 
+                           Ident[BlockIdentIndex].Signature.IsStdCall);
 
   if BlockStack[BlockStackTop].Index <> 1 then         
     begin

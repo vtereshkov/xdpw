@@ -82,8 +82,8 @@ procedure GenerateShortCircuitEpilog;
 procedure GenerateNestedProcsProlog;
 procedure GenerateNestedProcsEpilog;
 procedure GenerateFPUInit;
-procedure GenerateStackFrameProlog;
-procedure GenerateStackFrameEpilog(TotalStackStorageSize: LongInt);
+procedure GenerateStackFrameProlog(PreserveRegs: Boolean);
+procedure GenerateStackFrameEpilog(TotalStackStorageSize: LongInt; PreserveRegs: Boolean);
 procedure GenerateBreakProlog(LoopNesting: Integer);
 procedure GenerateBreakCall(LoopNesting: Integer);
 procedure GenerateBreakEpilog(LoopNesting: Integer);
@@ -1804,9 +1804,9 @@ begin
 for i := 0 to Depth div 2 - 1 do
   begin
   GenNew($8B); Gen($84); Gen($24); GenDWord(SizeOf(LongInt) * i);                        // mov eax, [esp + 4 * i]
-  GenNew($8B); Gen($9C); Gen($24); GenDWord(SizeOf(LongInt) * (Depth - i - 1));          // mov ebx, [esp + 4 * (Depth - i - 1)]
+  GenNew($8B); Gen($8C); Gen($24); GenDWord(SizeOf(LongInt) * (Depth - i - 1));          // mov ecx, [esp + 4 * (Depth - i - 1)]
   GenNew($89); Gen($84); Gen($24); GenDWord(SizeOf(LongInt) * (Depth - i - 1));          // mov [esp + 4 * (Depth - i - 1)], eax
-  GenNew($89); Gen($9C); Gen($24); GenDWord(SizeOf(LongInt) * i);                        // mov [esp + 4 * i], ebx  
+  GenNew($89); Gen($8C); Gen($24); GenDWord(SizeOf(LongInt) * i);                        // mov [esp + 4 * i], ecx  
   end;
 end;
 
@@ -2239,7 +2239,7 @@ end;
 
 
 
-procedure GenerateStackFrameProlog;
+procedure GenerateStackFrameProlog(PreserveRegs: Boolean);
 begin
 GenPushReg(EBP);                                                 // push ebp
 GenNew($8B); Gen($EC);                                           // mov ebp, esp
@@ -2252,17 +2252,29 @@ GenNew($90);                                                     // nop
 GenNew($90);                                                     // nop
 GenNew($90);                                                     // nop
 GenNew($90);                                                     // nop
+
+if PreserveRegs then
+  begin
+  GenPushReg(ESI);                                               // push esi
+  GenPushReg(EDI);                                               // push edi
+  end;
 end;
 
 
 
 
-procedure GenerateStackFrameEpilog(TotalStackStorageSize: LongInt);
+procedure GenerateStackFrameEpilog(TotalStackStorageSize: LongInt; PreserveRegs: Boolean);
 var
   CodePos: Integer;
 begin
 CodePos := RestoreCodePos;
 GenAt(CodePos, $81); GenAt(CodePos + 1, $EC); GenDWordAt(CodePos + 2, TotalStackStorageSize);     // sub esp, TotalStackStorageSize
+
+if PreserveRegs then
+  begin
+  GenPopReg(EDI);                                                                                 // pop edi
+  GenPopReg(ESI);                                                                                 // pop esi
+  end;
 
 GenNew($8B); Gen($E5);                                                                            // mov esp, ebp
 GenPopReg(EBP);                                                                                   // pop ebp
