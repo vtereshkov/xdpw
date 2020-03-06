@@ -1466,7 +1466,7 @@ if Tok.Kind = OPARTOK then
   until FALSE;
 
   EatTok(CPARTOK);
-  end;// if Tok.Kind = OPARTOR
+  end;// if Tok.Kind = OPARTOK
 
 
 // Function result type
@@ -1481,11 +1481,7 @@ if IsFunction then
   
 // Call modifier
 if (Tok.Kind = IDENTTOK) and (Tok.Name = 'STDCALL') then
-  begin
-  if IsFunction then
-    if Types[Signature.ResultType].Kind in StructuredTypes then
-      Error('STDCALL function cannot return structured result');
-      
+  begin    
   Signature.IsStdCall := TRUE;
   NextTok;
   end
@@ -1538,8 +1534,14 @@ var
   CurParam: PParam;
   
 begin
-NumActualParams := 0;
+// Allocate space for structured Result as a hidden VAR parameter
+if (Signature.ResultType <> 0) and (Types[Signature.ResultType].Kind in StructuredTypes) then
+  begin
+  TempStorageAddr := AllocateTempStorage(TypeSize(Signature.ResultType));
+  PushTempStoragePtr(TempStorageAddr);
+  end;
 
+NumActualParams := 0;
 
 if Tok.Kind = OPARTOK then                            // Actual parameter list found
   begin
@@ -1594,27 +1596,29 @@ for DefaultParamIndex := NumActualParams + 1 to Signature.NumParams do
   begin
   CurParam := Signature.Param[DefaultParamIndex];
   PushConst(CurParam^.Default.OrdValue);
-  end; // for  
-
+  end; // for
   
-// Allocate space for structured Result as a hidden VAR parameter
-if Signature.ResultType <> 0 then
-  if Types[Signature.ResultType].Kind in StructuredTypes then
-    begin
-    TempStorageAddr := AllocateTempStorage(TypeSize(Signature.ResultType));
-    PushTempStoragePtr(TempStorageAddr);
-    end;
 end;// CompileActualParameters
 
 
 
 
 procedure CompileCall(IdentIndex: Integer);
+var
+  TotalNumParams: Integer;
+  ResultType: Integer;
 begin
+TotalNumParams := Ident[IdentIndex].Signature.NumParams;
+ResultType := Ident[IdentIndex].Signature.ResultType;
+
+// Allocate space for structured Result as a hidden VAR parameter   
+if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) then
+  Inc(TotalNumParams); 
+
 CompileActualParameters(Ident[IdentIndex].Signature);
 
 if Ident[IdentIndex].Signature.IsStdCall then
-  InverseStack(Ident[IdentIndex].Signature.NumParams);
+  InverseStack(TotalNumParams);
   
 GenerateCall(Ident[IdentIndex].Address, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
 end; // CompileCall
@@ -1640,8 +1644,10 @@ end; // CompileMethodCall
 procedure CompileIndirectCall(ProcVarType: Integer);
 var
   TotalNumParams: Integer;
+  ResultType: Integer;
 begin
 TotalNumParams := Types[ProcVarType].Signature.NumParams;
+ResultType := Types[ProcVarType].Signature.ResultType;
 
 if Types[ProcVarType].SelfPointerOffset <> 0 then   // Interface method found
   begin
@@ -1653,12 +1659,13 @@ if Types[ProcVarType].SelfPointerOffset <> 0 then   // Interface method found
   DuplicateStackTop;
   GetFieldPtr(Types[ProcVarType].SelfPointerOffset);
   DerefPtr(POINTERTYPEINDEX);
-  end;   
-
+  end;
+  
+// Allocate space for structured Result as a hidden VAR parameter   
+if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) then
+  Inc(TotalNumParams);  
+  
 CompileActualParameters(Types[ProcVarType].Signature);
-
-if Types[Types[ProcVarType].Signature.ResultType].Kind in StructuredTypes then
-  Inc(TotalNumParams);  //   Allocate space for structured Result as a hidden VAR parameter
 
 if Types[ProcVarType].Signature.IsStdCall then
   InverseStack(TotalNumParams);
@@ -3907,23 +3914,38 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   NestedProcsFound := FALSE; 
  
   // For procedures and functions, declare parameters and the Result variable
+  
+  // Default calling convention: ([var Self,] [var Result,] Parameter1, ... ParameterN)
+  // STDCALL calling convention: (ParameterN, ... Parameter1, [, var Result])
+  
   if BlockStack[BlockStackTop].Index <> 1 then             
     begin
-    // Declare parameters like local variables
     TotalNumParams := Ident[BlockIdentIndex].Signature.NumParams;
-    
-    // Allocate space for structured Result as a hidden VAR parameter  
-    if (Ident[BlockIdentIndex].Kind = FUNC) and (Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes) then
-      Inc(TotalNumParams);    
     
     // Allocate Self as a first (hidden) VAR parameter if the current block is a method
     if Ident[BlockIdentIndex].ReceiverType <> 0 then
-      begin
       Inc(TotalNumParams);
+             
+    // Allocate Result as a hidden VAR parameter if the current block is a function returning a structure
+    if (Ident[BlockIdentIndex].Kind = FUNC) and (Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes) then
+      Inc(TotalNumParams);
+      
+    // Declare Self
+    if Ident[BlockIdentIndex].ReceiverType <> 0 then
       DeclareIdent(Ident[BlockIdentIndex].ReceiverName, VARIABLE, TotalNumParams, Ident[BlockIdentIndex].ReceiverType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
-      end;
+             
+    // Declare Result
+    if Ident[BlockIdentIndex].Kind = FUNC then
+      begin
+      if Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes then    // For functions returning structured variables, Result is a hidden VAR parameter 
+        DeclareIdent('RESULT', VARIABLE, TotalNumParams, Ident[BlockIdentIndex].Signature.ResultType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0)
+      else                                                                                  // Otherwise, Result is a hidden local variable
+        DeclareIdent('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].Signature.ResultType, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+        
+      Ident[BlockIdentIndex].ResultIdentIndex := NumIdent;
+      end;              
     
-    // Allocate other parameters
+    // Allocate and declare other parameters
     for ParamIndex := 1 to Ident[BlockIdentIndex].Signature.NumParams do
       begin
       if Ident[BlockIdentIndex].Signature.IsStdCall then
@@ -3944,17 +3966,6 @@ procedure CompileBlock(BlockIdentIndex: Integer);
                    '', 
                    0);
       end;             
-
-    // Allocate Result variable if the current block is a function
-    if Ident[BlockIdentIndex].Kind = FUNC then
-      begin
-      if Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes then    // For functions returning structured variables, Result is a hidden VAR parameter 
-        DeclareIdent('RESULT', VARIABLE, TotalNumParams, Ident[BlockIdentIndex].Signature.ResultType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0)
-      else                                                                                  // Otherwise, Result is a hidden local variable
-        DeclareIdent('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].Signature.ResultType, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
-        
-      Ident[BlockIdentIndex].ResultIdentIndex := NumIdent;
-      end;  
     end; // if
 
   
