@@ -48,7 +48,8 @@ procedure GenerateAssignment(DesignatorType: Integer);
 procedure GenerateForAssignmentAndNumberOfIterations(CounterType: Integer; Down: Boolean);
 procedure GenerateStructuredAssignment(DesignatorType: Integer);
 procedure GenerateInterfaceFieldAssignment(Offset: Integer; PopValueFromStack: Boolean; Value: LongInt; RelocType: TRelocType);
-procedure InverseStack(Depth: Integer);
+procedure InitializeCStack;
+procedure PushToCStack(SourceStackDepth: Integer);
 procedure GenerateImportFuncStub(EntryPoint: LongInt);
 procedure GenerateCall(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer);
 procedure GenerateIndirectCall(NumParam: Integer);
@@ -1797,17 +1798,17 @@ end;
 
 
 
-procedure InverseStack(Depth: Integer);
-var
-  i: Integer;
+procedure InitializeCStack;
 begin
-for i := 0 to Depth div 2 - 1 do
-  begin
-  GenNew($8B); Gen($84); Gen($24); GenDWord(SizeOf(LongInt) * i);                        // mov eax, [esp + 4 * i]
-  GenNew($8B); Gen($8C); Gen($24); GenDWord(SizeOf(LongInt) * (Depth - i - 1));          // mov ecx, [esp + 4 * (Depth - i - 1)]
-  GenNew($89); Gen($84); Gen($24); GenDWord(SizeOf(LongInt) * (Depth - i - 1));          // mov [esp + 4 * (Depth - i - 1)], eax
-  GenNew($89); Gen($8C); Gen($24); GenDWord(SizeOf(LongInt) * i);                        // mov [esp + 4 * i], ecx  
-  end;
+GenNew($89); Gen($E6);                                                          // mov esi, esp
+end;
+
+
+
+
+procedure PushToCStack(SourceStackDepth: Integer);
+begin
+GenNew($FF); Gen($B6); GenDWord(SourceStackDepth);                              // push [esi + SourceStackDepth]
 end;
 
 
@@ -1858,7 +1859,6 @@ procedure GenerateIndirectCall(NumParam: Integer);
 begin
 GenNew($8B); Gen($B4); Gen($24); GenDWord(SizeOf(LongInt) * NumParam);       // mov esi, dword ptr [esp + 4 * NumParam]
 GenNew($FF); Gen($16);                                                       // call [esi]
-GenPopReg(ECX);                                                              // pop ecx  ; pop and discard call address
 end;
 
 

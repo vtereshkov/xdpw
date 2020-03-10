@@ -1150,7 +1150,6 @@ case proc of
       PushConst(0);
       
     LibProcIdentIndex := GetIdent('EXITPROCESS');
-    InverseStack(Ident[LibProcIdentIndex].Signature.NumParams);
     GenerateCall(Ident[LibProcIdentIndex].Address, 1, 1);
     end;
 
@@ -1606,7 +1605,7 @@ end;// CompileActualParameters
 
 procedure CompileCall(IdentIndex: Integer);
 var
-  TotalNumParams: Integer;
+  TotalNumParams, ParamIndex: Integer;
   ResultType: Integer;
   StructuredResultAddr: LongInt;
   
@@ -1620,10 +1619,19 @@ if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) then
 
 CompileActualParameters(Ident[IdentIndex].Signature, StructuredResultAddr);
 
-if Ident[IdentIndex].Signature.IsStdCall then
-  InverseStack(TotalNumParams);
+// Convert stack to C format
+if Ident[IdentIndex].Signature.IsStdCall and (TotalNumParams > 1) then
+  begin
+  InitializeCStack;
+  for ParamIndex := 1 to TotalNumParams do
+    PushToCStack((ParamIndex - 1) * SizeOf(LongInt));
+  end; 
   
 GenerateCall(Ident[IdentIndex].Address, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
+
+// Free original stack
+if Ident[IdentIndex].Signature.IsStdCall and (TotalNumParams > 1) then
+  DiscardStackTop(TotalNumParams);
 
 // Save structured result pointer to EAX (not all external functions do it themselves)
 if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and Ident[IdentIndex].Signature.IsStdCall then
@@ -1655,7 +1663,7 @@ end; // CompileMethodCall
 
 procedure CompileIndirectCall(ProcVarType: Integer);
 var
-  TotalNumParams: Integer;
+  TotalNumParams, NumCStackParams, ParamIndex: Integer;
   ResultType: Integer;
   StructuredResultAddr: LongInt;
   
@@ -1681,10 +1689,24 @@ if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) then
   
 CompileActualParameters(Types[ProcVarType].Signature, StructuredResultAddr);
 
-if Types[ProcVarType].Signature.IsStdCall then
-  InverseStack(TotalNumParams);
+// Convert stack to C format
+NumCStackParams := 0;
+if Types[ProcVarType].Signature.IsStdCall and (TotalNumParams > 1) then
+  begin
+  InitializeCStack;
+  for ParamIndex := 1 to TotalNumParams do
+    PushToCStack((ParamIndex - 1) * SizeOf(LongInt));
+  NumCStackParams := TotalNumParams;  
+  end;
 
-GenerateIndirectCall(TotalNumParams);
+GenerateIndirectCall(TotalNumParams + NumCStackParams);
+
+// Free original stack
+if Types[ProcVarType].Signature.IsStdCall and (TotalNumParams > 1) then
+  DiscardStackTop(TotalNumParams);
+  
+// Remove call address
+DiscardStackTop(1);  
 
 // Save structured result pointer to EAX (not all external functions do it themselves)
 if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and Types[ProcVarType].Signature.IsStdCall then
@@ -4190,7 +4212,6 @@ else
     begin
     LibProcIdentIndex := GetIdent('EXITPROCESS');  
     PushConst(0);
-    InverseStack(Ident[LibProcIdentIndex].Signature.NumParams);
     GenerateCall(Ident[LibProcIdentIndex].Address, 1, 1);
     end;
 
