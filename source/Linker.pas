@@ -171,14 +171,6 @@ const
  
 
  
-function Align(Size, Alignment: Integer): Integer;
-begin
-Result := ((Size + (Alignment - 1)) div Alignment) * Alignment;
-end;
-
-
-
-
 procedure Pad(var f: file; Size, Alignment: Integer);
 var
   i: Integer;

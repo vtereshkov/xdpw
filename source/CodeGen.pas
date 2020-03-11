@@ -49,10 +49,10 @@ procedure GenerateForAssignmentAndNumberOfIterations(CounterType: Integer; Down:
 procedure GenerateStructuredAssignment(DesignatorType: Integer);
 procedure GenerateInterfaceFieldAssignment(Offset: Integer; PopValueFromStack: Boolean; Value: LongInt; RelocType: TRelocType);
 procedure InitializeCStack;
-procedure PushToCStack(SourceStackDepth: Integer);
+procedure PushToCStack(SourceStackDepth: Integer; DataType: Integer; PushByValue: Boolean; var ActualSize: Integer);
 procedure GenerateImportFuncStub(EntryPoint: LongInt);
 procedure GenerateCall(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer);
-procedure GenerateIndirectCall(NumParam: Integer);
+procedure GenerateIndirectCall(CallAddressDepth: Integer);
 procedure GenerateReturn(TotalParamsSize, Nesting: Integer);
 procedure GenerateForwardReference;
 procedure GenerateForwardResolution(CodePos: Integer);
@@ -1766,7 +1766,6 @@ end;
 
 
 
-
 procedure GenerateStructuredAssignment(DesignatorType: Integer);
 begin
 GenPopReg(ESI);                                                            // pop esi      ; source address
@@ -1800,15 +1799,33 @@ end;
 
 procedure InitializeCStack;
 begin
-GenNew($89); Gen($E6);                                                          // mov esi, esp
+GenNew($89); Gen($E3);                                                          // mov ebx, esp
 end;
 
 
 
 
-procedure PushToCStack(SourceStackDepth: Integer);
+procedure PushToCStack(SourceStackDepth: Integer; DataType: Integer; PushByValue: Boolean; var ActualSize: Integer);
 begin
-GenNew($FF); Gen($B6); GenDWord(SourceStackDepth);                              // push [esi + SourceStackDepth]
+if PushByValue and (Types[DataType].Kind in StructuredTypes) then
+  begin  
+  ActualSize := Align(TypeSize(DataType), SizeOf(LongInt));
+  
+  // Copy structure to the C stack
+  GenNew($81); Gen($EC); GenDWord(ActualSize);                                  // sub esp, ActualSize
+  GenNew($8B); Gen($B3); GenDWord(SourceStackDepth);                            // mov esi, [ebx + SourceStackDepth] 
+  GenNew($89); Gen($E7);                                                        // mov edi, esp
+  GenPushReg(EDI);                                                              // push edi                       ; destination address
+  GenPushReg(ESI);                                                              // push esi                       ; source address
+  
+  GenerateStructuredAssignment(DataType);
+  end
+else
+  begin
+  ActualSize := SizeOf(LongInt);
+  
+  GenNew($FF); Gen($B3); GenDWord(SourceStackDepth);                            // push [ebx + SourceStackDepth]
+  end; 
 end;
 
 
@@ -1855,9 +1872,9 @@ end;
 
 
 
-procedure GenerateIndirectCall(NumParam: Integer);
+procedure GenerateIndirectCall(CallAddressDepth: Integer);
 begin
-GenNew($8B); Gen($B4); Gen($24); GenDWord(SizeOf(LongInt) * NumParam);       // mov esi, dword ptr [esp + 4 * NumParam]
+GenNew($8B); Gen($B4); Gen($24); GenDWord(CallAddressDepth);                 // mov esi, dword ptr [esp + CallAddressDepth]
 GenNew($FF); Gen($16);                                                       // call [esi]
 end;
 

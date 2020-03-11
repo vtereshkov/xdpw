@@ -1603,9 +1603,35 @@ end;// CompileActualParameters
 
 
 
+function MakeCStack(const Signature: TSignature): Integer;
+var
+  ParamIndex: Integer;
+  ActualSize: Integer;
+begin
+Result := 0;
+
+InitializeCStack;
+for ParamIndex := Signature.NumParams downto 1 do
+  with Signature.Param[ParamIndex]^ do
+    begin
+    PushToCStack((Signature.NumParams - ParamIndex) * SizeOf(LongInt), DataType, PassMethod = VALPASSING, ActualSize);
+    Result := Result + ActualSize;  
+    end;
+
+// Push structured Result onto the C stack 
+if (Signature.ResultType <> 0) and (Types[Signature.ResultType].Kind in StructuredTypes) then
+  begin
+  PushToCStack(Signature.NumParams * SizeOf(LongInt), Signature.ResultType, FALSE, ActualSize);
+  Result := Result + ActualSize;
+  end;    
+end; // MakeCStack
+
+
+
+
 procedure CompileCall(IdentIndex: Integer);
 var
-  TotalNumParams, ParamIndex: Integer;
+  TotalNumParams: Integer;
   ResultType: Integer;
   StructuredResultAddr: LongInt;
   
@@ -1620,17 +1646,13 @@ if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) then
 CompileActualParameters(Ident[IdentIndex].Signature, StructuredResultAddr);
 
 // Convert stack to C format
-if Ident[IdentIndex].Signature.IsStdCall and (TotalNumParams > 1) then
-  begin
-  InitializeCStack;
-  for ParamIndex := 1 to TotalNumParams do
-    PushToCStack((ParamIndex - 1) * SizeOf(LongInt));
-  end; 
+if Ident[IdentIndex].Signature.IsStdCall and (TotalNumParams > 0) then
+  MakeCStack(Ident[IdentIndex].Signature);
   
 GenerateCall(Ident[IdentIndex].Address, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
 
 // Free original stack
-if Ident[IdentIndex].Signature.IsStdCall and (TotalNumParams > 1) then
+if Ident[IdentIndex].Signature.IsStdCall and (TotalNumParams > 0) then
   DiscardStackTop(TotalNumParams);
 
 // Save structured result pointer to EAX (not all external functions do it themselves)
@@ -1663,9 +1685,10 @@ end; // CompileMethodCall
 
 procedure CompileIndirectCall(ProcVarType: Integer);
 var
-  TotalNumParams, NumCStackParams, ParamIndex: Integer;
+  TotalNumParams: Integer;
   ResultType: Integer;
   StructuredResultAddr: LongInt;
+  CStackSize: LongInt;
   
 begin
 TotalNumParams := Types[ProcVarType].Signature.NumParams;
@@ -1690,19 +1713,15 @@ if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) then
 CompileActualParameters(Types[ProcVarType].Signature, StructuredResultAddr);
 
 // Convert stack to C format
-NumCStackParams := 0;
-if Types[ProcVarType].Signature.IsStdCall and (TotalNumParams > 1) then
-  begin
-  InitializeCStack;
-  for ParamIndex := 1 to TotalNumParams do
-    PushToCStack((ParamIndex - 1) * SizeOf(LongInt));
-  NumCStackParams := TotalNumParams;  
-  end;
+if Types[ProcVarType].Signature.IsStdCall and (TotalNumParams > 0) then
+  CStackSize := MakeCStack(Types[ProcVarType].Signature)
+else
+  CStackSize := 0;  
 
-GenerateIndirectCall(TotalNumParams + NumCStackParams);
+GenerateIndirectCall(TotalNumParams * SizeOf(LongInt) + CStackSize);
 
 // Free original stack
-if Types[ProcVarType].Signature.IsStdCall and (TotalNumParams > 1) then
+if Types[ProcVarType].Signature.IsStdCall and (TotalNumParams > 0) then
   DiscardStackTop(TotalNumParams);
   
 // Remove call address

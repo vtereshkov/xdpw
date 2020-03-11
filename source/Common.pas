@@ -357,6 +357,7 @@ procedure DisposeParams(var Signature: TSignature);
 procedure DisposeFields(var DataType: TType);
 function GetTokSpelling(TokKind: TTokenKind): TString;
 function GetTypeSpelling(DataType: Integer): TString;
+function Align(Size, Alignment: Integer): Integer;
 procedure SetWriteProcs(NewNoticeProc, NewWarningProc, NewErrorProc: TWriteProc);
 procedure Notice(const Msg: TString);
 procedure Warning(const Msg: TString);
@@ -603,6 +604,14 @@ case Types[DataType].Kind of
 else
   Result := 'unknown type';
 end; //case
+end;
+
+
+
+
+function Align(Size, Alignment: Integer): Integer;
+begin
+Result := ((Size + (Alignment - 1)) div Alignment) * Alignment;
 end;
 
 
