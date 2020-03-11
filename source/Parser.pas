@@ -1492,10 +1492,10 @@ end; // CompileFormalParametersAndResult
 
 
 
-procedure CompileActualParameters(var Signature: TSignature; var StructuredResultAddr: LongInt);
+procedure CompileActualParameters(const Signature: TSignature; var StructuredResultAddr: LongInt);
 
 
-  procedure CompileExpressionCopy(var ValType: Integer);
+  procedure CompileExpressionCopy(var ValType: Integer; IsStdCall: Boolean);
   var
     TempStorageAddr: Integer;
     LibProcIdentIndex: Integer;
@@ -1503,8 +1503,11 @@ procedure CompileActualParameters(var Signature: TSignature; var StructuredResul
   begin
   CompileExpression(ValType);
   
-  // Copy structured parameter passed by value
-  if Types[ValType].Kind in StructuredTypes then
+  if IsString(ValType) and IsStdCall then
+    Error('Strings cannot be passed by value to STDCALL procedures');
+  
+  // Copy structured parameter passed by value (for STDCALL functions there is no need to do it here since it will be done in MakeCStack)
+  if (Types[ValType].Kind in StructuredTypes) and not IsStdCall then
     begin
     SaveStackTopToEAX; 
     TempStorageAddr := AllocateTempStorage(TypeSize(ValType));
@@ -1555,7 +1558,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       CurParam := Signature.Param[NumActualParams + 1];
 
       case CurParam^.PassMethod of
-        VALPASSING:   CompileExpressionCopy(ActualParamType);
+        VALPASSING:   CompileExpressionCopy(ActualParamType, Signature.IsStdCall);
         CONSTPASSING: CompileExpression(ActualParamType);
         VARPASSING:   CompileDesignator(ActualParamType, CurParam^.DataType = ANYTYPEINDEX);
       else

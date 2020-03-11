@@ -1768,6 +1768,8 @@ end;
 
 procedure GenerateStructuredAssignment(DesignatorType: Integer);
 begin
+// EBX should be preserved
+
 GenPopReg(ESI);                                                            // pop esi      ; source address
 GenPopReg(EDI);                                                            // pop edi      ; destination address
 
