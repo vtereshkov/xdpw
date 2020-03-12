@@ -49,7 +49,7 @@ procedure GenerateForAssignmentAndNumberOfIterations(CounterType: Integer; Down:
 procedure GenerateStructuredAssignment(DesignatorType: Integer);
 procedure GenerateInterfaceFieldAssignment(Offset: Integer; PopValueFromStack: Boolean; Value: LongInt; RelocType: TRelocType);
 procedure InitializeCStack;
-procedure PushToCStack(SourceStackDepth: Integer; DataType: Integer; PushByValue: Boolean; var ActualSize: Integer);
+procedure PushToCStack(SourceStackDepth: Integer; DataType: Integer; PushByValue: Boolean);
 procedure GenerateImportFuncStub(EntryPoint: LongInt);
 procedure GenerateCall(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer);
 procedure GenerateIndirectCall(CallAddressDepth: Integer);
@@ -1768,15 +1768,17 @@ end;
 
 procedure GenerateStructuredAssignment(DesignatorType: Integer);
 begin
-// EBX should be preserved
+// ECX should be preserved
 
 GenPopReg(ESI);                                                            // pop esi      ; source address
 GenPopReg(EDI);                                                            // pop edi      ; destination address
 
 // Copy source to destination
+GenPushReg(ECX);                                                           // push ecx
 GenNew($B9); GenDWord(TypeSize(DesignatorType));                           // mov ecx, TypeSize(DesignatorType)
 GenNew($FC);                                                               // cld          ; increment esi, edi after each step
 GenNew($F3); Gen($A4);                                                     // rep movsb
+GenPopReg(ECX);                                                            // pop ecx
 end;
 
 
@@ -1801,13 +1803,16 @@ end;
 
 procedure InitializeCStack;
 begin
-GenNew($89); Gen($E3);                                                          // mov ebx, esp
+GenNew($89); Gen($E1);                                                          // mov ecx, esp
 end;
 
 
 
 
-procedure PushToCStack(SourceStackDepth: Integer; DataType: Integer; PushByValue: Boolean; var ActualSize: Integer);
+procedure PushToCStack(SourceStackDepth: Integer; DataType: Integer; PushByValue: Boolean);
+var
+  ActualSize: Integer;
+  
 begin
 if PushByValue and (Types[DataType].Kind in StructuredTypes) then
   begin  
@@ -1815,7 +1820,7 @@ if PushByValue and (Types[DataType].Kind in StructuredTypes) then
   
   // Copy structure to the C stack
   GenNew($81); Gen($EC); GenDWord(ActualSize);                                  // sub esp, ActualSize
-  GenNew($8B); Gen($B3); GenDWord(SourceStackDepth);                            // mov esi, [ebx + SourceStackDepth] 
+  GenNew($8B); Gen($B1); GenDWord(SourceStackDepth);                            // mov esi, [ecx + SourceStackDepth] 
   GenNew($89); Gen($E7);                                                        // mov edi, esp
   GenPushReg(EDI);                                                              // push edi                       ; destination address
   GenPushReg(ESI);                                                              // push esi                       ; source address
@@ -1823,10 +1828,8 @@ if PushByValue and (Types[DataType].Kind in StructuredTypes) then
   GenerateStructuredAssignment(DataType);
   end
 else
-  begin
-  ActualSize := SizeOf(LongInt);
-  
-  GenNew($FF); Gen($B3); GenDWord(SourceStackDepth);                            // push [ebx + SourceStackDepth]
+  begin 
+  GenNew($FF); Gen($B1); GenDWord(SourceStackDepth);                            // push [ecx + SourceStackDepth]
   end; 
 end;
 

@@ -43,7 +43,7 @@ procedure CompileType(var DataType: Integer); forward;
 
 
 
-procedure DeclareIdent(const IdentName: TString; IdentKind: TIdentKind; IdentTotalNumParams: Integer; IdentDataType: Integer; IdentPassMethod: TPassMethod; 
+procedure DeclareIdent(const IdentName: TString; IdentKind: TIdentKind; TotalParamDataSize: Integer; IdentIsInCStack: Boolean; IdentDataType: Integer; IdentPassMethod: TPassMethod; 
                        IdentOrdConstValue: LongInt; IdentRealConstValue: Single; const IdentStrConstValue: TString; const IdentSetConstValue: TByteSet;
                        IdentPredefProc: TPredefProc; const IdentReceiverName: TString; IdentReceiverType: Integer);
 var
@@ -82,6 +82,7 @@ with Ident[NumIdent] do
   IsUnresolvedForward := FALSE;
   IsExported          := ParserState.IsInterfaceSection and (IdentScope = GLOBAL);
   IsTypedConst        := FALSE;
+  IsInCStack          := IdentIsInCStack;
   ForLoopNesting      := 0;
   end;
 
@@ -114,7 +115,7 @@ case IdentKind of
        end;// else
 
      LOCAL:
-       if IdentTotalNumParams > 0 then
+       if TotalParamDataSize > 0 then               // Declare parameter (always 4 bytes, except structures in the C stack)
          begin          
          if Ident[NumIdent].NestingLevel = 2 then                                            // Inside a non-nested routine
            AdditionalStackItems := 1                                                         // Return address
@@ -123,15 +124,20 @@ case IdentKind of
 
          with BlockStack[BlockStackTop] do
            begin
-           if SizeOf(LongInt) > MAXSTACKSIZE - ParamDataSize then
+           if IdentIsInCStack and (IdentPassMethod = VALPASSING) then           
+             IdentTypeSize := Align(TypeSize(IdentDataType), SizeOf(LongInt))
+           else
+             IdentTypeSize := SizeOf(LongInt);
+  
+           if IdentTypeSize > MAXSTACKSIZE - ParamDataSize then
              Error('Not enough memory for parameter');
 
-           Ident[NumIdent].Address := (AdditionalStackItems + IdentTotalNumParams) * SizeOf(LongInt) - ParamDataSize;  // Parameter offset from EBP (>0)
-           ParamDataSize := ParamDataSize + SizeOf(LongInt);                                 // Parameters always occupy 4 bytes each
+           Ident[NumIdent].Address := AdditionalStackItems * SizeOf(LongInt) + TotalParamDataSize - ParamDataSize - (IdentTypeSize - SizeOf(LongInt));  // Parameter offset from EBP (>0)
+           ParamDataSize := ParamDataSize + IdentTypeSize;
            end
          end
        else
-         with BlockStack[BlockStackTop] do
+         with BlockStack[BlockStackTop] do          // Declare local variable
            begin
            IdentTypeSize := TypeSize(IdentDataType);
            if IdentTypeSize > MAXSTACKSIZE - LocalDataSize then
@@ -207,52 +213,52 @@ end; // DeclareType
 procedure DeclarePredefinedIdents;
 begin
 // Constants
-DeclareIdent('TRUE',  CONSTANT, 0, BOOLEANTYPEINDEX, EMPTYPASSING, 1, 0.0, '', [], EMPTYPROC, '', 0);
-DeclareIdent('FALSE', CONSTANT, 0, BOOLEANTYPEINDEX, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+DeclareIdent('TRUE',  CONSTANT, 0, FALSE, BOOLEANTYPEINDEX, EMPTYPASSING, 1, 0.0, '', [], EMPTYPROC, '', 0);
+DeclareIdent('FALSE', CONSTANT, 0, FALSE, BOOLEANTYPEINDEX, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
 
 // Types
-DeclareIdent('INTEGER',  USERTYPE, 0, INTEGERTYPEINDEX,  EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
-DeclareIdent('SMALLINT', USERTYPE, 0, SMALLINTTYPEINDEX, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
-DeclareIdent('SHORTINT', USERTYPE, 0, SHORTINTTYPEINDEX, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
-DeclareIdent('WORD',     USERTYPE, 0, WORDTYPEINDEX,     EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
-DeclareIdent('BYTE',     USERTYPE, 0, BYTETYPEINDEX,     EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);  
-DeclareIdent('CHAR',     USERTYPE, 0, CHARTYPEINDEX,     EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
-DeclareIdent('BOOLEAN',  USERTYPE, 0, BOOLEANTYPEINDEX,  EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
-DeclareIdent('REAL',     USERTYPE, 0, REALTYPEINDEX,     EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
-DeclareIdent('POINTER',  USERTYPE, 0, POINTERTYPEINDEX,  EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+DeclareIdent('INTEGER',  USERTYPE, 0, FALSE, INTEGERTYPEINDEX,  EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+DeclareIdent('SMALLINT', USERTYPE, 0, FALSE, SMALLINTTYPEINDEX, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+DeclareIdent('SHORTINT', USERTYPE, 0, FALSE, SHORTINTTYPEINDEX, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+DeclareIdent('WORD',     USERTYPE, 0, FALSE, WORDTYPEINDEX,     EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+DeclareIdent('BYTE',     USERTYPE, 0, FALSE, BYTETYPEINDEX,     EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);  
+DeclareIdent('CHAR',     USERTYPE, 0, FALSE, CHARTYPEINDEX,     EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+DeclareIdent('BOOLEAN',  USERTYPE, 0, FALSE, BOOLEANTYPEINDEX,  EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+DeclareIdent('REAL',     USERTYPE, 0, FALSE, REALTYPEINDEX,     EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+DeclareIdent('POINTER',  USERTYPE, 0, FALSE, POINTERTYPEINDEX,  EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
 
 // Procedures
-DeclareIdent('INC',      PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], INCPROC,      '', 0);
-DeclareIdent('DEC',      PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], DECPROC,      '', 0);
-DeclareIdent('READ',     PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], READPROC,     '', 0);
-DeclareIdent('WRITE',    PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], WRITEPROC,    '', 0);
-DeclareIdent('READLN',   PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], READLNPROC,   '', 0);
-DeclareIdent('WRITELN',  PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], WRITELNPROC,  '', 0);
-DeclareIdent('NEW',      PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], NEWPROC,      '', 0);
-DeclareIdent('DISPOSE',  PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], DISPOSEPROC,  '', 0);
-DeclareIdent('BREAK',    PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], BREAKPROC,    '', 0);
-DeclareIdent('CONTINUE', PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], CONTINUEPROC, '', 0);  
-DeclareIdent('EXIT',     PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], EXITPROC,     '', 0);
-DeclareIdent('HALT',     PROC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], HALTPROC,     '', 0);
+DeclareIdent('INC',      PROC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], INCPROC,      '', 0);
+DeclareIdent('DEC',      PROC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], DECPROC,      '', 0);
+DeclareIdent('READ',     PROC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], READPROC,     '', 0);
+DeclareIdent('WRITE',    PROC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], WRITEPROC,    '', 0);
+DeclareIdent('READLN',   PROC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], READLNPROC,   '', 0);
+DeclareIdent('WRITELN',  PROC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], WRITELNPROC,  '', 0);
+DeclareIdent('NEW',      PROC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], NEWPROC,      '', 0);
+DeclareIdent('DISPOSE',  PROC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], DISPOSEPROC,  '', 0);
+DeclareIdent('BREAK',    PROC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], BREAKPROC,    '', 0);
+DeclareIdent('CONTINUE', PROC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], CONTINUEPROC, '', 0);  
+DeclareIdent('EXIT',     PROC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], EXITPROC,     '', 0);
+DeclareIdent('HALT',     PROC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], HALTPROC,     '', 0);
 
 // Functions
-DeclareIdent('SIZEOF', FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], SIZEOFFUNC, '', 0);
-DeclareIdent('ORD',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], ORDFUNC,    '', 0);
-DeclareIdent('CHR',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], CHRFUNC,    '', 0);
-DeclareIdent('LOW',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], LOWFUNC,    '', 0);
-DeclareIdent('HIGH',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], HIGHFUNC,   '', 0);
-DeclareIdent('PRED',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], PREDFUNC,   '', 0);
-DeclareIdent('SUCC',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], SUCCFUNC,   '', 0);
-DeclareIdent('ROUND',  FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], ROUNDFUNC,  '', 0);
-DeclareIdent('TRUNC',  FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], TRUNCFUNC,  '', 0);
-DeclareIdent('ABS',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], ABSFUNC,    '', 0);
-DeclareIdent('SQR',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], SQRFUNC,    '', 0);
-DeclareIdent('SIN',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], SINFUNC,    '', 0);
-DeclareIdent('COS',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], COSFUNC,    '', 0);
-DeclareIdent('ARCTAN', FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], ARCTANFUNC, '', 0);
-DeclareIdent('EXP',    FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], EXPFUNC,    '', 0);
-DeclareIdent('LN',     FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], LNFUNC,     '', 0);
-DeclareIdent('SQRT',   FUNC, 0, 0, EMPTYPASSING, 0, 0.0, '', [], SQRTFUNC,   '', 0);
+DeclareIdent('SIZEOF', FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], SIZEOFFUNC, '', 0);
+DeclareIdent('ORD',    FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], ORDFUNC,    '', 0);
+DeclareIdent('CHR',    FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], CHRFUNC,    '', 0);
+DeclareIdent('LOW',    FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], LOWFUNC,    '', 0);
+DeclareIdent('HIGH',   FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], HIGHFUNC,   '', 0);
+DeclareIdent('PRED',   FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], PREDFUNC,   '', 0);
+DeclareIdent('SUCC',   FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], SUCCFUNC,   '', 0);
+DeclareIdent('ROUND',  FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], ROUNDFUNC,  '', 0);
+DeclareIdent('TRUNC',  FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], TRUNCFUNC,  '', 0);
+DeclareIdent('ABS',    FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], ABSFUNC,    '', 0);
+DeclareIdent('SQR',    FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], SQRFUNC,    '', 0);
+DeclareIdent('SIN',    FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], SINFUNC,    '', 0);
+DeclareIdent('COS',    FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], COSFUNC,    '', 0);
+DeclareIdent('ARCTAN', FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], ARCTANFUNC, '', 0);
+DeclareIdent('EXP',    FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], EXPFUNC,    '', 0);
+DeclareIdent('LN',     FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], LNFUNC,     '', 0);
+DeclareIdent('SQRT',   FUNC, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], SQRTFUNC,   '', 0);
 end;// DeclarePredefinedIdents
 
 
@@ -1606,27 +1612,20 @@ end;// CompileActualParameters
 
 
 
-function MakeCStack(const Signature: TSignature): Integer;
+procedure MakeCStack(const Signature: TSignature);
 var
   ParamIndex: Integer;
-  ActualSize: Integer;
 begin
-Result := 0;
-
 InitializeCStack;
+
+// Push explicit parameters
 for ParamIndex := Signature.NumParams downto 1 do
   with Signature.Param[ParamIndex]^ do
-    begin
-    PushToCStack((Signature.NumParams - ParamIndex) * SizeOf(LongInt), DataType, PassMethod = VALPASSING, ActualSize);
-    Result := Result + ActualSize;  
-    end;
+    PushToCStack((Signature.NumParams - ParamIndex) * SizeOf(LongInt), DataType, PassMethod = VALPASSING);
 
 // Push structured Result onto the C stack 
 if (Signature.ResultType <> 0) and (Types[Signature.ResultType].Kind in StructuredTypes) then
-  begin
-  PushToCStack(Signature.NumParams * SizeOf(LongInt), Signature.ResultType, FALSE, ActualSize);
-  Result := Result + ActualSize;
-  end;    
+  PushToCStack(Signature.NumParams * SizeOf(LongInt), Signature.ResultType, FALSE);
 end; // MakeCStack
 
 
@@ -1634,36 +1633,30 @@ end; // MakeCStack
 
 procedure CompileCall(IdentIndex: Integer);
 var
-  TotalNumParams: Integer;
-  ResultType: Integer;
-  StructuredResultAddr: LongInt;
-  
+  TotalPascalParamSize: Integer;
+  StructuredResultAddr: LongInt;  
 begin
-TotalNumParams := Ident[IdentIndex].Signature.NumParams;
-ResultType := Ident[IdentIndex].Signature.ResultType;
-
-// Allocate space for structured Result as a hidden VAR parameter   
-if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) then
-  Inc(TotalNumParams); 
+TotalPascalParamSize := GetTotalParamSize(Ident[IdentIndex].Signature, FALSE, TRUE); 
 
 CompileActualParameters(Ident[IdentIndex].Signature, StructuredResultAddr);
 
 // Convert stack to C format
-if Ident[IdentIndex].Signature.IsStdCall and (TotalNumParams > 0) then
+if Ident[IdentIndex].Signature.IsStdCall and (TotalPascalParamSize > 0) then
   MakeCStack(Ident[IdentIndex].Signature);
   
 GenerateCall(Ident[IdentIndex].Address, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
 
 // Free original stack
-if Ident[IdentIndex].Signature.IsStdCall and (TotalNumParams > 0) then
-  DiscardStackTop(TotalNumParams);
+if Ident[IdentIndex].Signature.IsStdCall and (TotalPascalParamSize > 0) then
+  DiscardStackTop(TotalPascalParamSize div SizeOf(LongInt));
 
 // Save structured result pointer to EAX (not all external functions do it themselves)
-if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and Ident[IdentIndex].Signature.IsStdCall then
-  begin
-  PushTempStoragePtr(StructuredResultAddr);
-  SaveStackTopToEAX;
-  end;
+with Ident[IdentIndex].Signature do
+  if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and IsStdCall then
+    begin
+    PushTempStoragePtr(StructuredResultAddr);
+    SaveStackTopToEAX;
+    end;
 end; // CompileCall
 
 
@@ -1688,14 +1681,12 @@ end; // CompileMethodCall
 
 procedure CompileIndirectCall(ProcVarType: Integer);
 var
-  TotalNumParams: Integer;
-  ResultType: Integer;
+  TotalPascalParamSize, TotalCParamSize, CallAddrDepth: Integer;
   StructuredResultAddr: LongInt;
-  CStackSize: LongInt;
   
 begin
-TotalNumParams := Types[ProcVarType].Signature.NumParams;
-ResultType := Types[ProcVarType].Signature.ResultType;
+TotalPascalParamSize := GetTotalParamSize(Types[ProcVarType].Signature, Types[ProcVarType].SelfPointerOffset <> 0, TRUE);
+TotalCParamSize      := GetTotalParamSize(Types[ProcVarType].Signature, Types[ProcVarType].SelfPointerOffset <> 0, FALSE);
 
 if Types[ProcVarType].SelfPointerOffset <> 0 then   // Interface method found
   begin
@@ -1703,39 +1694,38 @@ if Types[ProcVarType].SelfPointerOffset <> 0 then   // Interface method found
     Error('STDCALL is not allowed for methods');
   
   // Push Self pointer as a first (hidden) VAR parameter
-  Inc(TotalNumParams);
   DuplicateStackTop;
   GetFieldPtr(Types[ProcVarType].SelfPointerOffset);
   DerefPtr(POINTERTYPEINDEX);
   end;
   
-// Allocate space for structured Result as a hidden VAR parameter   
-if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) then
-  Inc(TotalNumParams);  
-  
 CompileActualParameters(Types[ProcVarType].Signature, StructuredResultAddr);
 
 // Convert stack to C format
-if Types[ProcVarType].Signature.IsStdCall and (TotalNumParams > 0) then
-  CStackSize := MakeCStack(Types[ProcVarType].Signature)
+if Types[ProcVarType].Signature.IsStdCall and (TotalPascalParamSize > 0) then
+  begin
+  MakeCStack(Types[ProcVarType].Signature); 
+  CallAddrDepth := TotalPascalParamSize + TotalCParamSize;
+  end
 else
-  CStackSize := 0;  
+  CallAddrDepth := TotalPascalParamSize;  
 
-GenerateIndirectCall(TotalNumParams * SizeOf(LongInt) + CStackSize);
+GenerateIndirectCall(CallAddrDepth);
 
 // Free original stack
-if Types[ProcVarType].Signature.IsStdCall and (TotalNumParams > 0) then
-  DiscardStackTop(TotalNumParams);
+if Types[ProcVarType].Signature.IsStdCall and (TotalPascalParamSize > 0) then
+  DiscardStackTop(TotalPascalParamSize div SizeOf(LongInt));
   
 // Remove call address
 DiscardStackTop(1);  
 
 // Save structured result pointer to EAX (not all external functions do it themselves)
-if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and Types[ProcVarType].Signature.IsStdCall then
-  begin
-  PushTempStoragePtr(StructuredResultAddr);
-  SaveStackTopToEAX;
-  end;
+with Types[ProcVarType].Signature do
+  if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and IsStdCall then
+    begin
+    PushTempStoragePtr(StructuredResultAddr);
+    SaveStackTopToEAX;
+    end;
 end; // CompileIndirectCall
 
 
@@ -2035,8 +2025,9 @@ if ValType = 0 then
       IsConst := Ident[IdentIndex].IsTypedConst or (Ident[IdentIndex].PassMethod = CONSTPASSING);         
       
       // Structured CONST parameters are passed by reference, scalar CONST parameters are passed by value
-      if (Ident[IdentIndex].PassMethod = VARPASSING) or 
-        ((Ident[IdentIndex].PassMethod <> EMPTYPASSING) and (Types[ValType].Kind in StructuredTypes))
+      if (Ident[IdentIndex].PassMethod = VARPASSING) or
+        ((Ident[IdentIndex].PassMethod <> VALPASSING) and (Types[ValType].Kind in StructuredTypes) and Ident[IdentIndex].IsInCStack) or
+        ((Ident[IdentIndex].PassMethod <> EMPTYPASSING) and (Types[ValType].Kind in StructuredTypes) and not Ident[IdentIndex].IsInCStack)
       then
         DerefPtr(POINTERTYPEINDEX);
      
@@ -3074,7 +3065,7 @@ procedure CompileType(var DataType: Integer);
   
   repeat
     AssertIdent;
-    DeclareIdent(Tok.Name, CONSTANT, 0, DataType, EMPTYPASSING, ConstIndex, 0.0, '', [], EMPTYPROC, '', 0);
+    DeclareIdent(Tok.Name, CONSTANT, 0, FALSE, DataType, EMPTYPASSING, ConstIndex, 0.0, '', [], EMPTYPROC, '', 0);
     
     Inc(ConstIndex);
     if ConstIndex > MAXENUMELEMENTS - 1 then
@@ -3661,7 +3652,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   repeat
     AssertIdent;
     
-    DeclareIdent(Tok.Name, GOTOLABEL, 0, 0, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+    DeclareIdent(Tok.Name, GOTOLABEL, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
     
     NextTok;
     if Tok.Kind <> COMMATOK then Break;
@@ -3684,7 +3675,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     begin
     EatTok(EQTOK);    
     CompileConstExpression(ConstVal, ConstValType);
-    DeclareIdent(NameTok.Name, CONSTANT, 0, ConstValType, EMPTYPASSING, ConstVal.OrdValue, ConstVal.RealValue, ConstVal.StrValue, ConstVal.SetValue, EMPTYPROC, '', 0);
+    DeclareIdent(NameTok.Name, CONSTANT, 0, FALSE, ConstValType, EMPTYPASSING, ConstVal.OrdValue, ConstVal.RealValue, ConstVal.StrValue, ConstVal.SetValue, EMPTYPROC, '', 0);
     end; // CompileUntypedConstDeclaration;
    
     
@@ -3694,7 +3685,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     begin
     EatTok(COLONTOK);    
     CompileType(ConstType);    
-    DeclareIdent(NameTok.Name, CONSTANT, 0, ConstType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);    
+    DeclareIdent(NameTok.Name, CONSTANT, 0, FALSE, ConstType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);    
     EatTok(EQTOK);    
     CompileInitializer(Ident[NumIdent].Address, ConstType);   
     end; // CompileTypedConstDeclaration    
@@ -3735,7 +3726,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     EatTok(EQTOK);
 
     CompileType(VarType);
-    DeclareIdent(NameTok.Name, USERTYPE, 0, VarType, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);   
+    DeclareIdent(NameTok.Name, USERTYPE, 0, FALSE, VarType, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);   
     
     EatTok(SEMICOLONTOK);
   until Tok.Kind <> IDENTTOK;
@@ -3782,13 +3773,13 @@ procedure CompileBlock(BlockIdentIndex: Integer);
         Error('Multiple variables cannot be initialized');
         
       NextTok;
-      DeclareIdent(IdentInListName[1], CONSTANT, 0, VarType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+      DeclareIdent(IdentInListName[1], CONSTANT, 0, FALSE, VarType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
       Ident[NumIdent].IsTypedConst := FALSE;  // Allow mutability
       CompileInitializer(Ident[NumIdent].Address, VarType);      
       end
     else                                                         // Uninitialized variables   
       for IdentInListIndex := 1 to NumIdentInList do
-        DeclareIdent(IdentInListName[IdentInListIndex], VARIABLE, 0, VarType, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);  
+        DeclareIdent(IdentInListName[IdentInListIndex], VARIABLE, 0, FALSE, VarType, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);  
       
     EatTok(SEMICOLONTOK);
   until Tok.Kind <> IDENTTOK;
@@ -3932,7 +3923,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     begin
     if IsFunction then ProcOrFunc := FUNC else ProcOrFunc := PROC;
     
-    DeclareIdent(ProcName, ProcOrFunc, 0, 0, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, ReceiverName, ReceiverType);
+    DeclareIdent(ProcName, ProcOrFunc, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, ReceiverName, ReceiverType);
     CompileFormalParametersAndResult(IsFunction, Ident[NumIdent].Signature);
 
     if (ReceiverType <> 0) and Ident[NumIdent].Signature.IsStdCall then
@@ -3972,16 +3963,16 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   var
     DeclTok: TToken;
     ParamIndex, StackParamIndex: Integer;
-    TotalNumParams: Integer;
+    TotalParamSize: Integer;
     NestedProcsFound: Boolean;
     
     
     procedure DeclareResult;
     begin
     if Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes then    // For functions returning structured variables, Result is a hidden VAR parameter 
-      DeclareIdent('RESULT', VARIABLE, TotalNumParams, Ident[BlockIdentIndex].Signature.ResultType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0)
+      DeclareIdent('RESULT', VARIABLE, TotalParamSize, FALSE, Ident[BlockIdentIndex].Signature.ResultType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0)
     else                                                                                  // Otherwise, Result is a hidden local variable
-      DeclareIdent('RESULT', VARIABLE, 0, Ident[BlockIdentIndex].Signature.ResultType, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+      DeclareIdent('RESULT', VARIABLE, 0, FALSE, Ident[BlockIdentIndex].Signature.ResultType, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
       
     Ident[BlockIdentIndex].ResultIdentIndex := NumIdent;
     end; // DeclareResult
@@ -3997,19 +3988,11 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   
   if BlockStack[BlockStackTop].Index <> 1 then             
     begin
-    TotalNumParams := Ident[BlockIdentIndex].Signature.NumParams;
+    TotalParamSize := GetTotalParamSize(Ident[BlockIdentIndex].Signature, Ident[BlockIdentIndex].ReceiverType <> 0, FALSE);
     
-    // Allocate Self as a first (hidden) VAR parameter if the current block is a method
-    if Ident[BlockIdentIndex].ReceiverType <> 0 then
-      Inc(TotalNumParams);
-             
-    // Allocate Result as a hidden VAR parameter if the current block is a function returning a structure
-    if (Ident[BlockIdentIndex].Kind = FUNC) and (Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes) then
-      Inc(TotalNumParams);
-      
     // Declare Self
     if Ident[BlockIdentIndex].ReceiverType <> 0 then
-      DeclareIdent(Ident[BlockIdentIndex].ReceiverName, VARIABLE, TotalNumParams, Ident[BlockIdentIndex].ReceiverType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+      DeclareIdent(Ident[BlockIdentIndex].ReceiverName, VARIABLE, TotalParamSize, FALSE, Ident[BlockIdentIndex].ReceiverType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
              
     // Declare Result (default calling convention)
     if (Ident[BlockIdentIndex].Kind = FUNC) and not Ident[BlockIdentIndex].Signature.IsStdCall then
@@ -4025,7 +4008,8 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   
       DeclareIdent(Ident[BlockIdentIndex].Signature.Param[StackParamIndex]^.Name,
                    VARIABLE,
-                   TotalNumParams,
+                   TotalParamSize,
+                   Ident[BlockIdentIndex].Signature.IsStdCall,
                    Ident[BlockIdentIndex].Signature.Param[StackParamIndex]^.DataType,
                    Ident[BlockIdentIndex].Signature.Param[StackParamIndex]^.PassMethod,
                    0,
@@ -4157,7 +4141,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
 
 var
   LibProcIdentIndex: Integer;
-  TotalNumParams: Integer;
+  TotalParamSize: Integer;
 
 
 begin // CompileBlock
@@ -4237,20 +4221,13 @@ else
     GenerateCall(Ident[LibProcIdentIndex].Address, 1, 1);
     end;
 
-  GenerateStackFrameEpilog(BlockStack[BlockStackTop].LocalDataSize + BlockStack[BlockStackTop].TempDataSize, 
+  GenerateStackFrameEpilog(Align(BlockStack[BlockStackTop].LocalDataSize + BlockStack[BlockStackTop].TempDataSize, SizeOf(LongInt)), 
                            Ident[BlockIdentIndex].Signature.IsStdCall);
 
   if BlockStack[BlockStackTop].Index <> 1 then         
     begin
-    TotalNumParams := Ident[BlockIdentIndex].Signature.NumParams;
-    
-    if Ident[BlockIdentIndex].ReceiverType <> 0 then
-      Inc(TotalNumParams);                            // Deallocate space allocated for Self as a hidden VAR parameter
-    
-    if (Ident[BlockIdentIndex].Kind = FUNC) and (Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes) then
-      Inc(TotalNumParams);                            // Deallocate space allocated for structured Result as a hidden VAR parameter
-      
-    GenerateReturn(TotalNumParams * SizeOf(LongInt), Ident[BlockIdentIndex].NestingLevel);
+    TotalParamSize := GetTotalParamSize(Ident[BlockIdentIndex].Signature, Ident[BlockIdentIndex].ReceiverType <> 0, FALSE);
+    GenerateReturn(TotalParamSize, Ident[BlockIdentIndex].NestingLevel);
     end;
     
   DeleteDeclarations;

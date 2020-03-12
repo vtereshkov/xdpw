@@ -255,6 +255,7 @@ type
     IsUnresolvedForward: Boolean;
     IsExported: Boolean;
     IsTypedConst: Boolean;
+    IsInCStack: Boolean;
     ForLoopNesting: Integer;                    // Number of nested FOR loops where the label is defined
   end;
 
@@ -368,6 +369,7 @@ function IsString(DataType: Integer): Boolean;
 function LowBound(DataType: Integer): Integer;
 function HighBound(DataType: Integer): Integer;
 function TypeSize(DataType: Integer): Integer;
+function GetTotalParamSize(const Signature: TSignature; IsMethod, AlwaysTreatStructuresAsReferences: Boolean): Integer;
 function GetCompatibleType(LeftType, RightType: Integer): Integer;
 function GetCompatibleRefType(LeftType, RightType: Integer): Integer;
 procedure CheckOperator(const Tok: TToken; DataType: Integer);
@@ -802,7 +804,39 @@ case Types[DataType].Kind of
 else
   Error('Illegal type')
 end;// case
-end;    
+end; 
+
+
+
+
+function GetTotalParamSize(const Signature: TSignature; IsMethod, AlwaysTreatStructuresAsReferences: Boolean): Integer;
+var
+  i: Integer;
+begin
+if Signature.IsStdCall and IsMethod then
+  Error('Internal fault: Methods cannot be STDCALL');
+  
+Result := 0;
+  
+// For a method, Self is a first (hidden) VAR parameter
+if IsMethod then
+  Result := Result + SizeOf(LongInt);
+
+// For a function returning a structure, Result is a hidden VAR parameter
+if (Signature.ResultType <> 0) and (Types[Signature.ResultType].Kind in StructuredTypes) then
+  Result := Result + SizeOf(LongInt);
+  
+// Any parameter occupies 4 bytes (except structures in the C stack)
+if Signature.IsStdCall and not AlwaysTreatStructuresAsReferences then
+  for i := 1 to Signature.NumParams do
+    if Signature.Param[i]^.PassMethod = VALPASSING then
+      Result := Result + Align(TypeSize(Signature.Param[i]^.DataType), SizeOf(LongInt))
+    else
+      Result := Result + SizeOf(LongInt)
+else
+  Result := Result + Signature.NumParams * SizeOf(LongInt);
+       
+end; // GetTotalParamSize   
 
 
 
