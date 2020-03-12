@@ -17,8 +17,8 @@ const
   MAXSTRLENGTH              = 255;
   MAXSETELEMENTS            = 256;
   MAXENUMELEMENTS           = 256;
-  MAXIDENTS                 = 1000;
-  MAXTYPES                  = 1000;
+  MAXIDENTS                 = 2000;
+  MAXTYPES                  = 2000;
   MAXUNITS                  = 100;
   MAXBLOCKNESTING           = 10;
   MAXPARAMS                 = 30;

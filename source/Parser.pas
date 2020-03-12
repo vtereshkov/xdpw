@@ -1336,12 +1336,14 @@ var
   NumIdentInList, IdentInListIndex: Integer;  
   ParamType, DefaultValueType: Integer;    
   ListPassMethod: TPassMethod;
-  IsOpenArrayList: Boolean;
+  IsOpenArrayList, StringByValFound: Boolean;
   Default: TConst;
   
 begin
 Signature.NumParams := 0;
 Signature.NumDefaultParams := 0;
+
+StringByValFound := FALSE;
   
 if Tok.Kind = OPARTOK then
   begin
@@ -1419,6 +1421,9 @@ if Tok.Kind = OPARTOK then
     if (ListPassMethod <> VARPASSING) and (ParamType = ANYTYPEINDEX) then
       Error('Untyped parameters require VAR');
       
+    if (ListPassMethod = VALPASSING) and IsString(ParamType) then
+      StringByValFound := TRUE;
+      
 
     // Default parameter value
     if (Tok.Kind = EQTOK) or (Signature.NumDefaultParams > 0) then
@@ -1490,8 +1495,16 @@ if (Tok.Kind = IDENTTOK) and (Tok.Name = 'STDCALL') then
   Signature.CallConv := STDCALLCONV;
   NextTok;
   end
+else if (Tok.Kind = IDENTTOK) and (Tok.Name = 'CDECL') then
+  begin    
+  Signature.CallConv := CDECLCONV;
+  NextTok;
+  end  
 else  
   Signature.CallConv := DEFAULTCONV;
+  
+if (Signature.CallConv <> DEFAULTCONV) and StringByValFound then
+  Error('Strings cannot be passed by value to STDCALL/CDECL procedures');  
   
 end; // CompileFormalParametersAndResult
 
@@ -1508,9 +1521,6 @@ procedure CompileActualParameters(const Signature: TSignature; var StructuredRes
     
   begin
   CompileExpression(ValType);
-  
-  if IsString(ValType) and (CallConv <> DEFAULTCONV) then
-    Error('Strings cannot be passed by value to STDCALL/CDECL procedures');
   
   // Copy structured parameter passed by value (for STDCALL/CDECL functions there is no need to do it here since it will be done in MakeCStack)
   if (Types[ValType].Kind in StructuredTypes) and not (CallConv <> DEFAULTCONV) then
@@ -1633,10 +1643,11 @@ end; // MakeCStack
 
 procedure CompileCall(IdentIndex: Integer);
 var
-  TotalPascalParamSize: Integer;
+  TotalPascalParamSize, TotalCParamSize: Integer;
   StructuredResultAddr: LongInt;  
 begin
 TotalPascalParamSize := GetTotalParamSize(Ident[IdentIndex].Signature, FALSE, TRUE); 
+TotalCParamSize      := GetTotalParamSize(Ident[IdentIndex].Signature, FALSE, FALSE);
 
 CompileActualParameters(Ident[IdentIndex].Signature, StructuredResultAddr);
 
@@ -1645,6 +1656,10 @@ if (Ident[IdentIndex].Signature.CallConv <> DEFAULTCONV) and (TotalPascalParamSi
   MakeCStack(Ident[IdentIndex].Signature);
   
 GenerateCall(Ident[IdentIndex].Address, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
+
+// Free C stack for a CDECL function
+if (Ident[IdentIndex].Signature.CallConv = CDECLCONV) and (TotalPascalParamSize > 0) then
+  DiscardStackTop(TotalCParamSize div SizeOf(LongInt));
 
 // Free original stack
 if (Ident[IdentIndex].Signature.CallConv <> DEFAULTCONV) and (TotalPascalParamSize > 0) then
@@ -1711,6 +1726,10 @@ else
   CallAddrDepth := TotalPascalParamSize;  
 
 GenerateIndirectCall(CallAddrDepth);
+
+// Free C stack for a CDECL function
+if (Types[ProcVarType].Signature.CallConv = CDECLCONV) and (TotalPascalParamSize > 0) then
+  DiscardStackTop(TotalCParamSize div SizeOf(LongInt));
 
 // Free original stack
 if (Types[ProcVarType].Signature.CallConv <> DEFAULTCONV) and (TotalPascalParamSize > 0) then
@@ -4227,7 +4246,11 @@ else
 
   if BlockStack[BlockStackTop].Index <> 1 then         
     begin
-    TotalParamSize := GetTotalParamSize(Ident[BlockIdentIndex].Signature, Ident[BlockIdentIndex].ReceiverType <> 0, FALSE);
+    if Ident[BlockIdentIndex].Signature.CallConv = CDECLCONV then
+      TotalParamSize := 0                                           // CDECL implies that the stack is cleared by the caller - no need to do it here
+    else  
+      TotalParamSize := GetTotalParamSize(Ident[BlockIdentIndex].Signature, Ident[BlockIdentIndex].ReceiverType <> 0, FALSE);
+      
     GenerateReturn(TotalParamSize, Ident[BlockIdentIndex].NestingLevel);
     end;
     
