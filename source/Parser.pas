@@ -76,7 +76,7 @@ with Ident[NumIdent] do
   ReceiverName        := IdentReceiverName;
   ReceiverType        := IdentReceiverType;
   Signature.NumParams := 0;
-  Signature.IsStdCall := FALSE;
+  Signature.CallConv  := DEFAULTCONV;
   PassMethod          := IdentPassMethod;
   IsUsed              := FALSE;
   IsUnresolvedForward := FALSE;
@@ -1487,11 +1487,11 @@ if IsFunction then
 // Call modifier
 if (Tok.Kind = IDENTTOK) and (Tok.Name = 'STDCALL') then
   begin    
-  Signature.IsStdCall := TRUE;
+  Signature.CallConv := STDCALLCONV;
   NextTok;
   end
 else  
-  Signature.IsStdCall := FALSE;
+  Signature.CallConv := DEFAULTCONV;
   
 end; // CompileFormalParametersAndResult
 
@@ -1501,7 +1501,7 @@ end; // CompileFormalParametersAndResult
 procedure CompileActualParameters(const Signature: TSignature; var StructuredResultAddr: LongInt);
 
 
-  procedure CompileExpressionCopy(var ValType: Integer; IsStdCall: Boolean);
+  procedure CompileExpressionCopy(var ValType: Integer; CallConv: TCallConv);
   var
     TempStorageAddr: Integer;
     LibProcIdentIndex: Integer;
@@ -1509,11 +1509,11 @@ procedure CompileActualParameters(const Signature: TSignature; var StructuredRes
   begin
   CompileExpression(ValType);
   
-  if IsString(ValType) and IsStdCall then
-    Error('Strings cannot be passed by value to STDCALL procedures');
+  if IsString(ValType) and (CallConv <> DEFAULTCONV) then
+    Error('Strings cannot be passed by value to STDCALL/CDECL procedures');
   
-  // Copy structured parameter passed by value (for STDCALL functions there is no need to do it here since it will be done in MakeCStack)
-  if (Types[ValType].Kind in StructuredTypes) and not IsStdCall then
+  // Copy structured parameter passed by value (for STDCALL/CDECL functions there is no need to do it here since it will be done in MakeCStack)
+  if (Types[ValType].Kind in StructuredTypes) and not (CallConv <> DEFAULTCONV) then
     begin
     SaveStackTopToEAX; 
     TempStorageAddr := AllocateTempStorage(TypeSize(ValType));
@@ -1564,7 +1564,7 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
       CurParam := Signature.Param[NumActualParams + 1];
 
       case CurParam^.PassMethod of
-        VALPASSING:   CompileExpressionCopy(ActualParamType, Signature.IsStdCall);
+        VALPASSING:   CompileExpressionCopy(ActualParamType, Signature.CallConv);
         CONSTPASSING: CompileExpression(ActualParamType);
         VARPASSING:   CompileDesignator(ActualParamType, CurParam^.DataType = ANYTYPEINDEX);
       else
@@ -1641,18 +1641,18 @@ TotalPascalParamSize := GetTotalParamSize(Ident[IdentIndex].Signature, FALSE, TR
 CompileActualParameters(Ident[IdentIndex].Signature, StructuredResultAddr);
 
 // Convert stack to C format
-if Ident[IdentIndex].Signature.IsStdCall and (TotalPascalParamSize > 0) then
+if (Ident[IdentIndex].Signature.CallConv <> DEFAULTCONV) and (TotalPascalParamSize > 0) then
   MakeCStack(Ident[IdentIndex].Signature);
   
 GenerateCall(Ident[IdentIndex].Address, BlockStackTop - 1, Ident[IdentIndex].NestingLevel);
 
 // Free original stack
-if Ident[IdentIndex].Signature.IsStdCall and (TotalPascalParamSize > 0) then
+if (Ident[IdentIndex].Signature.CallConv <> DEFAULTCONV) and (TotalPascalParamSize > 0) then
   DiscardStackTop(TotalPascalParamSize div SizeOf(LongInt));
 
 // Save structured result pointer to EAX (not all external functions do it themselves)
 with Ident[IdentIndex].Signature do
-  if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and IsStdCall then
+  if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and (CallConv <> DEFAULTCONV) then
     begin
     PushTempStoragePtr(StructuredResultAddr);
     SaveStackTopToEAX;
@@ -1690,8 +1690,8 @@ TotalCParamSize      := GetTotalParamSize(Types[ProcVarType].Signature, Types[Pr
 
 if Types[ProcVarType].SelfPointerOffset <> 0 then   // Interface method found
   begin
-  if Types[ProcVarType].Signature.IsStdCall then
-    Error('STDCALL is not allowed for methods');
+  if Types[ProcVarType].Signature.CallConv <> DEFAULTCONV then
+    Error('STDCALL/CDECL is not allowed for methods');
   
   // Push Self pointer as a first (hidden) VAR parameter
   DuplicateStackTop;
@@ -1702,7 +1702,7 @@ if Types[ProcVarType].SelfPointerOffset <> 0 then   // Interface method found
 CompileActualParameters(Types[ProcVarType].Signature, StructuredResultAddr);
 
 // Convert stack to C format
-if Types[ProcVarType].Signature.IsStdCall and (TotalPascalParamSize > 0) then
+if (Types[ProcVarType].Signature.CallConv <> DEFAULTCONV) and (TotalPascalParamSize > 0) then
   begin
   MakeCStack(Types[ProcVarType].Signature); 
   CallAddrDepth := TotalPascalParamSize + TotalCParamSize;
@@ -1713,7 +1713,7 @@ else
 GenerateIndirectCall(CallAddrDepth);
 
 // Free original stack
-if Types[ProcVarType].Signature.IsStdCall and (TotalPascalParamSize > 0) then
+if (Types[ProcVarType].Signature.CallConv <> DEFAULTCONV) and (TotalPascalParamSize > 0) then
   DiscardStackTop(TotalPascalParamSize div SizeOf(LongInt));
   
 // Remove call address
@@ -1721,7 +1721,7 @@ DiscardStackTop(1);
 
 // Save structured result pointer to EAX (not all external functions do it themselves)
 with Types[ProcVarType].Signature do
-  if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and IsStdCall then
+  if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and (CallConv <> DEFAULTCONV) then
     begin
     PushTempStoragePtr(StructuredResultAddr);
     SaveStackTopToEAX;
@@ -3926,8 +3926,8 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     DeclareIdent(ProcName, ProcOrFunc, 0, FALSE, 0, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, ReceiverName, ReceiverType);
     CompileFormalParametersAndResult(IsFunction, Ident[NumIdent].Signature);
 
-    if (ReceiverType <> 0) and Ident[NumIdent].Signature.IsStdCall then
-      Error('STDCALL is not allowed for methods'); 
+    if (ReceiverType <> 0) and (Ident[NumIdent].Signature.CallConv <> DEFAULTCONV) then
+      Error('STDCALL/CDECL is not allowed for methods'); 
     end;           
 
   EatTok(SEMICOLONTOK);  
@@ -3985,6 +3985,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   
   // Default calling convention: ([var Self,] [var Result,] Parameter1, ... ParameterN)
   // STDCALL calling convention: (ParameterN, ... Parameter1, [, var Result])
+  // CDECL calling convention:   (ParameterN, ... Parameter1, [, var Result]), caller clears the stack
   
   if BlockStack[BlockStackTop].Index <> 1 then             
     begin
@@ -3995,21 +3996,21 @@ procedure CompileBlock(BlockIdentIndex: Integer);
       DeclareIdent(Ident[BlockIdentIndex].ReceiverName, VARIABLE, TotalParamSize, FALSE, Ident[BlockIdentIndex].ReceiverType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
              
     // Declare Result (default calling convention)
-    if (Ident[BlockIdentIndex].Kind = FUNC) and not Ident[BlockIdentIndex].Signature.IsStdCall then
+    if (Ident[BlockIdentIndex].Kind = FUNC) and (Ident[BlockIdentIndex].Signature.CallConv = DEFAULTCONV) then
       DeclareResult;              
     
     // Allocate and declare other parameters
     for ParamIndex := 1 to Ident[BlockIdentIndex].Signature.NumParams do
       begin
-      if Ident[BlockIdentIndex].Signature.IsStdCall then
-        StackParamIndex := Ident[BlockIdentIndex].Signature.NumParams - ParamIndex + 1    // Inverse parameter stack for STDCALL procedures (structured Result is not allowed anyway)
-      else
-        StackParamIndex := ParamIndex;
+      if Ident[BlockIdentIndex].Signature.CallConv = DEFAULTCONV then
+        StackParamIndex := ParamIndex
+      else  
+        StackParamIndex := Ident[BlockIdentIndex].Signature.NumParams - ParamIndex + 1;    // Inverse parameter stack for STDCALL/CDECL procedures     
   
       DeclareIdent(Ident[BlockIdentIndex].Signature.Param[StackParamIndex]^.Name,
                    VARIABLE,
                    TotalParamSize,
-                   Ident[BlockIdentIndex].Signature.IsStdCall,
+                   Ident[BlockIdentIndex].Signature.CallConv <> DEFAULTCONV,
                    Ident[BlockIdentIndex].Signature.Param[StackParamIndex]^.DataType,
                    Ident[BlockIdentIndex].Signature.Param[StackParamIndex]^.PassMethod,
                    0,
@@ -4021,8 +4022,8 @@ procedure CompileBlock(BlockIdentIndex: Integer);
                    0);
       end;
 
-    // Declare Result (STDCALL calling convention)
-    if (Ident[BlockIdentIndex].Kind = FUNC) and Ident[BlockIdentIndex].Signature.IsStdCall then
+    // Declare Result (STDCALL/CDECL calling convention)
+    if (Ident[BlockIdentIndex].Kind = FUNC) and (Ident[BlockIdentIndex].Signature.CallConv <> DEFAULTCONV) then
       DeclareResult;
               
     end; // if
@@ -4177,7 +4178,7 @@ else
   if BlockStack[BlockStackTop].Index = 1 then
     SetProgramEntryPoint;
 
-  GenerateStackFrameProlog(Ident[BlockIdentIndex].Signature.IsStdCall);
+  GenerateStackFrameProlog(Ident[BlockIdentIndex].Signature.CallConv <> DEFAULTCONV);
 
   if BlockStack[BlockStackTop].Index = 1 then          // Main program
     begin
@@ -4222,7 +4223,7 @@ else
     end;
 
   GenerateStackFrameEpilog(Align(BlockStack[BlockStackTop].LocalDataSize + BlockStack[BlockStackTop].TempDataSize, SizeOf(LongInt)), 
-                           Ident[BlockIdentIndex].Signature.IsStdCall);
+                           Ident[BlockIdentIndex].Signature.CallConv <> DEFAULTCONV);
 
   if BlockStack[BlockStackTop].Index <> 1 then         
     begin

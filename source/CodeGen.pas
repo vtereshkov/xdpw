@@ -1148,7 +1148,7 @@ procedure DiscardStackTop(NumItems: Byte);
     
     if NumItems > 1 then
       begin
-      GenNew($83); Gen($C4); Gen(SizeOf(LongInt) * (NumItems - 1));                     // add esp, 4 * (NumItems - 1)
+      GenNew($81); Gen($C4); GenDWord(SizeOf(LongInt) * (NumItems - 1));                // add esp, 4 * (NumItems - 1)
       end;
       
     Result := TRUE;
@@ -1159,7 +1159,7 @@ procedure DiscardStackTop(NumItems: Byte);
 begin  // DiscardStackTop
 if not OptimizeDiscardStackTop then
   begin
-  GenNew($83); Gen($C4); Gen(SizeOf(LongInt) * NumItems);                               // add esp, 4 * NumItems
+  GenNew($81); Gen($C4); GenDWord(SizeOf(LongInt) * NumItems);                          // add esp, 4 * NumItems
   end
 end;
 
@@ -1168,7 +1168,7 @@ end;
 
 procedure DiscardStackTopAt(Pos: LongInt; NumItems: Byte);
 begin
-GenAt(Pos, $83); GenAt(Pos + 1, $C4); GenAt(Pos + 2, SizeOf(LongInt) * NumItems);       // add esp, 4 * NumItems
+GenAt(Pos, $81); GenAt(Pos + 1, $C4); GenDWordAt(Pos + 2, SizeOf(LongInt) * NumItems);  // add esp, 4 * NumItems
 end;
 
 

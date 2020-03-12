@@ -187,6 +187,8 @@ type
   
   TRelocType = (EMPTYRELOC, CODERELOC, INITDATARELOC, UNINITDATARELOC, IMPORTRELOC);
   
+  TCallConv = (DEFAULTCONV, STDCALLCONV, CDECLCONV);
+  
   TPredefProc = 
     (
     EMPTYPROC,
@@ -230,7 +232,7 @@ type
     NumDefaultParams: Integer;
     Param: PParams;
     ResultType: Integer;
-    IsStdCall: Boolean;
+    CallConv: TCallConv;
   end;      
 
   TIdentifier = record
@@ -813,8 +815,8 @@ function GetTotalParamSize(const Signature: TSignature; IsMethod, AlwaysTreatStr
 var
   i: Integer;
 begin
-if Signature.IsStdCall and IsMethod then
-  Error('Internal fault: Methods cannot be STDCALL');
+if (Signature.CallConv <> DEFAULTCONV) and IsMethod then
+  Error('Internal fault: Methods cannot be STDCALL/CDECL');
   
 Result := 0;
   
@@ -827,7 +829,7 @@ if (Signature.ResultType <> 0) and (Types[Signature.ResultType].Kind in Structur
   Result := Result + SizeOf(LongInt);
   
 // Any parameter occupies 4 bytes (except structures in the C stack)
-if Signature.IsStdCall and not AlwaysTreatStructuresAsReferences then
+if (Signature.CallConv <> DEFAULTCONV) and not AlwaysTreatStructuresAsReferences then
   for i := 1 to Signature.NumParams do
     if Signature.Param[i]^.PassMethod = VALPASSING then
       Result := Result + Align(TypeSize(Signature.Param[i]^.DataType), SizeOf(LongInt))
@@ -1017,8 +1019,8 @@ for i := 1 to Signature1.NumParams do
 if Signature1.ResultType <> Signature2.ResultType then
   Error('Incompatible result types in ' + Name + ': ' + GetTypeSpelling(Signature1.ResultType) + ' and ' + GetTypeSpelling(Signature2.ResultType));
   
-if Signature1.IsStdCall <> Signature2.IsStdCall then
-  Error('STDCALL is incompatible with non-STDCALL in ' + Name);
+if Signature1.CallConv <> Signature2.CallConv then
+  Error('Incompatible calling convention in ' + Name);
 
 end;
 
