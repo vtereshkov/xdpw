@@ -2181,17 +2181,21 @@ case Tok.Kind of
         USERTYPE:                                                                       // Type cast
           begin                                                                      
           NextTok;
-          EatTok(OPARTOK);
           
+          EatTok(OPARTOK);
           CompileExpression(ValType);
+          EatTok(CPARTOK);
 
           if (Ident[IdentIndex].DataType <> ValType) and 
              not ((Types[Ident[IdentIndex].DataType].Kind in CastableTypes) and (Types[ValType].Kind in CastableTypes)) 
           then
             Error('Invalid typecast');            
-           
-          EatTok(CPARTOK);
+                     
           ValType := Ident[IdentIndex].DataType;
+          
+          if (Types[ValType].Kind = POINTERTYPE) and (Types[Types[ValType].BaseType].Kind in StructuredTypes) then
+            DereferencePointerAsDesignator(ValType, FALSE);
+          
           CompileSelectors(ValType);  
           end
           
