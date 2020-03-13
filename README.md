@@ -87,9 +87,11 @@ VarDeclarations = "var" IdentList ":" Type ["=" Initializer] ";"
 
 ProcFuncDeclarations = ("procedure" | "function") Ident 
                        [Receiver] [FormalParams] [":" TypeIdent] 
-                       ["stdcall"] ";" [(Directive | Block) ";"] .
+                       [CallModifier] ";" [(Directive | Block) ";"] .
 
 Receiver = "for" Ident ":" TypeIdent .
+
+CallModifier = "stdcall" | "cdecl" .
 
 Directive = "forward" | "external" ConstExpression .         
 
@@ -112,7 +114,7 @@ Type = "(" Ident {"," Ident} ")" |
        ["packed"] "string" [ "[" ConstExpression "]" ] |
        ["packed"] "file" ["of" Type] |
        ConstExpression ".." ConstExpression |
-       ("procedure" | "function") [FormalParams] [":" TypeIdent] ["stdcall"] |
+       ("procedure" | "function") [FormalParams] [":" TypeIdent] [CallModifier] |
        Ident .
        
 Fields = FixedFields 

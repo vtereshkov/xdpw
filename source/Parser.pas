@@ -1523,7 +1523,7 @@ procedure CompileActualParameters(const Signature: TSignature; var StructuredRes
   CompileExpression(ValType);
   
   // Copy structured parameter passed by value (for STDCALL/CDECL functions there is no need to do it here since it will be done in MakeCStack)
-  if (Types[ValType].Kind in StructuredTypes) and not (CallConv <> DEFAULTCONV) then
+  if (Types[ValType].Kind in StructuredTypes) and (CallConv <> DEFAULTCONV) then
     begin
     SaveStackTopToEAX; 
     TempStorageAddr := AllocateTempStorage(TypeSize(ValType));
@@ -1551,14 +1551,15 @@ var
   CurParam: PParam;
   
 begin
-// Allocate space for structured Result as a hidden VAR parameter
-if (Signature.ResultType <> 0) and (Types[Signature.ResultType].Kind in StructuredTypes) then
-  begin
-  StructuredResultAddr := AllocateTempStorage(TypeSize(Signature.ResultType));
-  PushTempStoragePtr(StructuredResultAddr);
-  end
-else
-  StructuredResultAddr := 0;  
+// Allocate space for structured Result as a hidden VAR parameter (except STDCALL/CDECL functions returning small structures in EDX:EAX)
+with Signature do
+  if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and ((CallConv = DEFAULTCONV) or (TypeSize(ResultType) > 2 * SizeOf(LongInt))) then
+    begin
+    StructuredResultAddr := AllocateTempStorage(TypeSize(ResultType));
+    PushTempStoragePtr(StructuredResultAddr);
+    end
+  else
+    StructuredResultAddr := 0;  
 
 NumActualParams := 0;
 
@@ -1633,9 +1634,10 @@ for ParamIndex := Signature.NumParams downto 1 do
   with Signature.Param[ParamIndex]^ do
     PushToCStack((Signature.NumParams - ParamIndex) * SizeOf(LongInt), DataType, PassMethod = VALPASSING);
 
-// Push structured Result onto the C stack 
-if (Signature.ResultType <> 0) and (Types[Signature.ResultType].Kind in StructuredTypes) then
-  PushToCStack(Signature.NumParams * SizeOf(LongInt), Signature.ResultType, FALSE);
+// Push structured Result onto the C stack, except STDCALL/CDECL functions returning small structures in EDX:EAX
+with Signature do 
+  if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and ((CallConv = DEFAULTCONV) or (TypeSize(ResultType) > 2 * SizeOf(LongInt))) then
+    PushToCStack(NumParams * SizeOf(LongInt), ResultType, FALSE);
 end; // MakeCStack
 
 
@@ -1665,13 +1667,21 @@ if (Ident[IdentIndex].Signature.CallConv = CDECLCONV) and (TotalPascalParamSize 
 if (Ident[IdentIndex].Signature.CallConv <> DEFAULTCONV) and (TotalPascalParamSize > 0) then
   DiscardStackTop(TotalPascalParamSize div SizeOf(LongInt));
 
-// Save structured result pointer to EAX (not all external functions do it themselves)
 with Ident[IdentIndex].Signature do
   if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and (CallConv <> DEFAULTCONV) then
-    begin
-    PushTempStoragePtr(StructuredResultAddr);
-    SaveStackTopToEAX;
-    end;
+    if TypeSize(ResultType) <= 2 * SizeOf(LongInt) then
+      begin     
+      // For small structures returned by STDCALL/CDECL functions, allocate structured result pointer and load structure from EDX:EAX
+      StructuredResultAddr := AllocateTempStorage(TypeSize(ResultType));
+      ConvertSmallStructureToPointer(StructuredResultAddr, TypeSize(ResultType));
+      end
+    else  
+      begin
+      // Save structured result pointer to EAX (not all external functions do it themselves)
+      PushTempStoragePtr(StructuredResultAddr);
+      SaveStackTopToEAX;
+      end;
+      
 end; // CompileCall
 
 
@@ -1738,13 +1748,21 @@ if (Types[ProcVarType].Signature.CallConv <> DEFAULTCONV) and (TotalPascalParamS
 // Remove call address
 DiscardStackTop(1);  
 
-// Save structured result pointer to EAX (not all external functions do it themselves)
 with Types[ProcVarType].Signature do
   if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and (CallConv <> DEFAULTCONV) then
-    begin
-    PushTempStoragePtr(StructuredResultAddr);
-    SaveStackTopToEAX;
-    end;
+    if TypeSize(ResultType) <= 2 * SizeOf(LongInt) then
+      begin
+      // For small structures returned by STDCALL/CDECL functions, allocate structured result pointer and load structure from EDX:EAX
+      StructuredResultAddr := AllocateTempStorage(TypeSize(ResultType));
+      ConvertSmallStructureToPointer(StructuredResultAddr, TypeSize(ResultType));
+      end
+    else  
+      begin
+      // Save structured result pointer to EAX (not all external functions do it themselves)
+      PushTempStoragePtr(StructuredResultAddr);
+      SaveStackTopToEAX;
+      end;
+      
 end; // CompileIndirectCall
 
 
@@ -3011,7 +3029,8 @@ case Tok.Kind of
               // Push pointer to Result
               PushVarIdentPtr(Ident[IdentIndex].ResultIdentIndex);              
               DesignatorType := Ident[Ident[IdentIndex].ResultIdentIndex].DataType;
-              if Types[DesignatorType].Kind in StructuredTypes then 
+              
+              if Ident[Ident[IdentIndex].ResultIdentIndex].PassMethod = VARPASSING then
                 DerefPtr(POINTERTYPEINDEX);                        
 
               CompileAssignment(DesignatorType);
@@ -3992,10 +4011,11 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     
     procedure DeclareResult;
     begin
-    if Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes then    // For functions returning structured variables, Result is a hidden VAR parameter 
-      DeclareIdent('RESULT', VARIABLE, TotalParamSize, FALSE, Ident[BlockIdentIndex].Signature.ResultType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0)
-    else                                                                                  // Otherwise, Result is a hidden local variable
-      DeclareIdent('RESULT', VARIABLE, 0, FALSE, Ident[BlockIdentIndex].Signature.ResultType, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+    with Ident[BlockIdentIndex].Signature do
+      if (Types[ResultType].Kind in StructuredTypes) and ((CallConv = DEFAULTCONV) or (TypeSize(ResultType) > 2 * SizeOf(LongInt))) then    // For functions returning structured variables, Result is a hidden VAR parameter 
+        DeclareIdent('RESULT', VARIABLE, TotalParamSize, FALSE, ResultType, VARPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0)
+      else                                                                                  // Otherwise, Result is a hidden local variable
+        DeclareIdent('RESULT', VARIABLE, 0, FALSE, ResultType, EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
       
     Ident[BlockIdentIndex].ResultIdentIndex := NumIdent;
     end; // DeclareResult
@@ -4007,8 +4027,8 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   // For procedures and functions, declare parameters and the Result variable
   
   // Default calling convention: ([var Self,] [var Result,] Parameter1, ... ParameterN)
-  // STDCALL calling convention: (ParameterN, ... Parameter1, [, var Result])
-  // CDECL calling convention:   (ParameterN, ... Parameter1, [, var Result]), caller clears the stack
+  // STDCALL calling convention: (ParameterN, ... Parameter1, [, var Result]), small structures returned in EDX:EAX
+  // CDECL calling convention:   (ParameterN, ... Parameter1, [, var Result]), small structures returned in EDX:EAX, caller clears the stack
   
   if BlockStack[BlockStackTop].Index <> 1 then             
     begin
@@ -4232,10 +4252,19 @@ else
     begin
     PushVarIdentPtr(Ident[BlockIdentIndex].ResultIdentIndex);
     if Types[Ident[BlockIdentIndex].Signature.ResultType].Kind in StructuredTypes then
-      DerefPtr(POINTERTYPEINDEX)
+      begin
+      if Ident[Ident[BlockIdentIndex].ResultIdentIndex].PassMethod = VARPASSING then
+        DerefPtr(POINTERTYPEINDEX);
+      end
     else  
       DerefPtr(Ident[BlockIdentIndex].Signature.ResultType);
+      
     SaveStackTopToEAX;
+    
+    // In STDCALL/CDECL functions, return small structure in EDX:EAX
+    with Ident[BlockIdentIndex].Signature do
+      if (Types[ResultType].Kind in StructuredTypes) and (CallConv <> DEFAULTCONV) and (TypeSize(ResultType) <= 2 * SizeOf(LongInt)) then
+        ConvertPointerToSmallStructure(TypeSize(ResultType));    
     end;
 
   if BlockStack[BlockStackTop].Index = 1 then          // Main program

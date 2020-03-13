@@ -50,6 +50,8 @@ procedure GenerateStructuredAssignment(DesignatorType: Integer);
 procedure GenerateInterfaceFieldAssignment(Offset: Integer; PopValueFromStack: Boolean; Value: LongInt; RelocType: TRelocType);
 procedure InitializeCStack;
 procedure PushToCStack(SourceStackDepth: Integer; DataType: Integer; PushByValue: Boolean);
+procedure ConvertSmallStructureToPointer(Addr: LongInt; Size: LongInt);
+procedure ConvertPointerToSmallStructure(Size: LongInt);
 procedure GenerateImportFuncStub(EntryPoint: LongInt);
 procedure GenerateCall(EntryPoint: LongInt; CallerNesting, CalleeNesting: Integer);
 procedure GenerateIndirectCall(CallAddressDepth: Integer);
@@ -1833,6 +1835,46 @@ else
   end; 
 end;
 
+
+
+
+procedure ConvertSmallStructureToPointer(Addr: LongInt; Size: LongInt);
+begin
+// Converts a small structure in EDX:EAX into a pointer in EAX
+if Size <= SizeOf(LongInt) then
+  begin
+  GenNew($89); Gen($85); GenDWord(Addr);                                        // mov [ebp + Addr], eax
+  end
+else if Size <= 2 * SizeOf(LongInt) then
+  begin
+  GenNew($89); Gen($85); GenDWord(Addr);                                        // mov [ebp + Addr], eax
+  GenNew($89); Gen($95); GenDWord(Addr + SizeOf(LongInt));                      // mov [ebp + Addr + 4], edx  
+  end
+else
+  Error('Internal fault: Structure is too large to return in EDX:EAX');
+  
+GenNew($8D); Gen($85); GenDWord(Addr);                                          // lea eax, [ebp + Addr]  
+end;
+
+
+
+
+procedure ConvertPointerToSmallStructure(Size: LongInt);
+begin
+// Converts a pointer in EAX into a small structure in EDX:EAX 
+if Size <= SizeOf(LongInt) then
+  begin
+  GenNew($8B); Gen($00);                                                        // mov eax, [eax]
+  end
+else if Size <= 2 * SizeOf(LongInt) then
+  begin
+  GenNew($8B); Gen($50); Gen(Byte(SizeOf(LongInt)));                            // mov edx, [eax + 4]
+  GenNew($8B); Gen($00);                                                        // mov eax, [eax]  
+  end
+else
+  Error('Internal fault: Structure is too large to return in EDX:EAX');
+end;
+ 
 
 
 

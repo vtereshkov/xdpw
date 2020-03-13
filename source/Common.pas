@@ -824,9 +824,10 @@ Result := 0;
 if IsMethod then
   Result := Result + SizeOf(LongInt);
 
-// For a function returning a structure, Result is a hidden VAR parameter
-if (Signature.ResultType <> 0) and (Types[Signature.ResultType].Kind in StructuredTypes) then
-  Result := Result + SizeOf(LongInt);
+// Allocate space for structured Result as a hidden VAR parameter (except STDCALL/CDECL functions returning small structures in EDX:EAX)
+with Signature do
+  if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and ((CallConv = DEFAULTCONV) or (TypeSize(ResultType) > 2 * SizeOf(LongInt))) then
+    Result := Result + SizeOf(LongInt);
   
 // Any parameter occupies 4 bytes (except structures in the C stack)
 if (Signature.CallConv <> DEFAULTCONV) and not AlwaysTreatStructuresAsReferences then
