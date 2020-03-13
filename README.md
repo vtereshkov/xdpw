@@ -8,7 +8,7 @@ _Dedicated to my father Mikhail Tereshkov, who instilled in me a taste for engin
 XD Pascal is a small embeddable self-hosting compiler for a Pascal language dialect. Any comments, suggestions, or bug reports are appreciated. Feel free to contact the author on GitHub or by e-mail VTereshkov@mail.ru. Enjoy.
 
 ### Features
-* [__Go-style methods and interfaces__](https://medium.com/@vtereshkov/how-i-implemented-go-style-interfaces-in-my-own-pascal-compiler-a0f8d37cd297?source=friends_link&sk=72a20752cb866c716daac13abc1fab22)
+* [Go-style methods and interfaces](https://medium.com/@vtereshkov/how-i-implemented-go-style-interfaces-in-my-own-pascal-compiler-a0f8d37cd297?source=friends_link&sk=72a20752cb866c716daac13abc1fab22)
 * Native x86 code generation (32 bit Windows executables)
 * Support for both console and GUI applications
 * No external assembler or linker needed
