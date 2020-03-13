@@ -4158,7 +4158,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   while (NumIdent > 0) and (Ident[NumIdent].Block = BlockStack[BlockStackTop].Index) do
     begin
     // Warn if not used
-    if not Ident[NumIdent].IsUsed and (Ident[NumIdent].Kind = VARIABLE) and (Ident[NumIdent].PassMethod = EMPTYPASSING) then
+    if not Ident[NumIdent].IsUsed and not Ident[NumIdent].IsExported and (Ident[NumIdent].Kind = VARIABLE) and (Ident[NumIdent].PassMethod = EMPTYPASSING) then
       Warning('Variable ' + Ident[NumIdent].Name + ' is not used');
   
     // If procedure or function, delete parameters first
