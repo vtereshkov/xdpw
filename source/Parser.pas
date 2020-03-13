@@ -1523,7 +1523,7 @@ procedure CompileActualParameters(const Signature: TSignature; var StructuredRes
   CompileExpression(ValType);
   
   // Copy structured parameter passed by value (for STDCALL/CDECL functions there is no need to do it here since it will be done in MakeCStack)
-  if (Types[ValType].Kind in StructuredTypes) and (CallConv <> DEFAULTCONV) then
+  if (Types[ValType].Kind in StructuredTypes) and (CallConv = DEFAULTCONV) then
     begin
     SaveStackTopToEAX; 
     TempStorageAddr := AllocateTempStorage(TypeSize(ValType));
@@ -2212,9 +2212,15 @@ case Tok.Kind of
           ValType := Ident[IdentIndex].DataType;
           
           if (Types[ValType].Kind = POINTERTYPE) and (Types[Types[ValType].BaseType].Kind in StructuredTypes) then
-            DereferencePointerAsDesignator(ValType, FALSE);
-          
-          CompileSelectors(ValType);  
+            begin
+            if DereferencePointerAsDesignator(ValType, FALSE) then
+              begin
+              CompileSelectors(ValType);
+              CompileDereferenceOrCall(ValType);
+              end
+            end             
+          else  
+            CompileSelectors(ValType); 
           end
           
       else
