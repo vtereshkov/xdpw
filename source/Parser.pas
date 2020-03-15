@@ -1960,14 +1960,37 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
     OBRACKETTOK:                                      // Array element access
       begin
       repeat
+        // Convert a pointer to an array if needed (C style)
+        if (Types[ValType].Kind = POINTERTYPE) and (Types[ValType].BaseType <> ANYTYPEINDEX) then
+          begin
+          DerefPtr(ValType);
+          
+          // Add new anonymous type 0..0 for array index
+          DeclareType(SUBRANGETYPE);
+          
+          Types[NumTypes].BaseType    := INTEGERTYPEINDEX;
+          Types[NumTypes].Low         := 0;
+          Types[NumTypes].High        := 0;
+          
+          // Add new anonymous type for array itself
+          DeclareType(ARRAYTYPE);
+          
+          Types[NumTypes].BaseType    := Types[ValType].BaseType;
+          Types[NumTypes].IndexType   := NumTypes - 1;
+
+          ValType := NumTypes;   
+          end;
+          
         if Types[ValType].Kind <> ARRAYTYPE then
           Error('Array expected');
+          
         NextTok;
         CompileExpression(ArrayIndexType);            // Array index
         GetCompatibleType(ArrayIndexType, Types[ValType].IndexType);
         GetArrayElementPtr(ValType);
         ValType := Types[ValType].BaseType;
       until Tok.Kind <> COMMATOK;
+      
       EatTok(CBRACKETTOK);
       end;
       
