@@ -129,12 +129,12 @@ type
   case Kind: TTokenKind of
     IDENTTOK:         (NonUppercaseName: TShortString);  
     INTNUMBERTOK:     (OrdValue: LongInt);                   // For all ordinal types
-    REALNUMBERTOK:    (RealValue: Single);
+    REALNUMBERTOK:    (RealValue: Double);
     STRINGLITERALTOK: (StrAddress: Integer;
                        StrLength: Integer);
   end;
   
-  TTypeKind = (EMPTYTYPE, ANYTYPE, INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE, CHARTYPE, BOOLEANTYPE, REALTYPE,
+  TTypeKind = (EMPTYTYPE, ANYTYPE, INTEGERTYPE, SMALLINTTYPE, SHORTINTTYPE, WORDTYPE, BYTETYPE, CHARTYPE, BOOLEANTYPE, REALTYPE, SINGLETYPE,
                POINTERTYPE, FILETYPE, ARRAYTYPE, RECORDTYPE, INTERFACETYPE, SETTYPE, ENUMERATEDTYPE, SUBRANGETYPE, 
                PROCEDURALTYPE, METHODTYPE, FORWARDTYPE);  
 
@@ -150,10 +150,11 @@ const
   BYTETYPEINDEX         = 6;  
   CHARTYPEINDEX         = 7;
   BOOLEANTYPEINDEX      = 8;
-  REALTYPEINDEX         = 9;
-  POINTERTYPEINDEX      = 10;     // Untyped pointer, compatible with any other pointers
-  FILETYPEINDEX         = 11;     // Untyped file, compatible with text files
-  STRINGTYPEINDEX       = 12;     // String of maximum allowed length
+  REALTYPEINDEX         = 9;      // Basic real type: 64-bit double
+  SINGLETYPEINDEX       = 10;
+  POINTERTYPEINDEX      = 11;     // Untyped pointer, compatible with any other pointers
+  FILETYPEINDEX         = 12;     // Untyped file, compatible with text files
+  STRINGTYPEINDEX       = 13;     // String of maximum allowed length
 
 
 
@@ -163,7 +164,8 @@ type
   TConst = packed record
   case Kind: TTypeKind of
     INTEGERTYPE: (OrdValue: LongInt);         // For all ordinal types 
-    REALTYPE:    (RealValue: Single);
+    REALTYPE:    (RealValue: Double);
+    SINGLETYPE:  (SingleValue: Single);
     ARRAYTYPE:   (StrValue: TShortString);
     SETTYPE:     (SetValue: TByteSet);        // For all set types    
   end;   
@@ -588,6 +590,7 @@ case Types[DataType].Kind of
   CHARTYPE:       Result := 'character';
   BOOLEANTYPE:    Result := 'Boolean';
   REALTYPE:       Result := 'real';
+  SINGLETYPE:     Result := 'single-precision real';
   POINTERTYPE:    begin
                   Result := 'pointer';
                   if Types[Types[DataType].BaseType].Kind <> ANYTYPE then
@@ -770,7 +773,8 @@ case Types[DataType].Kind of
   BYTETYPE:                  Result := SizeOf(Byte);  
   CHARTYPE:                  Result := SizeOf(TCharacter);
   BOOLEANTYPE:               Result := SizeOf(Boolean);
-  REALTYPE:                  Result := SizeOf(Single);
+  REALTYPE:                  Result := SizeOf(Double);
+  SINGLETYPE:                Result := SizeOf(Single);
   POINTERTYPE:               Result := SizeOf(Pointer);
   FILETYPE:                  Result := SizeOf(TString) + SizeOf(Integer);  // Name + Handle
   SUBRANGETYPE:              Result := TypeSize(Types[DataType].BaseType);
@@ -834,10 +838,14 @@ if (Signature.CallConv <> DEFAULTCONV) and not AlwaysTreatStructuresAsReferences
   for i := 1 to Signature.NumParams do
     if Signature.Param[i]^.PassMethod = VALPASSING then
       Result := Result + Align(TypeSize(Signature.Param[i]^.DataType), SizeOf(LongInt))
-    else
+    else  
       Result := Result + SizeOf(LongInt)
 else
-  Result := Result + Signature.NumParams * SizeOf(LongInt);
+  for i := 1 to Signature.NumParams do
+    if (Signature.Param[i]^.PassMethod = VALPASSING) and (Types[Signature.Param[i]^.DataType].Kind = REALTYPE) then
+      Result := Result + SizeOf(Double)
+    else  
+      Result := Result + SizeOf(LongInt);
        
 end; // GetTotalParamSize   
 

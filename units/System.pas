@@ -30,7 +30,7 @@ const
   
   // Other constants
   
-  Pi                    = 3.1415927;
+  Pi                    = 3.141592653589793;
   MaxStrLength          = 255;
   MaxSetElements        = 256;
   MaxSetIndex           = MaxSetElements div 32 - 1;
@@ -39,7 +39,6 @@ const
 
 type
   LongInt = Integer;  
-  Single = Real;
   Double = Real;
   Extended = Real;
   Text = file;  
@@ -186,6 +185,7 @@ procedure ReadWord(var F: file; P: PStream; var Number: Word);
 procedure ReadByte(var F: file; P: PStream; var Number: Byte);
 procedure ReadBoolean(var F: file; P: PStream; var Value: Boolean);
 procedure ReadReal(var F: file; P: PStream; var Number: Real);
+procedure ReadSingle(var F: file; P: PStream; var Number: Single);
 procedure ReadString(var F: file; P: PStream; var s: string);
 procedure ReadNewLine(var F: file; P: PStream);
 function UpCase(ch: Char): Char;
@@ -720,7 +720,7 @@ end;
 
 procedure WriteReal(var F: file; P: PStream; Number: Real; DecPlaces: Integer);
 const
-  MaxDecPlaces = 7;
+  MaxDecPlaces = 16;
   
 var
   Integ, Digit, IntegExpon: Integer;
@@ -1052,6 +1052,17 @@ if (Ch = 'E') or (Ch = 'e') then     // Exponent found
      
 if Expon <> 0 then Number := Number * exp(Expon * ln(10));
 if Negative then Number := -Number;
+end;
+
+
+
+
+procedure ReadSingle(var F: file; P: PStream; var Number: Single);
+var
+  RealNumber: Real;
+begin
+ReadReal(F, P, RealNumber);
+Number := RealNumber;
 end;
 
 

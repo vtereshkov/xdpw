@@ -44,7 +44,7 @@ procedure CompileType(var DataType: Integer); forward;
 
 
 procedure DeclareIdent(const IdentName: TString; IdentKind: TIdentKind; TotalParamDataSize: Integer; IdentIsInCStack: Boolean; IdentDataType: Integer; IdentPassMethod: TPassMethod; 
-                       IdentOrdConstValue: LongInt; IdentRealConstValue: Single; const IdentStrConstValue: TString; const IdentSetConstValue: TByteSet;
+                       IdentOrdConstValue: LongInt; IdentRealConstValue: Double; const IdentStrConstValue: TString; const IdentSetConstValue: TByteSet;
                        IdentPredefProc: TPredefProc; const IdentReceiverName: TString; IdentReceiverType: Integer);
 var
   i, AdditionalStackItems, IdentTypeSize: Integer;
@@ -115,7 +115,7 @@ case IdentKind of
        end;// else
 
      LOCAL:
-       if TotalParamDataSize > 0 then               // Declare parameter (always 4 bytes, except structures in the C stack)
+       if TotalParamDataSize > 0 then               // Declare parameter (always 4 bytes, except structures in the C stack and doubles)
          begin          
          if Ident[NumIdent].NestingLevel = 2 then                                            // Inside a non-nested routine
            AdditionalStackItems := 1                                                         // Return address
@@ -124,7 +124,7 @@ case IdentKind of
 
          with BlockStack[BlockStackTop] do
            begin
-           if IdentIsInCStack and (IdentPassMethod = VALPASSING) then           
+           if (IdentIsInCStack or (Types[IdentDataType].Kind = REALTYPE)) and (IdentPassMethod = VALPASSING) then           
              IdentTypeSize := Align(TypeSize(IdentDataType), SizeOf(LongInt))
            else
              IdentTypeSize := SizeOf(LongInt);
@@ -225,6 +225,7 @@ DeclareIdent('BYTE',     USERTYPE, 0, FALSE, BYTETYPEINDEX,     EMPTYPASSING, 0,
 DeclareIdent('CHAR',     USERTYPE, 0, FALSE, CHARTYPEINDEX,     EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
 DeclareIdent('BOOLEAN',  USERTYPE, 0, FALSE, BOOLEANTYPEINDEX,  EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
 DeclareIdent('REAL',     USERTYPE, 0, FALSE, REALTYPEINDEX,     EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
+DeclareIdent('SINGLE',   USERTYPE, 0, FALSE, SINGLETYPEINDEX,   EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
 DeclareIdent('POINTER',  USERTYPE, 0, FALSE, POINTERTYPEINDEX,  EMPTYPASSING, 0, 0.0, '', [], EMPTYPROC, '', 0);
 
 // Procedures
@@ -277,6 +278,7 @@ Types[BYTETYPEINDEX].Kind     := BYTETYPE;
 Types[CHARTYPEINDEX].Kind     := CHARTYPE;
 Types[BOOLEANTYPEINDEX].Kind  := BOOLEANTYPE;
 Types[REALTYPEINDEX].Kind     := REALTYPE;
+Types[SINGLETYPEINDEX].Kind   := SINGLETYPE;
 Types[POINTERTYPEINDEX].Kind  := POINTERTYPE;
 Types[FILETYPEINDEX].Kind     := FILETYPE;
 Types[STRINGTYPEINDEX].Kind   := ARRAYTYPE;
@@ -331,7 +333,7 @@ end; // PushVarIdentPtr
 procedure ConvertConstIntegerToReal(DestType: Integer; var SrcType: Integer; var ConstVal: TConst);
 begin
 // Try to convert an integer (right-hand side) into a real
-if (Types[DestType].Kind = REALTYPE) and
+if (Types[DestType].Kind in [REALTYPE, SINGLETYPE]) and
    ((Types[SrcType].Kind in IntegerTypes) or 
    ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind in IntegerTypes)))
 then
@@ -347,15 +349,51 @@ end; // ConvertConstIntegerToReal
 procedure ConvertIntegerToReal(DestType: Integer; var SrcType: Integer; Depth: Integer);
 begin
 // Try to convert an integer (right-hand side) into a real
-if (Types[DestType].Kind = REALTYPE) and
+if (Types[DestType].Kind in [REALTYPE, SINGLETYPE]) and
    ((Types[SrcType].Kind in IntegerTypes) or 
    ((Types[SrcType].Kind = SUBRANGETYPE) and (Types[Types[SrcType].BaseType].Kind in IntegerTypes)))
 then
   begin
-  GenerateFloat(Depth);
+  GenerateDoubleFromInteger(Depth);
   SrcType := REALTYPEINDEX;
   end;   
 end; // ConvertIntegerToReal
+
+
+
+
+procedure ConvertConstRealToReal(DestType: Integer; var SrcType: Integer; var ConstVal: TConst);
+begin
+// Try to convert a single (right-hand side) into a double or vice versa
+if (Types[DestType].Kind = REALTYPE) and (Types[SrcType].Kind = SINGLETYPE) then
+  begin
+  ConstVal.RealValue := ConstVal.SingleValue;
+  SrcType := REALTYPEINDEX;
+  end
+else if (Types[DestType].Kind = SINGLETYPE) and (Types[SrcType].Kind = REALTYPE) then
+  begin
+  ConstVal.SingleValue := ConstVal.RealValue;
+  SrcType := SINGLETYPEINDEX;
+  end  
+end; // ConvertConstRealToReal
+
+
+
+
+procedure ConvertRealToReal(DestType: Integer; var SrcType: Integer);
+begin
+// Try to convert a single (right-hand side) into a double or vice versa
+if (Types[DestType].Kind = REALTYPE) and (Types[SrcType].Kind = SINGLETYPE) then
+  begin
+  GenerateDoubleFromSingle;
+  SrcType := REALTYPEINDEX;
+  end
+else if (Types[DestType].Kind = SINGLETYPE) and (Types[SrcType].Kind = REALTYPE) then
+  begin
+  GenerateSingleFromDouble;
+  SrcType := SINGLETYPEINDEX;
+  end  
+end; // ConvertRealToReal
 
 
 
@@ -839,6 +877,9 @@ procedure CompilePredefinedProc(proc: TPredefProc; LoopNesting: Integer);
           
     else if Kind = REALTYPE then
       Result := GetIdent('READREAL')                // Real argument
+      
+    else if Kind = SINGLETYPE then
+      Result := GetIdent('READSINGLE')              // Single argument      
           
     else if (Kind = ARRAYTYPE) and (BaseType = CHARTYPEINDEX) then
       Result := GetIdent('READSTRING')              // String argument
@@ -1009,6 +1050,9 @@ case proc of
         else
           begin
           CompileExpression(ExpressionType);
+          
+          // Try to convert single to double
+          ConvertRealToReal(REALTYPEINDEX, ExpressionType);
           
           // Try to convert character to string
           ConvertCharToString(STRINGTYPEINDEX, ExpressionType, 0);
@@ -1584,9 +1628,12 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
 
       Inc(NumActualParams);
 
-      // Try to convert integer to real
+      // Try to convert integer to double, single to double or double to single 
       if CurParam^.PassMethod <> VARPASSING then
+        begin
         ConvertIntegerToReal(CurParam^.DataType, ActualParamType, 0);
+        ConvertRealToReal(CurParam^.DataType, ActualParamType);
+        end;        
        
       // Try to convert character to string
       ConvertCharToString(CurParam^.DataType, ActualParamType, 0);      
@@ -2153,8 +2200,10 @@ procedure CompileFactor(var ValType: Integer);
     PushFunctionResult(ValType);
     end       
   else                         // Usual variable
-    if not (Types[ValType].Kind in StructuredTypes) then // Structured expressions are stored as pointers to them
+    if not (Types[ValType].Kind in StructuredTypes) then  // Structured expressions are stored as pointers to them
       DerefPtr(ValType);
+      
+  ConvertRealToReal(REALTYPEINDEX, ValType);              // Real expressions must be double, not single            
   end; // CompileDereferenceOrCall
   
   
@@ -2194,7 +2243,8 @@ case Tok.Kind of
             
             CompileCall(IdentIndex);
             PushFunctionResult(ValType);
-            
+            ConvertRealToReal(REALTYPEINDEX, ValType);              // Real expressions must be double, not single            
+
             if (Types[ValType].Kind in StructuredTypes) or DereferencePointerAsDesignator(ValType, FALSE) then
               begin
               CompileSelectors(ValType);
@@ -2212,6 +2262,8 @@ case Tok.Kind of
           begin
           if Types[Ident[IdentIndex].DataType].Kind in StructuredTypes then
             PushVarPtr(Ident[IdentIndex].Address, GLOBAL, 0, INITDATARELOC)
+          else if Types[Ident[IdentIndex].DataType].Kind = REALTYPE then
+            PushRealConst(Ident[IdentIndex].ConstVal.RealValue)
           else            
             PushConst(Ident[IdentIndex].ConstVal.OrdValue);
             
@@ -2300,7 +2352,7 @@ case Tok.Kind of
 
   REALNUMBERTOK:
     begin
-    PushConst(Tok.OrdValue);
+    PushRealConst(Tok.RealValue);
     ValType := REALTYPEINDEX;
     NextTok;
     end;
@@ -2384,13 +2436,13 @@ while Tok.Kind in MultiplicativeOperators do
 
   // Try to convert integer to real
   ConvertIntegerToReal(ValType, RightValType, 0);
-  ConvertIntegerToReal(RightValType, ValType, SizeOf(Single));
+  ConvertIntegerToReal(RightValType, ValType, SizeOf(Double));
   
   // Special case: real division of two integers
   if OpTok.Kind = DIVTOK then
     begin
     ConvertIntegerToReal(REALTYPEINDEX, RightValType, 0);
-    ConvertIntegerToReal(REALTYPEINDEX, ValType, SizeOf(Single));
+    ConvertIntegerToReal(REALTYPEINDEX, ValType, SizeOf(Double));
     end;
     
   // Special case: set intersection  
@@ -2458,7 +2510,7 @@ while Tok.Kind in AdditiveOperators do
 
   // Try to convert integer to real
   ConvertIntegerToReal(ValType, RightValType, 0);
-  ConvertIntegerToReal(RightValType, ValType, SizeOf(Single));
+  ConvertIntegerToReal(RightValType, ValType, SizeOf(Double));
     
   // Try to convert character to string
   ConvertCharToString(ValType, RightValType, 0);
@@ -2529,7 +2581,7 @@ if Tok.Kind in RelationOperators then
 
   // Try to convert integer to real
   ConvertIntegerToReal(ValType, RightValType, 0);
-  ConvertIntegerToReal(RightValType, ValType, SizeOf(Single));
+  ConvertIntegerToReal(RightValType, ValType, SizeOf(Double));
     
   // Try to convert character to string
   ConvertCharToString(ValType, RightValType, 0);
@@ -2660,8 +2712,9 @@ procedure CompileStatement(LoopNesting: Integer);
 
   CompileExpression(ExpressionType);
   
-  // Try to convert integer to real
+  // Try to convert integer to double, single to double or double to single
   ConvertIntegerToReal(DesignatorType, ExpressionType, 0);
+  ConvertRealToReal(DesignatorType, ExpressionType);
     
   // Try to convert character to string
   ConvertCharToString(DesignatorType, ExpressionType, 0);    
@@ -3633,16 +3686,19 @@ procedure CompileBlock(BlockIdentIndex: Integer);
     
   begin
   // Numbers
-  if Types[ConstType].Kind in OrdinalTypes + [REALTYPE] then
+  if Types[ConstType].Kind in OrdinalTypes + [REALTYPE, SINGLETYPE] then
     begin
     CompileConstExpression(ConstVal, ConstValType);
 
-    // Try to convert integer to real
-    ConvertConstIntegerToReal(ConstType, ConstValType, ConstVal);          
+    // Try to convert integer to double or double to single
+    ConvertConstIntegerToReal(ConstType, ConstValType, ConstVal);
+    ConvertConstRealToReal(ConstType, ConstValType, ConstVal);          
     GetCompatibleType(ConstType, ConstValType); 
       
     if Types[ConstType].Kind = REALTYPE then
       Move(ConstVal.RealValue, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType))
+    else if Types[ConstType].Kind = SINGLETYPE then 
+      Move(ConstVal.SingleValue, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType)) 
     else
       Move(ConstVal.OrdValue, InitializedGlobalData[InitializedDataOffset], TypeSize(ConstType));
     end
@@ -4289,6 +4345,10 @@ else
       DerefPtr(Ident[BlockIdentIndex].Signature.ResultType);
       
     SaveStackTopToEAX;
+    
+    // Return Double in EDX:EAX
+    if Types[Ident[BlockIdentIndex].Signature.ResultType].Kind = REALTYPE then
+      SaveStackTopToEDX;
     
     // In STDCALL/CDECL functions, return small structure in EDX:EAX
     with Ident[BlockIdentIndex].Signature do

@@ -208,7 +208,7 @@ end;
 
 
 
-procedure ReadSingleLineComment;
+procedure ReadDoubleLineComment;
 begin
 with ScannerState do
   while (ch <> #10) and not EndOfUnit do
@@ -305,7 +305,7 @@ end;
 procedure ReadDecimalNumber;
 var
   Num, Expon, Digit: Integer;
-  Frac, FracWeight: Single;
+  Frac, FracWeight: Double;
   NegExpon, RangeFound, ExponFound: Boolean;
 begin
 with ScannerState do
@@ -538,7 +538,7 @@ with ScannerState do
       begin
       ReadUppercaseChar(ch2);
       if ch2 = '/' then
-        ReadSingleLineComment                                             // Single-line comment
+        ReadDoubleLineComment                                             // Double-line comment
       else
         begin
         if not EndOfUnit then Dec(Buffer.Pos);                            // Discard ch2     
@@ -558,7 +558,7 @@ with ScannerState do
       ReadKeywordOrIdentifier;
     '''':
       ReadCharOrStringLiteral;
-    ':':                              // Single- or double-character tokens
+    ':':                              // Double- or double-character tokens
       begin
       Token.Kind := COLONTOK;
       ReadUppercaseChar(ch);
@@ -603,7 +603,7 @@ with ScannerState do
         ReadUppercaseChar(ch);
         end;
       end
-  else                                // Single-character tokens
+  else                                // Double-character tokens
     case ch of
       '=': Token.Kind := EQTOK;
       ',': Token.Kind := COMMATOK;

@@ -24,6 +24,7 @@ var
 procedure InitializeCodeGen;
 function GetCodeSize: LongInt;
 procedure PushConst(Value: LongInt);
+procedure PushRealConst(Value: Double);
 procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 procedure Relocate(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr, ImportDeltaAddr: Integer);
 procedure PushFunctionResult(ResultType: Integer);
@@ -34,12 +35,16 @@ procedure GetFieldPtr(Offset: Integer);
 procedure GetCharAsTempString(Depth: Integer);
 procedure SaveStackTopToEAX;
 procedure RestoreStackTopFromEAX;
+procedure SaveStackTopToEDX;
+procedure RestoreStackTopFromEDX;
 procedure DiscardStackTop(NumItems: Byte);
 procedure DuplicateStackTop;
 procedure SaveCodePos;
 procedure GenerateIncDec(proc: TPredefProc; Size: Byte; BaseTypeSize: Integer = 0);
 procedure GenerateRound(TruncMode: Boolean);
-procedure GenerateFloat(Depth: Byte);
+procedure GenerateDoubleFromInteger(Depth: Byte);
+procedure GenerateDoubleFromSingle;
+procedure GenerateSingleFromDouble;
 procedure GenerateMathFunction(func: TPredefProc; ResultType: Integer);
 procedure GenerateUnaryOperator(op: TTokenKind; ResultType: Integer);
 procedure GenerateBinaryOperator(op: TTokenKind; ResultType: Integer);
@@ -130,7 +135,7 @@ type
     Pos: array [1..MAXBREAKCALLS] of LongInt;
   end; 
    
-  TRegister = (EAX, ECX, ESI, EDI, EBP);
+  TRegister = (EAX, ECX, EDX, ESI, EDI, EBP);
 
   
 var
@@ -348,6 +353,23 @@ end;
 
 
 
+procedure PushRealConst(Value: Double);
+type
+  TIntegerArray = array [0..1] of LongInt;
+  PIntegerArray = ^TIntegerArray;
+  
+var
+  IntegerArray: PIntegerArray;
+  
+begin
+IntegerArray := PIntegerArray(@Value);
+PushConst(IntegerArray^[1]);
+PushConst(IntegerArray^[0]);
+end;
+
+
+
+
 procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 begin
 GenNew($68); GenRelocDWord(Value, RelocType);            // push Value  ; relocatable
@@ -385,6 +407,7 @@ begin
 case Reg of
   EAX: GenNew($50);            // push eax
   ECX: GenNew($51);            // push ecx
+  EDX: GenNew($52);            // push edx
   ESI: GenNew($56);            // push esi
   EDI: GenNew($57);            // push edi
   EBP: GenNew($55)             // push ebp
@@ -414,6 +437,7 @@ procedure GenPopReg(Reg: TRegister);
   // Optimization: (push Reg) + (pop Reg) -> 0
   if ((Reg = EAX) and (PrevOpCode = $50)) or                                    // Previous: push eax
      ((Reg = ECX) and (PrevOpCode = $51)) or                                    // Previous: push ecx
+     ((Reg = EDX) and (PrevOpCode = $52)) or                                    // Previous: push edx
      ((Reg = ESI) and (PrevOpCode = $56)) or                                    // Previous: push esi      
      ((Reg = EDI) and (PrevOpCode = $57)) or                                    // Previous: push edi      
      ((Reg = EBP) and (PrevOpCode = $55))                                       // Previous: push ebp
@@ -560,33 +584,6 @@ procedure GenPopReg(Reg: TRegister);
     end
     
     
-  // Optimization: (mov eax, [ebp + Value]) + (push eax) + (fld dword ptr [esp]) + (pop eax) -> (fld dword ptr [ebp + Value])
-  else if (Reg = EAX) and (PrevInstrByte(2, 0) = $8B) and (PrevInstrByte(2, 1) = $85)                                 // Previous: mov eax, [ebp + Value]
-                      and (PrevInstrByte(1, 0) = $50)                                                                 // Previous: push eax
-                      and (PrevInstrByte(0, 0) = $D9) and (PrevInstrByte(0, 1) = $04) and (PrevInstrByte(0, 2) = $24) // Previous: fld dword ptr [esp] 
-  then        
-    begin 
-    Value := PrevInstrDWord(2, 2);  
-    RemovePrevInstr(2);                                                       // Remove: mov eax, [ebp + Value], push eax, fld dword ptr [esp]
-    GenNew($D9); Gen($85); GenDWord(Value);                                   // fld dword ptr [ebp + Value]      
-    Result := TRUE;
-    Exit;
-    end    
-    
-    
-  // Optimization: (mov eax, [esi]) + (push eax) + (fld dword ptr [esp]) + (pop eax) -> (fld dword ptr [esi])
-  else if (Reg = EAX) and (PrevInstrByte(2, 0) = $8B) and (PrevInstrByte(2, 1) = $06)                                 // Previous: mov eax, [esi]
-                      and (PrevInstrByte(1, 0) = $50)                                                                 // Previous: push eax
-                      and (PrevInstrByte(0, 0) = $D9) and (PrevInstrByte(0, 1) = $04) and (PrevInstrByte(0, 2) = $24) // Previous: fld dword ptr [esp] 
-  then        
-    begin   
-    RemovePrevInstr(2);                                                       // Remove: mov eax, [esi], push eax, fld dword ptr [esp]
-    GenNew($D9); Gen($06);                                                    // fld dword ptr [esi]      
-    Result := TRUE;
-    Exit;
-    end
-    
-
   // Optimization: (push dword ptr [esp]) + (pop esi) -> (mov esi, [esp])
   else if (Reg = ESI) and (PrevInstrByte(0, 0) = $FF) and (PrevInstrByte(0, 1) = $34) and (PrevInstrByte(0, 2) = $24) // Previous: push dword ptr [esp] 
   then        
@@ -605,6 +602,7 @@ if not OptimizePopReg then
   case Reg of
     EAX: GenNew($58);            // pop eax
     ECX: GenNew($59);            // pop ecx
+    EDX: GenNew($5A);            // pop edx
     ESI: GenNew($5E);            // pop esi
     EDI: GenNew($5F);            // pop edi
     EBP: GenNew($5D)             // pop ebp
@@ -624,11 +622,11 @@ procedure GenPushToFPU;
   begin
   Result := FALSE;
   
-  // Optimization: (fstp dword ptr [esp]) + (fld dword ptr [esp]) -> (fst dword ptr [esp])
-  if (PrevInstrByte(0, 0) = $D9) and (PrevInstrByte(0, 1) = $1C) and (PrevInstrByte(0, 2) = $24) then    // Previous: fstp dword ptr [esp]
+  // Optimization: (fstp qword ptr [esp]) + (fld qword ptr [esp]) -> (fst qword ptr [esp])
+  if (PrevInstrByte(0, 0) = $DD) and (PrevInstrByte(0, 1) = $1C) and (PrevInstrByte(0, 2) = $24) then    // Previous: fstp dword ptr [esp]
     begin
     RemovePrevInstr(0);                                                  // Remove: fstp dword ptr [esp]
-    GenNew($D9); Gen($14); Gen($24);                                     // fst dword ptr [esp]
+    GenNew($DD); Gen($14); Gen($24);                                     // fst qword ptr [esp]
     Result := TRUE;
     end; 
   end;
@@ -637,7 +635,7 @@ procedure GenPushToFPU;
 begin
 if not OptimizeGenPushToFPU then
   begin
-  GenNew($D9); Gen($04); Gen($24);                                       // fld dword ptr [esp]
+  GenNew($DD); Gen($04); Gen($24);                                       // fld qword ptr [esp]
   end;
 end;
 
@@ -646,7 +644,7 @@ end;
 
 procedure GenPopFromFPU;
 begin
-GenNew($D9); Gen($1C); Gen($24);                                         // fstp dword ptr [esp]
+GenNew($DD); Gen($1C); Gen($24);                                         // fstp qword ptr [esp]
 end; 
 
 
@@ -654,7 +652,9 @@ end;
 
 procedure PushFunctionResult(ResultType: Integer);
 begin
-if Types[ResultType].Kind = BOOLEANTYPE then
+if Types[ResultType].Kind = REALTYPE then
+  GenPushReg(EDX)                                                        // push edx
+else if Types[ResultType].Kind = BOOLEANTYPE then
   begin
   GenNew($83); Gen($E0); Gen($01);                                       // and eax, 1
   end
@@ -865,45 +865,53 @@ procedure DerefPtr(DataType: Integer);
     Result := TRUE;
     Exit;
     end;
-
-
-    
+  
   end;
 
 
 begin // DerefPtr
 GenPopReg(ESI);                                                      // pop esi
 
-if not OptimizeDerefPtr then
-  case TypeSize(DataType) of
+if Types[DataType].Kind = REALTYPE then             // Special case: Double
+  begin
+  GenNew($8B); Gen($06);                                                 // mov eax, dword ptr [esi]
+  GenNew($8B); Gen($56); Gen($04);                                       // mov edx, dword ptr [esi + 4]
+  GenPushReg(EDX);                                                       // push edx
+  GenPushReg(EAX);                                                       // push eax
+  end
+else                                                // General rule
+  begin                                                
+  if not OptimizeDerefPtr then
+    case TypeSize(DataType) of
 
-    1: if Types[DataType].Kind in UnsignedTypes then
-         begin
-         GenNew($0F); Gen($B6); Gen($06);                              // movzx eax, byte ptr [esi]
-         end
-       else  
-         begin
-         GenNew($0F); Gen($BE); Gen($06);                              // movsx eax, byte ptr [esi]
-         end; 
+      1: if Types[DataType].Kind in UnsignedTypes then
+           begin
+           GenNew($0F); Gen($B6); Gen($06);                              // movzx eax, byte ptr [esi]
+           end
+         else  
+           begin
+           GenNew($0F); Gen($BE); Gen($06);                              // movsx eax, byte ptr [esi]
+           end; 
+           
+      2: if Types[DataType].Kind in UnsignedTypes then
+           begin
+           GenNew($0F); Gen($B7); Gen($06);                              // movzx eax, word ptr [esi]
+           end
+         else  
+           begin
+           GenNew($0F); Gen($BF); Gen($06);                              // movsx eax, word ptr [esi]
+           end;      
          
-    2: if Types[DataType].Kind in UnsignedTypes then
-         begin
-         GenNew($0F); Gen($B7); Gen($06);                              // movzx eax, word ptr [esi]
+      4: begin
+         GenNew($8B); Gen($06);                                          // mov eax, dword ptr [esi]
          end
-       else  
-         begin
-         GenNew($0F); Gen($BF); Gen($06);                              // movsx eax, word ptr [esi]
-         end;      
-       
-    4: begin
-       GenNew($8B); Gen($06);                                          // mov eax, dword ptr [esi]
-       end
 
-  else
-    Error('Internal fault: Illegal designator size');
+    else
+      Error('Internal fault: Illegal designator size');
+    end;
+
+  GenPushReg(EAX);                                                     // push eax
   end;
-
-GenPushReg(EAX);                                                     // push eax
 end;
 
 
@@ -1137,6 +1145,22 @@ end;
 
 
 
+procedure SaveStackTopToEDX;
+begin
+GenPopReg(EDX);                                                    // pop edx
+end;
+
+
+
+
+procedure RestoreStackTopFromEDX;
+begin
+GenPushReg(EDX);                                                   // push edx
+end;
+
+
+
+
 procedure DiscardStackTop(NumItems: Byte);
 
   function OptimizeDiscardStackTop: Boolean;
@@ -1144,7 +1168,7 @@ procedure DiscardStackTop(NumItems: Byte);
   Result := FALSE;
   
   // Optimization: (push Reg) + (add esp, 4 * NumItems) -> (add esp, 4 * (NumItems - 1))
-  if PrevInstrByte(0, 0) in [$50, $51, $56, $57, $55] then
+  if PrevInstrByte(0, 0) in [$50, $51, $52, $56, $57, $55] then
     begin
     RemovePrevInstr(0);                                                                 // Remove: push Reg
     
@@ -1243,7 +1267,8 @@ end;
 
 procedure GenerateRound(TruncMode: Boolean);
 begin
-GenPushToFPU;                                                                  // fld dword ptr [esp]  ;  st = operand
+GenPushToFPU;                                                                  // fld qword ptr [esp]  ;  st = operand
+DiscardStackTop(1);                                                            // add esp, 4           ;  shrink stack
 
 if TruncMode then
   begin
@@ -1264,45 +1289,45 @@ end;// GenerateRound
 
 
 
-procedure GenerateFloat(Depth: Byte);
-
-
-  function OptimizeGenerateFloat: Boolean;
-  var
-    ConstVal: TConst;
-    ValueRelocIndex: LongInt;
-  begin
-  Result := FALSE;
-
-  // Optimization: (push OrdValue) + (fild dword ptr [esp]) + (fstp dword ptr [esp]) -> (push RealValue)
-  if (Depth = 0) and (PrevInstrByte(0, 0) = $68) then       // Previous: push OrdValue
-    begin
-    ConstVal.RealValue := PrevInstrDWord(0, 1);
-    ValueRelocIndex := PrevInstrRelocDWordIndex(0, 1);
-    
-    if ValueRelocIndex = 0 then                             // Non-relocatable values only
-      begin
-      RemovePrevInstr(0);                                   // Remove: push OrdValue
-      GenNew($68); GenDWord(ConstVal.OrdValue);             // push RealValue
-      Result := TRUE;
-      end;
-    end;
-  end;  
-
-
+procedure GenerateDoubleFromInteger(Depth: Byte);
 begin
-if not OptimizeGenerateFloat then
-  if Depth = 0 then
-    begin
-    GenNew($DB); Gen($04); Gen($24);                                         // fild dword ptr [esp]  ;  st := float(operand)
-    GenPopFromFPU;                                                           // fstp dword ptr [esp]  ;  [esp] := st;  pop
-    end
-  else
-    begin  
-    GenNew($DB); Gen($44); Gen($24); Gen(Depth);                             // fild dword ptr [esp + Depth]  ;  st := float(operand)
-    GenNew($D9); Gen($5C); Gen($24); Gen(Depth);                             // fstp dword ptr [esp + Depth]  ;  [esp] := st;  pop
-    end;
-end;// GenerateFloat
+if Depth = 0 then
+  begin
+  GenNew($DB); Gen($04); Gen($24);                                         // fild dword ptr [esp]  ;  st := double(operand)
+  GenNew($81); Gen($EC); GenDWord($04);                                    // sub esp, 4            ;  expand stack
+  GenPopFromFPU;                                                           // fstp qword ptr [esp]  ;  [esp] := st;  pop
+  end
+else if Depth = SizeOf(Double) then
+  begin
+  GenPushToFPU;                                                            // fld qword ptr [esp]           ;  st := operand2  
+  GenNew($DB); Gen($44); Gen($24); Gen(Depth);                             // fild dword ptr [esp + Depth]  ;  st := double(operand), st(1) = operand2
+  GenNew($81); Gen($EC); GenDWord($04);                                    // sub esp, 4                    ;  expand stack
+  GenNew($DD); Gen($5C); Gen($24); Gen(Depth);                             // fstp qword ptr [esp + Depth]  ;  [esp + Depth] := operand;  pop
+  GenPopFromFPU;                                                           // fstp qword ptr [esp]          ;  [esp] := operand2;  pop
+  end
+else
+  Error('Internal fault: Illegal stack depth');  
+end;// GenerateDoubleFromInteger
+
+
+
+
+procedure GenerateDoubleFromSingle;
+begin
+GenNew($D9); Gen($04); Gen($24);                                         // fld dword ptr [esp]   ;  st := double(operand)
+GenNew($81); Gen($EC); GenDWord($04);                                    // sub esp, 4            ;  expand stack
+GenPopFromFPU;                                                           // fstp qword ptr [esp]  ;  [esp] := st;  pop
+end; // GenerateDoubleFromSingle
+
+
+
+
+procedure GenerateSingleFromDouble;
+begin
+GenPushToFPU;                                                            // fld qword ptr [esp]   ;  st := operand
+DiscardStackTop(1);                                                      // add esp, 4            ;  shrink stack
+GenNew($D9); Gen($1C); Gen($24);                                         // fstp dword ptr [esp]  ;  [esp] := single(st);  pop
+end; // GenerateDoubleFromSingle
 
 
 
@@ -1311,7 +1336,7 @@ procedure GenerateMathFunction(func: TPredefProc; ResultType: Integer);
 begin
 if Types[ResultType].Kind = REALTYPE then       // Real type
   begin
-  GenPushToFPU;                                                            // fld dword ptr [esp]  ;  st = operand
+  GenPushToFPU;                                                            // fld qword ptr [esp]  ;  st = operand
   case func of
     ABSFUNC:
       begin
@@ -1360,7 +1385,7 @@ if Types[ResultType].Kind = REALTYPE then       // Real type
 
   end;// case
 
-  GenPopFromFPU;                                                           // fstp dword ptr [esp]  ;  [esp] := st;  pop
+  GenPopFromFPU;                                                           // fstp qword ptr [esp]  ;  [esp] := st;  pop
   end
 else                                // Ordinal types
   case func of
@@ -1391,9 +1416,9 @@ if Types[ResultType].Kind = REALTYPE then     // Real type
   begin
   if op = MINUSTOK then
     begin
-    GenPushToFPU;                                                          // fld dword ptr [esp]  ;  st = operand
+    GenPushToFPU;                                                          // fld qword ptr [esp]  ;  st = operand
     GenNew($D9); Gen($E0);                                                 // fchs
-    GenPopFromFPU;                                                         // fstp dword ptr [esp] ;  [esp] := st;  pop
+    GenPopFromFPU;                                                         // fstp qword ptr [esp] ;  [esp] := st;  pop
     end;
   end
 else                                              // Ordinal types
@@ -1427,9 +1452,9 @@ procedure GenerateBinaryOperator(op: TTokenKind; ResultType: Integer);
 begin
 if Types[ResultType].Kind = REALTYPE then     // Real type
   begin
-  GenPushToFPU;                                                            // fld dword ptr [esp]  ;  st = operand2
-  GenPopReg(EAX);                                                          // pop eax
-  GenPushToFPU;                                                            // fld dword ptr [esp]  ;  st(1) = operand2;  st = operand1
+  GenPushToFPU;                                                            // fld qword ptr [esp]  ;  st = operand2
+  DiscardStackTop(2);                                                      // add esp, 8
+  GenPushToFPU;                                                            // fld qword ptr [esp]  ;  st(1) = operand2;  st = operand1
 
   case op of
     PLUSTOK:
@@ -1547,9 +1572,9 @@ begin
 if Types[ValType].Kind = REALTYPE then        // Real type
   begin
   GenPushToFPU;                                                            // fld dword ptr [esp]  ;  st = operand2
-  GenPopReg(EAX);                                                          // pop eax
+  DiscardStackTop(2);                                                      // add esp, 8
   GenPushToFPU;                                                            // fld dword ptr [esp]  ;  st(1) = operand2;  st = operand1
-  GenPopReg(EAX);                                                          // pop eax
+  DiscardStackTop(2);                                                      // add esp, 8
   GenNew($DE); Gen($D9);                                                   // fcompp               ;  test st - st(1)
   GenNew($DF); Gen($E0);                                                   // fnstsw ax
   GenNew($9E);                                                             // sahf  
@@ -1653,7 +1678,14 @@ procedure GenerateAssignment(DesignatorType: Integer);
 begin
 GenPopReg(EAX);                                                              // pop eax   ; source value
   
-if not OptimizeGenerateAssignment then
+if Types[DesignatorType].Kind = REALTYPE then
+  begin
+  GenPopReg(EDX);                                                            // pop edx
+  GenPopReg(ESI);                                                            // pop esi   ; destination address
+  GenNew($89); Gen($06);                                                     // mov [esi], eax
+  GenNew($89); Gen($56); Gen($04);                                           // mov [esi + 4], edx
+  end
+else if not OptimizeGenerateAssignment then
   begin
   GenPopReg(ESI);                                                            // pop esi   ; destination address
                                                           
@@ -1816,7 +1848,7 @@ var
   ActualSize: Integer;
   
 begin
-if PushByValue and (Types[DataType].Kind in StructuredTypes) then
+if PushByValue and (Types[DataType].Kind in StructuredTypes + [REALTYPE]) then
   begin  
   ActualSize := Align(TypeSize(DataType), SizeOf(LongInt));
   
@@ -2230,6 +2262,9 @@ Gotos[NumGotos].ForLoopNesting := ForLoopNesting;
 GenNew($90);               // nop   ; the remaining numbers of iterations of all nested FOR loops will be removed from stack here 
 GenNew($90);               // nop
 GenNew($90);               // nop
+GenNew($90);               // nop
+GenNew($90);               // nop
+GenNew($90);               // nop
 
 GenerateForwardReference;
 end;
@@ -2246,7 +2281,7 @@ for i := 1 to NumGotos do
   begin
   CodePos := Gotos[i].Pos;
   DiscardStackTopAt(CodePos, Gotos[i].ForLoopNesting - Ident[Gotos[i].LabelIndex].ForLoopNesting); // Remove the remaining numbers of iterations of all nested FOR loops
-  GenerateForwardResolutionToDestination(CodePos + 3, Ident[Gotos[i].LabelIndex].Address);
+  GenerateForwardResolutionToDestination(CodePos + 6, Ident[Gotos[i].LabelIndex].Address);
   end;
 end;
 
