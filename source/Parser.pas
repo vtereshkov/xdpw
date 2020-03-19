@@ -1673,19 +1673,68 @@ end;// CompileActualParameters
 procedure MakeCStack(const Signature: TSignature);
 var
   ParamIndex: Integer;
+  SourceStackDepth: Integer;
 begin
 InitializeCStack;
 
 // Push explicit parameters
+SourceStackDepth := 0;
 for ParamIndex := Signature.NumParams downto 1 do
   with Signature.Param[ParamIndex]^ do
-    PushToCStack((Signature.NumParams - ParamIndex) * SizeOf(LongInt), DataType, PassMethod = VALPASSING);
+    begin
+    PushToCStack(SourceStackDepth, DataType, PassMethod = VALPASSING);
+    
+    if (Types[DataType].Kind = REALTYPE) and (PassMethod = VALPASSING) then           
+      SourceStackDepth := SourceStackDepth + Align(TypeSize(DataType), SizeOf(LongInt))
+    else
+      SourceStackDepth := SourceStackDepth + SizeOf(LongInt);
+    end;
 
 // Push structured Result onto the C stack, except STDCALL/CDECL functions returning small structures in EDX:EAX
 with Signature do 
   if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and ((CallConv = DEFAULTCONV) or (TypeSize(ResultType) > 2 * SizeOf(LongInt))) then
     PushToCStack(NumParams * SizeOf(LongInt), ResultType, FALSE);
 end; // MakeCStack
+
+
+
+
+procedure ConvertResultFromCToPascal(const Signature: TSignature; StructuredResultAddr: LongInt);
+begin
+with Signature do
+  if (ResultType <> 0) and (CallConv <> DEFAULTCONV) then
+    if Types[ResultType].Kind in StructuredTypes then
+      if TypeSize(ResultType) <= 2 * SizeOf(LongInt) then
+        begin     
+        // For small structures returned by STDCALL/CDECL functions, allocate structured result pointer and load structure from EDX:EAX
+        StructuredResultAddr := AllocateTempStorage(TypeSize(ResultType));
+        ConvertSmallStructureToPointer(StructuredResultAddr, TypeSize(ResultType));
+        end
+      else  
+        begin
+        // Save structured result pointer to EAX (not all external functions do it themselves)
+        PushTempStoragePtr(StructuredResultAddr);
+        SaveStackTopToEAX;
+        end
+    else if Types[ResultType].Kind in [REALTYPE, SINGLETYPE] then
+      // STDCALL/CDECL functions generally return real result in ST(0), but we do it in EAX or EDX:EAX 
+      MoveFunctionResultFromFPUToEDXEAX(ResultType);
+end; // ConvertResultFromCToPascal
+
+
+
+
+procedure ConvertResultFromPascalToC(const Signature: TSignature);
+begin
+with Signature do
+  if (ResultType <> 0) and (CallConv <> DEFAULTCONV) then
+    if (Types[ResultType].Kind in StructuredTypes) and (TypeSize(ResultType) <= 2 * SizeOf(LongInt)) then
+      // In STDCALL/CDECL functions, return small structure in EDX:EAX
+      ConvertPointerToSmallStructure(TypeSize(ResultType))
+    else if Types[ResultType].Kind in [REALTYPE, SINGLETYPE] then
+      // STDCALL/CDECL functions generally return real result in ST(0), but we do it in EAX or EDX:EAX 
+      MoveFunctionResultFromEDXEAXToFPU(ResultType);          
+end; // ConvertResultFromCPascalToC
 
 
 
@@ -1714,21 +1763,8 @@ if (Ident[IdentIndex].Signature.CallConv = CDECLCONV) and (TotalPascalParamSize 
 if (Ident[IdentIndex].Signature.CallConv <> DEFAULTCONV) and (TotalPascalParamSize > 0) then
   DiscardStackTop(TotalPascalParamSize div SizeOf(LongInt));
 
-with Ident[IdentIndex].Signature do
-  if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and (CallConv <> DEFAULTCONV) then
-    if TypeSize(ResultType) <= 2 * SizeOf(LongInt) then
-      begin     
-      // For small structures returned by STDCALL/CDECL functions, allocate structured result pointer and load structure from EDX:EAX
-      StructuredResultAddr := AllocateTempStorage(TypeSize(ResultType));
-      ConvertSmallStructureToPointer(StructuredResultAddr, TypeSize(ResultType));
-      end
-    else  
-      begin
-      // Save structured result pointer to EAX (not all external functions do it themselves)
-      PushTempStoragePtr(StructuredResultAddr);
-      SaveStackTopToEAX;
-      end;
-      
+// Treat special cases in STDCALL/CDECL functions
+ConvertResultFromCToPascal(Ident[IdentIndex].Signature, StructuredResultAddr);     
 end; // CompileCall
 
 
@@ -1795,21 +1831,8 @@ if (Types[ProcVarType].Signature.CallConv <> DEFAULTCONV) and (TotalPascalParamS
 // Remove call address
 DiscardStackTop(1);  
 
-with Types[ProcVarType].Signature do
-  if (ResultType <> 0) and (Types[ResultType].Kind in StructuredTypes) and (CallConv <> DEFAULTCONV) then
-    if TypeSize(ResultType) <= 2 * SizeOf(LongInt) then
-      begin
-      // For small structures returned by STDCALL/CDECL functions, allocate structured result pointer and load structure from EDX:EAX
-      StructuredResultAddr := AllocateTempStorage(TypeSize(ResultType));
-      ConvertSmallStructureToPointer(StructuredResultAddr, TypeSize(ResultType));
-      end
-    else  
-      begin
-      // Save structured result pointer to EAX (not all external functions do it themselves)
-      PushTempStoragePtr(StructuredResultAddr);
-      SaveStackTopToEAX;
-      end;
-      
+// Treat special cases in STDCALL/CDECL functions
+ConvertResultFromCToPascal(Types[ProcVarType].Signature, StructuredResultAddr);      
 end; // CompileIndirectCall
 
 
@@ -4332,7 +4355,7 @@ else
   if ForLoopNesting <> 0 then
     Error('Internal fault: Illegal FOR loop nesting');
 
-  // If function, return Result value via the EAX register
+  // If function, return Result value (via the EAX register, except some special cases in STDCALL/CDECL functions)
   if (BlockStack[BlockStackTop].Index <> 1) and (Ident[BlockIdentIndex].Kind = FUNC) then
     begin
     PushVarIdentPtr(Ident[BlockIdentIndex].ResultIdentIndex);
@@ -4350,10 +4373,8 @@ else
     if Types[Ident[BlockIdentIndex].Signature.ResultType].Kind = REALTYPE then
       SaveStackTopToEDX;
     
-    // In STDCALL/CDECL functions, return small structure in EDX:EAX
-    with Ident[BlockIdentIndex].Signature do
-      if (Types[ResultType].Kind in StructuredTypes) and (CallConv <> DEFAULTCONV) and (TypeSize(ResultType) <= 2 * SizeOf(LongInt)) then
-        ConvertPointerToSmallStructure(TypeSize(ResultType));    
+    // Treat special cases in STDCALL/CDECL functions
+    ConvertResultFromPascalToC(Ident[BlockIdentIndex].Signature);    
     end;
 
   if BlockStack[BlockStackTop].Index = 1 then          // Main program

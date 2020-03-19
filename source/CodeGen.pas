@@ -28,6 +28,8 @@ procedure PushRealConst(Value: Double);
 procedure PushRelocConst(Value: LongInt; RelocType: TRelocType);
 procedure Relocate(CodeDeltaAddr, InitDataDeltaAddr, UninitDataDeltaAddr, ImportDeltaAddr: Integer);
 procedure PushFunctionResult(ResultType: Integer);
+procedure MoveFunctionResultFromFPUToEDXEAX(DataType: Integer);
+procedure MoveFunctionResultFromEDXEAXToFPU(DataType: Integer);
 procedure PushVarPtr(Addr: Integer; Scope: TScope; DeltaNesting: Byte; RelocType: TRelocType);
 procedure DerefPtr(DataType: Integer);
 procedure GetArrayElementPtr(ArrType: Integer);
@@ -682,6 +684,52 @@ else
   end; // case
   
 GenPushReg(EAX);                                                         // push eax
+end;
+
+
+
+
+procedure MoveFunctionResultFromFPUToEDXEAX(DataType: Integer);
+begin
+if Types[DataType].Kind = REALTYPE then
+  begin
+  GenNew($81); Gen($EC); GenDWord($08);                                    // sub esp, 8            ;  expand stack
+  GenPopFromFPU;                                                           // fstp qword ptr [esp]  ;  [esp] := st;  pop
+  GenNew($8B); Gen($04); Gen($24);                                         // mov eax, [esp]
+  GenNew($8B); Gen($54); Gen($24); Gen($04);                               // mov edx, [esp + 4]
+  DiscardStackTop(2);                                                      // add esp, 8            ;  shrink stack
+  end
+else if Types[DataType].Kind = SINGLETYPE then
+  begin
+  GenNew($81); Gen($EC); GenDWord($04);                                    // sub esp, 4            ;  expand stack
+  GenNew($D9); Gen($1C); Gen($24);                                         // fstp dword ptr [esp]  ;  [esp] := single(st);  pop
+  GenNew($8B); Gen($04); Gen($24);                                         // mov eax, [esp]
+  DiscardStackTop(1);                                                      // add esp, 4            ;  shrink stack
+  end 
+else
+  Error('Internal fault: Illegal type'); 
+end;
+
+
+
+
+procedure MoveFunctionResultFromEDXEAXToFPU(DataType: Integer);
+begin
+if Types[DataType].Kind = REALTYPE then
+  begin
+  GenPushReg(EDX);                                                       // push edx
+  GenPushReg(EAX);                                                       // push eax
+  GenPushToFPU;                                                          // fld qword ptr [esp]
+  DiscardStackTop(2);                                                    // add esp, 8            ;  shrink stack
+  end
+else if Types[DataType].Kind = SINGLETYPE then
+  begin
+  GenPushReg(EAX);                                                       // push eax
+  GenNew($D9); Gen($04); Gen($24);                                       // fld dword ptr [esp]
+  DiscardStackTop(1);                                                    // add esp, 4            ;  shrink stack
+  end 
+else
+  Error('Internal fault: Illegal type'); 
 end;
 
 
@@ -1848,7 +1896,7 @@ var
   ActualSize: Integer;
   
 begin
-if PushByValue and (Types[DataType].Kind in StructuredTypes + [REALTYPE]) then
+if PushByValue and (Types[DataType].Kind in StructuredTypes) then
   begin  
   ActualSize := Align(TypeSize(DataType), SizeOf(LongInt));
   
@@ -1861,7 +1909,12 @@ if PushByValue and (Types[DataType].Kind in StructuredTypes + [REALTYPE]) then
   
   GenerateStructuredAssignment(DataType);
   end
-else
+else if PushByValue and (Types[DataType].Kind = REALTYPE) then
+  begin
+  GenNew($FF); Gen($B1); GenDWord(SourceStackDepth + SizeOf(LongInt));          // push [ecx + SourceStackDepth + 4]
+  GenNew($FF); Gen($B1); GenDWord(SourceStackDepth);                            // push [ecx + SourceStackDepth]  
+  end
+else  
   begin 
   GenNew($FF); Gen($B1); GenDWord(SourceStackDepth);                            // push [ecx + SourceStackDepth]
   end; 

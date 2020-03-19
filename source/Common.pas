@@ -11,7 +11,7 @@ interface
 
 
 const
-  VERSION                   = '0.11';
+  VERSION                   = '0.12';
   
   NUMKEYWORDS               = 43;          
   MAXSTRLENGTH              = 255;
@@ -150,7 +150,7 @@ const
   BYTETYPEINDEX         = 6;  
   CHARTYPEINDEX         = 7;
   BOOLEANTYPEINDEX      = 8;
-  REALTYPEINDEX         = 9;      // Basic real type: 64-bit double
+  REALTYPEINDEX         = 9;      // Basic real type: 64-bit double (all temporary real results are of this type)
   SINGLETYPEINDEX       = 10;
   POINTERTYPEINDEX      = 11;     // Untyped pointer, compatible with any other pointers
   FILETYPEINDEX         = 12;     // Untyped file, compatible with text files
