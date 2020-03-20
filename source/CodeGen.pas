@@ -922,10 +922,8 @@ GenPopReg(ESI);                                                      // pop esi
 
 if Types[DataType].Kind = REALTYPE then             // Special case: Double
   begin
-  GenNew($8B); Gen($06);                                                 // mov eax, dword ptr [esi]
-  GenNew($8B); Gen($56); Gen($04);                                       // mov edx, dword ptr [esi + 4]
-  GenPushReg(EDX);                                                       // push edx
-  GenPushReg(EAX);                                                       // push eax
+  GenNew($FF); Gen($76); Gen($04);                                       // push [esi + 4]
+  GenNew($FF); Gen($36);                                                 // push [esi]
   end
 else                                                // General rule
   begin                                                
