@@ -208,7 +208,7 @@ end;
 
 
 
-procedure ReadDoubleLineComment;
+procedure ReadSingleLineComment;
 begin
 with ScannerState do
   while (ch <> #10) and not EndOfUnit do
@@ -538,7 +538,7 @@ with ScannerState do
       begin
       ReadUppercaseChar(ch2);
       if ch2 = '/' then
-        ReadDoubleLineComment                                             // Double-line comment
+        ReadSingleLineComment                                             // Double-line comment
       else
         begin
         if not EndOfUnit then Dec(Buffer.Pos);                            // Discard ch2     
@@ -558,7 +558,7 @@ with ScannerState do
       ReadKeywordOrIdentifier;
     '''':
       ReadCharOrStringLiteral;
-    ':':                              // Double- or double-character tokens
+    ':':                              // Single- or double-character tokens
       begin
       Token.Kind := COLONTOK;
       ReadUppercaseChar(ch);
