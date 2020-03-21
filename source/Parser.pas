@@ -4134,9 +4134,9 @@ procedure CompileBlock(BlockIdentIndex: Integer);
  
   // For procedures and functions, declare parameters and the Result variable
   
-  // Default calling convention: ([var Self,] [var Result,] Parameter1, ... ParameterN)
-  // STDCALL calling convention: (ParameterN, ... Parameter1, [, var Result]), small structures returned in EDX:EAX
-  // CDECL calling convention:   (ParameterN, ... Parameter1, [, var Result]), small structures returned in EDX:EAX, caller clears the stack
+  // Default calling convention: ([var Self,] [var Result,] Parameter1, ... ParameterN [, StaticLink]), result returned in EAX
+  // STDCALL calling convention: (ParameterN, ... Parameter1, [, var Result]), result returned in EAX, small structures in EDX:EAX, reals in ST(0)
+  // CDECL calling convention:   equivalent to STDCALL, except that caller clears the stack
   
   if BlockStack[BlockStackTop].Index <> 1 then             
     begin
