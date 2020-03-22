@@ -59,7 +59,7 @@ end;
 
 function FloatToStr(x: Real): string;
 begin
-if abs(ln(x) / ln(10)) > 15 then
+if abs(ln(x) / ln(10)) > 9 then
   Str(x, Result)
 else
   Str(x, Result, 16);  
