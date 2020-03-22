@@ -631,7 +631,19 @@ procedure GenPushToFPU;
     RemovePrevInstr(0);                                                  // Remove: fstp dword ptr [esp]
     GenNew($DD); Gen($14); Gen($24);                                     // fst qword ptr [esp]
     Result := TRUE;
-    end; 
+    end
+
+  // Optimization: (push [esi + 4]) + (push [esi]) + (fld qword ptr [esp]) -> (fld qword ptr [esi]) + (sub esp, 8)
+  else if (PrevInstrByte(1, 0) = $FF) and (PrevInstrByte(1, 1) = $76) and (PrevInstrByte(1, 2) = $04) and     // Previous: push [esi + 4]
+          (PrevInstrByte(0, 0) = $FF) and (PrevInstrByte(0, 1) = $36)                                         // Previous: push [esi]
+  then    
+    begin
+    RemovePrevInstr(1);                                                  // Remove: push [esi + 4], push [esi]
+    GenNew($DD); Gen($06);                                               // fld qword ptr [esi]
+    RaiseStackTop(2);                                                    // sub esp, 8
+    Result := TRUE;
+    end;
+ 
   end;
   
   
@@ -1218,12 +1230,15 @@ end;
 
 procedure DiscardStackTop(NumItems: Byte);
 
+
   function OptimizeDiscardStackTop: Boolean;
+  var
+    Value: LongInt;
   begin
   Result := FALSE;
   
   // Optimization: (push Reg) + (add esp, 4 * NumItems) -> (add esp, 4 * (NumItems - 1))
-  if PrevInstrByte(0, 0) in [$50, $51, $52, $56, $57, $55] then
+  if PrevInstrByte(0, 0) in [$50, $51, $52, $56, $57, $55] then                         // Previous: push Reg
     begin
     RemovePrevInstr(0);                                                                 // Remove: push Reg
     
@@ -1233,9 +1248,21 @@ procedure DiscardStackTop(NumItems: Byte);
       end;
       
     Result := TRUE;
-    end;
-    
+    end
+  
+  // Optimization: (sub esp, 4 * NumItems) + (add esp, 4 * NumItems) -> 0  
+  else if (PrevInstrByte(0, 0) = $81) and (PrevInstrByte(0, 1) = $EC) then              // Previous: sub esp, 4 * NumItems
+    begin
+    Value := PrevInstrDWord(0, 2);
+
+    if Value = SizeOf(LongInt) * NumItems then
+      begin
+      RemovePrevInstr(0);                                                               // Remove: sub esp, 4 * NumItems
+      Result := TRUE;
+      end;    
+    end
   end;  
+
 
 begin  // DiscardStackTop
 if not OptimizeDiscardStackTop then
