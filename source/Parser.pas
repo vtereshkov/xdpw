@@ -35,7 +35,7 @@ var
 
 
 procedure CompileConstExpression(var ConstVal: TConst; var ConstValType: Integer); forward;
-procedure CompileDesignator(var ValType: Integer; AllowConst: Boolean = TRUE); forward;
+function CompileDesignator(var ValType: Integer; AllowConst: Boolean = TRUE): Boolean; forward;
 procedure CompileExpression(var ValType: Integer); forward;
 procedure CompileStatement(LoopNesting: Integer); forward;
 procedure CompileType(var DataType: Integer); forward;
@@ -2002,7 +2002,7 @@ end; // DereferencePointerAsDesignator
 
 
 
-procedure CompileSelectors(var ValType: Integer);
+function CompileSelectors(var ValType: Integer; BasicDesignatorIsStatement: Boolean = FALSE): Boolean;
 var
   FieldIndex, MethodIndex: Integer;
   ArrayIndexType: Integer;
@@ -2013,8 +2013,13 @@ begin
 // A function call can be part of a selector only if it returns an address (i.e. a structured result), not an immediate value
 // All other calls are part of a factor or a statement
 
+// Returns TRUE if constitutes a statement, i.e., ends with a function call
+Result := BasicDesignatorIsStatement;
+
 while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
   begin
+  Result := FALSE;
+  
   case Tok.Kind of
   
     DEREFERENCETOK:                                   // Pointer dereferencing
@@ -2098,7 +2103,8 @@ while Tok.Kind in [DEREFERENCETOK, OBRACKETTOK, PERIODTOK, OPARTOK] do
     OPARTOK: 
       begin
       if not CompileMethodOrProceduralVariableCall(ValType, TRUE, TRUE) then Break;  // Not a designator 
-      PushFunctionResult(ValType); 
+      PushFunctionResult(ValType);
+      Result := TRUE; 
       end;
       
   end; // case
@@ -2110,7 +2116,7 @@ end; // CompileSelectors
 
 
 
-procedure CompileBasicDesignator(var ValType: Integer; var IsConst: Boolean);
+function CompileBasicDesignator(var ValType: Integer; var IsConst: Boolean): Boolean;
 var
   ResultType: Integer;
   IdentIndex: Integer;  
@@ -2120,7 +2126,10 @@ begin
 // A function call can be part of a designator only if it returns an address (i.e. a structured result or a pointer), not an immediate value
 // All other calls are part of a factor or a statement
 
-IsConst := FALSE;   
+// Returns TRUE if constitutes a statement, i.e., ends with a function call
+Result := FALSE;
+IsConst := FALSE;
+   
 AssertIdent;
 
 // First search among records in WITH blocks
@@ -2142,10 +2151,12 @@ if ValType = 0 then
 
       NextTok;
       CompileCall(IdentIndex);
-      PushFunctionResult(ResultType);        
+      PushFunctionResult(ResultType);
+      Result := TRUE;        
       ValType := ResultType;
       
-      DereferencePointerAsDesignator(ValType, TRUE);
+      if DereferencePointerAsDesignator(ValType, TRUE) then
+        Result := FALSE;
       end;  
              
     VARIABLE:                                  
@@ -2197,16 +2208,17 @@ end; // CompileBasicDesignator
 
 
 
-procedure CompileDesignator(var ValType: Integer; AllowConst: Boolean = TRUE);
+function CompileDesignator(var ValType: Integer; AllowConst: Boolean = TRUE): Boolean;
 var
   IsConst: Boolean;
 begin
-CompileBasicDesignator(ValType, IsConst);
+// Returns TRUE if constitutes a statement, i.e., ends with a function call
+Result := CompileBasicDesignator(ValType, IsConst);
 
 if IsConst and not AllowConst then
   Error('Constant value cannot be modified');
   
-CompileSelectors(ValType);
+Result := CompileSelectors(ValType, Result);
 end; // CompileDesignator
 
 
@@ -2217,7 +2229,7 @@ procedure CompileFactor(var ValType: Integer);
 
   procedure CompileDereferenceOrCall(var ValType: Integer);
   begin
-  if Tok.Kind = OPARTOK then   // For method or procedural variable calls, parentheses are required even with empty parameter lists                                     
+  if Tok.Kind = OPARTOK then   // Method or procedural variable call (parentheses are required even for empty parameter list)                                     
     begin
     CompileMethodOrProceduralVariableCall(ValType, TRUE, FALSE);
     PushFunctionResult(ValType);
@@ -2762,11 +2774,16 @@ procedure CompileStatement(LoopNesting: Integer);
   
   
   
-  procedure CompileAssignmentOrCall(DesignatorType: Integer);
+  procedure CompileAssignmentOrCall(DesignatorType: Integer; DesignatorIsStatement: Boolean);
   begin
-  if Tok.Kind = OPARTOK then   // For method or procedural variable calls, parentheses are required even with empty parameter lists                                     
+  if Tok.Kind = OPARTOK then            // Method or procedural variable call (parentheses are required even for empty parameter list)                                     
     CompileMethodOrProceduralVariableCall(DesignatorType, FALSE, FALSE)
-  else                         // Assignment
+  else if DesignatorIsStatement then    // Optional assignment if designator already ends with a function call   
+    if Tok.Kind = ASSIGNTOK then     
+      CompileAssignment(DesignatorType)
+    else
+      DiscardStackTop(1)                // Nothing to do - remove designator
+  else                                  // Mandatory assignment
     begin  
     CheckTok(ASSIGNTOK);                               
     CompileAssignment(DesignatorType)
@@ -3089,7 +3106,8 @@ procedure CompileStatement(LoopNesting: Integer);
 var
   IdentIndex: Integer;
   DesignatorType: Integer;
-
+  DesignatorIsStatement: Boolean;
+  
   
 begin // CompileStatement
 CompileLabel;
@@ -3100,8 +3118,8 @@ case Tok.Kind of
     begin   
     if FieldOrMethodInsideWithFound(Tok.Name) then                      // Record field or method inside a WITH block
       begin
-      CompileDesignator(DesignatorType, FALSE);
-      CompileAssignmentOrCall(DesignatorType);
+      DesignatorIsStatement := CompileDesignator(DesignatorType, FALSE);
+      CompileAssignmentOrCall(DesignatorType, DesignatorIsStatement);
       end 
     else                                                                // Ordinary identifier                                                                                
       begin  
@@ -3111,8 +3129,8 @@ case Tok.Kind of
       
         VARIABLE, USERTYPE:                                             // Assignment or procedural variable call
           begin
-          CompileDesignator(DesignatorType, FALSE);
-          CompileAssignmentOrCall(DesignatorType); 
+          DesignatorIsStatement := CompileDesignator(DesignatorType, FALSE);
+          CompileAssignmentOrCall(DesignatorType, DesignatorIsStatement); 
           end;
 
         PROC, FUNC:                                                     // Procedure or function call (returned result discarded)
@@ -3151,8 +3169,8 @@ case Tok.Kind of
               then
                 begin
                 PushFunctionResult(DesignatorType);
-                CompileSelectors(DesignatorType);
-                CompileAssignmentOrCall(DesignatorType); 
+                DesignatorIsStatement := CompileSelectors(DesignatorType, TRUE);
+                CompileAssignmentOrCall(DesignatorType, DesignatorIsStatement); 
                 end;
               end;              
               
