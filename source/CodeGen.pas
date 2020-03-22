@@ -39,6 +39,7 @@ procedure SaveStackTopToEAX;
 procedure RestoreStackTopFromEAX;
 procedure SaveStackTopToEDX;
 procedure RestoreStackTopFromEDX;
+procedure RaiseStackTop(NumItems: Byte);
 procedure DiscardStackTop(NumItems: Byte);
 procedure DuplicateStackTop;
 procedure SaveCodePos;
@@ -693,7 +694,7 @@ procedure MoveFunctionResultFromFPUToEDXEAX(DataType: Integer);
 begin
 if Types[DataType].Kind = REALTYPE then
   begin
-  GenNew($81); Gen($EC); GenDWord($08);                                    // sub esp, 8            ;  expand stack
+  RaiseStackTop(2);                                                        // sub esp, 8            ;  expand stack
   GenPopFromFPU;                                                           // fstp qword ptr [esp]  ;  [esp] := st;  pop
   GenNew($8B); Gen($04); Gen($24);                                         // mov eax, [esp]
   GenNew($8B); Gen($54); Gen($24); Gen($04);                               // mov edx, [esp + 4]
@@ -701,7 +702,7 @@ if Types[DataType].Kind = REALTYPE then
   end
 else if Types[DataType].Kind = SINGLETYPE then
   begin
-  GenNew($81); Gen($EC); GenDWord($04);                                    // sub esp, 4            ;  expand stack
+  RaiseStackTop(1);                                                        // sub esp, 4            ;  expand stack
   GenNew($D9); Gen($1C); Gen($24);                                         // fstp dword ptr [esp]  ;  [esp] := single(st);  pop
   GenNew($8B); Gen($04); Gen($24);                                         // mov eax, [esp]
   DiscardStackTop(1);                                                      // add esp, 4            ;  shrink stack
@@ -1207,6 +1208,14 @@ end;
 
 
 
+procedure RaiseStackTop(NumItems: Byte);
+begin
+GenNew($81); Gen($EC); GenDWord(SizeOf(LongInt) * NumItems);       // sub esp, 4 * NumItems
+end;
+
+
+
+
 procedure DiscardStackTop(NumItems: Byte);
 
   function OptimizeDiscardStackTop: Boolean;
@@ -1340,14 +1349,14 @@ begin
 if Depth = 0 then
   begin
   GenNew($DB); Gen($04); Gen($24);                                         // fild dword ptr [esp]  ;  st := double(operand)
-  GenNew($81); Gen($EC); GenDWord($04);                                    // sub esp, 4            ;  expand stack
+  RaiseStackTop(1);                                                        // sub esp, 4            ;  expand stack
   GenPopFromFPU;                                                           // fstp qword ptr [esp]  ;  [esp] := st;  pop
   end
 else if Depth = SizeOf(Double) then
   begin
   GenPushToFPU;                                                            // fld qword ptr [esp]           ;  st := operand2  
   GenNew($DB); Gen($44); Gen($24); Gen(Depth);                             // fild dword ptr [esp + Depth]  ;  st := double(operand), st(1) = operand2
-  GenNew($81); Gen($EC); GenDWord($04);                                    // sub esp, 4                    ;  expand stack
+  RaiseStackTop(1);                                                        // sub esp, 4                    ;  expand stack
   GenNew($DD); Gen($5C); Gen($24); Gen(Depth);                             // fstp qword ptr [esp + Depth]  ;  [esp + Depth] := operand;  pop
   GenPopFromFPU;                                                           // fstp qword ptr [esp]          ;  [esp] := operand2;  pop
   end
@@ -1361,7 +1370,7 @@ end;// GenerateDoubleFromInteger
 procedure GenerateDoubleFromSingle;
 begin
 GenNew($D9); Gen($04); Gen($24);                                         // fld dword ptr [esp]   ;  st := double(operand)
-GenNew($81); Gen($EC); GenDWord($04);                                    // sub esp, 4            ;  expand stack
+RaiseStackTop(1);                                                        // sub esp, 4            ;  expand stack
 GenPopFromFPU;                                                           // fstp qword ptr [esp]  ;  [esp] := st;  pop
 end; // GenerateDoubleFromSingle
 
@@ -1663,8 +1672,23 @@ end;
 
 
 
-
 procedure GenerateAssignment(DesignatorType: Integer);
+
+
+  function OptimizeGenerateRealAssignment: Boolean;
+  begin
+  Result := FALSE;
+  
+  // Optimization: (fstp qword ptr [esp]) + (pop eax) + (pop edx) + (pop esi) + (mov [esi], eax) + (mov [esi + 4], edx) -> (add esp, 8) + (pop esi) + (fstp qword ptr [esi])
+  if (PrevInstrByte(0, 0) = $DD) and (PrevInstrByte(0, 1) = $1C) and (PrevInstrByte(0, 2) = $24) then    // Previous: fstp dword ptr [esp]
+    begin
+    RemovePrevInstr(0);                                                  // Remove: fstp dword ptr [esp]
+    DiscardStackTop(2);                                                  // add esp, 8
+    GenPopReg(ESI);                                                      // pop esi
+    GenNew($DD); Gen($1E);                                               // fstp qword ptr [esi]
+    Result := TRUE;
+    end;    
+  end;
 
 
   function OptimizeGenerateAssignment: Boolean;
@@ -1722,34 +1746,39 @@ procedure GenerateAssignment(DesignatorType: Integer);
   
 
 begin
-GenPopReg(EAX);                                                              // pop eax   ; source value
-  
-if Types[DesignatorType].Kind = REALTYPE then
+if Types[DesignatorType].Kind = REALTYPE then            // Special case: 64-bit real type
   begin
-  GenPopReg(EDX);                                                            // pop edx
-  GenPopReg(ESI);                                                            // pop esi   ; destination address
-  GenNew($89); Gen($06);                                                     // mov [esi], eax
-  GenNew($89); Gen($56); Gen($04);                                           // mov [esi + 4], edx
+  if not OptimizeGenerateRealAssignment then
+    begin
+    GenPopReg(EAX);                                                            // pop eax   ; source value
+    GenPopReg(EDX);                                                            // pop edx   ; source value
+    GenPopReg(ESI);                                                            // pop esi   ; destination address
+    GenNew($89); Gen($06);                                                     // mov [esi], eax
+    GenNew($89); Gen($56); Gen($04);                                           // mov [esi + 4], edx
+    end
   end
-else if not OptimizeGenerateAssignment then
-  begin
-  GenPopReg(ESI);                                                            // pop esi   ; destination address
-                                                          
-  case TypeSize(DesignatorType) of
-    1: begin
-       GenNew($88); Gen($06);                                                // mov [esi], al
-       end;
-    2: begin
-       GenNew($66); Gen($89); Gen($06);                                      // mov [esi], ax
-       end;
-    4: begin
-       GenNew($89); Gen($06);                                                // mov [esi], eax
-       end
-  else
-    Error('Internal fault: Illegal designator size');
-  end; // case
-  end;  
-
+else                                                     // General rule: 8, 16, 32-bit types                                                          
+  begin 
+  if not OptimizeGenerateAssignment then
+    begin
+    GenPopReg(EAX);                                                            // pop eax   ; source value
+    GenPopReg(ESI);                                                            // pop esi   ; destination address
+                                                            
+    case TypeSize(DesignatorType) of
+      1: begin
+         GenNew($88); Gen($06);                                                // mov [esi], al
+         end;
+      2: begin
+         GenNew($66); Gen($89); Gen($06);                                      // mov [esi], ax
+         end;
+      4: begin
+         GenNew($89); Gen($06);                                                // mov [esi], eax
+         end
+    else
+      Error('Internal fault: Illegal designator size');
+    end; // case
+    end;  
+  end;
 end;
 
 
@@ -1899,7 +1928,7 @@ if PushByValue and (Types[DataType].Kind in StructuredTypes) then
   ActualSize := Align(TypeSize(DataType), SizeOf(LongInt));
   
   // Copy structure to the C stack
-  GenNew($81); Gen($EC); GenDWord(ActualSize);                                  // sub esp, ActualSize
+  RaiseStackTop(ActualSize div SizeOf(LongInt));                                // sub esp, ActualSize
   GenNew($8B); Gen($B1); GenDWord(SourceStackDepth);                            // mov esi, [ecx + SourceStackDepth] 
   GenNew($89); Gen($E7);                                                        // mov edi, esp
   GenPushReg(EDI);                                                              // push edi                       ; destination address

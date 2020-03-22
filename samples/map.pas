@@ -171,6 +171,10 @@ var
   L: TList;      
   
 begin
+WriteLn;
+WriteLn('Heterogenous list operations and Map function demo');
+WriteLn;
+
 L.Create();
 Fill(L);
 
