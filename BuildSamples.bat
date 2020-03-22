@@ -5,6 +5,7 @@ xdpw samples\inserr.pas
 xdpw samples\life.pas
 xdpw samples\lineq.pas
 xdpw samples\list.pas
+xdpw samples\map.pas
 xdpw samples\raytracer.pas
 xdpw samples\sort.pas
 pause
