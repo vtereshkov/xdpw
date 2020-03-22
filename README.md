@@ -314,7 +314,7 @@ function PWideCharToStr(p: PWideChar): string;
 * `fft.pas`      - Fast Fourier Transform demo
 * `inserr.pas`   - Inertial navigation system error estimation demo. Uses `kalman.pas` unit
 * `list.pas`     - Linked list operations demo
-* `map.pas`      - Heterogenous list operations and Map function demo. Demonstrates XD Pascal methods and interfaces.
+* `map.pas`      - Heterogenous list operations and Map function demo. Demonstrates XD Pascal methods and interfaces
 * `gui.pas`      - GUI application demo. Uses `windows.pas` unit
 * `raytracer.pas`- Raytracer demo. Demonstrates XD Pascal methods and interfaces. Equivalent to `raytracer.go`
 
