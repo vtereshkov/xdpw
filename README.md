@@ -13,7 +13,7 @@ XD Pascal is a small embeddable self-hosting compiler for a Pascal language dial
 * Support for both console and GUI applications
 * No external assembler or linker needed
 * Floating-point arithmetic using the x87 FPU
-* [Integration](https://github.com/vtereshkov/raylib-xdpw) with [Raylib](https://www.raylib.com) game development library
+* [Integration](https://github.com/vtereshkov/raylib-xdpw) with the [Raylib](https://www.raylib.com) game development library
 * Integration with Geany IDE
 * Compiler source for Delphi 6/7, Free Pascal and XD Pascal itself (Delphi 2009+ migration is [straightforward](https://github.com/vtereshkov/xdpw/issues/2#issuecomment-573929657))
 
