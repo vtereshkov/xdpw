@@ -521,6 +521,30 @@ procedure GenPopReg(Reg: TRegister);
     end
     
     
+  // Optimization: (push [esi]) + (pop eax) -> (mov eax, [esi])
+  else if (Reg = EAX) and (PrevInstrByte(0, 0) = $FF) and (PrevInstrByte(0, 1) = $36) then    // Previous: push [esi]         
+    begin 
+    RemovePrevInstr(0);                                                         // Remove: push [esi]
+    GenNew($8B); Gen($06);                                                      // mov eax, [esi]      
+    Result := TRUE;
+    Exit;
+    end
+
+
+  // Optimization: (push [esi + 4]) + (mov eax, [esi]) + (pop edx) -> (mov eax, [esi]) + (mov edx, [esi + 4])
+  else if (Reg = EDX) and (PrevInstrByte(1, 0) = $FF) and (PrevInstrByte(1, 1) = $76) and (PrevInstrByte(1, 2) = $04)  // Previous: push [esi + 4]
+                      and (PrevInstrByte(0, 0) = $8B) and (PrevInstrByte(0, 1) = $06)                                  // Previous: mov eax, [esi]         
+  then  
+    begin 
+    RemovePrevInstr(1);                                                         // Remove: push [esi + 4], mov eax, [esi] 
+    GenNew($8B); Gen($06);                                                      // mov eax, [esi]
+    GenNew($8B); Gen($56); Gen($04);                                            // mov edx, [esi + 4]      
+    Result := TRUE;
+    Exit;
+    end
+   
+    
+    
   // Optimization: (push Value) + (pop ecx) -> (mov ecx, Value)  
   else if (Reg = ECX) and (PrevOpCode = $68) then                               // Previous: push Value
     begin
@@ -595,8 +619,9 @@ procedure GenPopReg(Reg: TRegister);
     GenNew($8B); Gen($34); Gen($24);                                          // mov esi, [esp]      
     Result := TRUE;
     Exit;
-    end;
-      
+    end
+
+     
   end;
 
 
