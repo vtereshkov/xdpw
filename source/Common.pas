@@ -20,6 +20,7 @@ const
   MAXIDENTS                 = 2000;
   MAXTYPES                  = 2000;
   MAXUNITS                  = 100;
+  MAXFOLDERS                = 10;
   MAXBLOCKNESTING           = 10;
   MAXPARAMS                 = 30;
   MAXFIELDS                 = 100;
@@ -342,16 +343,15 @@ var
   Ident: array [1..MAXIDENTS] of TIdentifier;
   Types: array [1..MAXTYPES] of TType;
   InitializedGlobalData: array [0..MAXINITIALIZEDDATASIZE - 1] of Byte;
-  Units: array [1..MAXUNITS] of TUnit;
+  Units: array [1..MAXUNITS] of TUnit;  
+  Folders: array [1..MAXFOLDERS] of TString;
   BlockStack: array [1..MAXBLOCKNESTING] of TBlock;
   WithStack: array [1..MAXWITHNESTING] of TWithDesignator;
 
-  NumIdent, NumTypes, NumUnits, NumBlocks, BlockStackTop, ForLoopNesting, WithNesting,
+  NumIdent, NumTypes, NumUnits, NumFolders, NumBlocks, BlockStackTop, ForLoopNesting, WithNesting,
   InitializedGlobalDataSize, UninitializedGlobalDataSize: Integer;
   
   IsConsoleProgram: Boolean;
-  
-  SourceFolder, UnitsFolder: TString;
   
 
 
@@ -462,7 +462,8 @@ FillChar(InitializedGlobalData, SizeOf(InitializedGlobalData), #0);
 
 NumIdent                    := 0; 
 NumTypes                    := 0;
-NumUnits                    := 0; 
+NumUnits                    := 0;
+NumFolders                  := 0; 
 NumBlocks                   := 0; 
 BlockStackTop               := 0; 
 ForLoopNesting              := 0;
@@ -471,9 +472,6 @@ InitializedGlobalDataSize   := 0;
 UninitializedGlobalDataSize := 0;
 
 IsConsoleProgram            := TRUE;  // Console program by default
-
-SourceFolder                := '';
-UnitsFolder                 := ''; 
 end;
 
 

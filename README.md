@@ -215,6 +215,7 @@ The compiler is based on a recursive descent parser. It directly builds a Window
 
 #### Directives
 * `$APPTYPE` - Set application type. Examples: `{$APPTYPE GUI}`, `{$APPTYPE CONSOLE}`
+* `$UNITPATH` - Set additional unit search path. Example: `{$UNITPATH ..\units\}`
 
 #### Optimizations
 Some simple peephole optimizations are performed:

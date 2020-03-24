@@ -110,8 +110,9 @@ InitializeCommon;
 InitializeLinker;
 InitializeCodeGen;
 
-SourceFolder := PasFolder;
-UnitsFolder  := CompilerFolder + 'units\';
+Folders[1] := PasFolder;
+Folders[2] := CompilerFolder + 'units\';
+NumFolders := 2;
    
 CompileProgramOrUnit('system.pas');
 CompileProgramOrUnit(PasName + PasExt);

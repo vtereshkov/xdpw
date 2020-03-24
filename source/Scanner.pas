@@ -74,21 +74,24 @@ procedure InitializeScanner(const Name: TString);
 var
   F: TInFile;
   ActualSize: Integer;
+  FolderIndex: Integer;
   
 begin
 ScannerState.Buffer.Ptr := nil;
 
-// First search the source folder, then the units folder
-Assign(F, TGenericString(SourceFolder + Name));
-Reset(F, 1);
-if IOResult <> 0 then
-  begin
-  Assign(F, TGenericString(UnitsFolder + Name));
-  Reset(F, 1);  
-  if IOResult <> 0 then
-    Error('Unable to open source file ' + Name);
-  end;  
+// First search the source folder, then the units folder, then the folders specified in $UNITPATH
+FolderIndex := 1;
 
+repeat
+  Assign(F, TGenericString(Folders[FolderIndex] + Name));
+  Reset(F, 1);
+  if IOResult = 0 then Break;
+  Inc(FolderIndex);
+until FolderIndex > NumFolders;
+
+if FolderIndex > NumFolders then
+  Error('Unable to open source file ' + Name);
+  
 with ScannerState do
   begin
   FileName := Name;
@@ -240,7 +243,7 @@ with ScannerState do
     ReadUppercaseChar(ch);
   until not (ch in AlphaNums);
 
-  if Text = '$APPTYPE' then       // Console/GUI application type directive
+  if Text = '$APPTYPE' then             // Console/GUI application type directive
     begin
     Text := '';
     ReadChar(ch);
@@ -257,8 +260,26 @@ with ScannerState do
       IsConsoleProgram := FALSE
     else
       Error('Unknown application type ' + Text);
-    end        
-  else                            // All other directives are ignored
+    end
+
+  else if Text = '$UNITPATH' then       // Unit path directive
+    begin
+    Text := '';
+    ReadChar(ch);
+    while (ch <> '}') and not EndOfUnit do
+      begin
+      if (ch = #0) or (ch > ' ') then 
+        AppendStrSafe(Text, UpCase(ch));
+      ReadChar(ch);
+      end;
+      
+    Inc(NumFolders);
+    if NumFolders > MAXFOLDERS then
+      Error('Maximum number of unit paths exceeded');
+    Folders[NumFolders] := Folders[1] + Text; 
+    end    
+    
+  else                                  // All other directives are ignored
     ReadMultiLineComment;
   end;  
 end;
