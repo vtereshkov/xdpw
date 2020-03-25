@@ -59,10 +59,10 @@ end;
 
 function FloatToStr(x: Real): string;
 begin
-if abs(ln(x) / ln(10)) > 9 then
+if abs(ln(abs(x)) / ln(10)) > 9 then
   Str(x, Result)
 else
-  Str(x, Result, 16);  
+  Str(x, Result, 0, 16);  
 end;
 
 
@@ -78,7 +78,7 @@ case Format of
     if Digits > Precision then
       Str(x, Result)
     else  
-      Str(x, Result, Digits);
+      Str(x, Result, 0, Digits);
 end;               
 end;
 

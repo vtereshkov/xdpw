@@ -155,7 +155,7 @@ function ParseCmdLine(Index: Integer; var Str: string): Integer;
 function ParamCount: Integer;
 function ParamStr(Index: Integer): string;
 procedure IStr(Number: Integer; var s: string);
-procedure Str(Number: Real; var s: string; DecPlaces: Integer = 0);
+procedure Str(Number: Real; var s: string; MinWidth: Integer = 0; DecPlaces: Integer = 0);
 procedure Val(const s: string; var Number: Real; var Code: Integer);
 procedure IVal(const s: string; var Number: Integer; var Code: Integer);
 procedure Assign(var F: file; const Name: string);
@@ -642,19 +642,26 @@ end;
 
 
 
-procedure WriteInt(var F: file; P: PStream; Number: Integer);
+function WriteInt(var F: file; P: PStream; Number: Integer): Integer;
 var
   Digit, Weight: Integer;
   Skip: Boolean;
 
 begin
+// Returns the string length
+
 if Number = 0 then
-  WriteCh(F, P,  '0')
+  begin
+  WriteCh(F, P,  '0');
+  Result := 1;
+  end
 else
   begin
+  Result := 0;
   if Number < 0 then
     begin
     WriteCh(F, P,  '-');
+    Inc(Result);
     Number := -Number;
     end;
 
@@ -669,6 +676,7 @@ else
       begin
       Digit := Number div Weight;
       WriteCh(F, P,  Char(ShortInt('0') + Digit));
+      Inc(Result);
       Number := Number - Weight * Digit;
       end;
 
@@ -718,9 +726,10 @@ end;
 
 
 
-procedure WriteReal(var F: file; P: PStream; Number: Real; DecPlaces: Integer);
+function WriteReal(var F: file; P: PStream; Number: Real; MinWidth, DecPlaces: Integer): Integer;
 const
   MaxDecPlaces = 16;
+  ExponPlaces = 3;
   
 var
   Integ, Digit, IntegExpon: Integer;
@@ -728,30 +737,39 @@ var
   WriteExpon: Boolean;
 
 begin
+// Returns the string length
+Result := 0;
+
+Expon := ln(abs(Number)) / ln(10);
+WriteExpon := (DecPlaces = 0) or (Expon > 9);
+
 // Write sign
 if Number < 0 then
   begin
   WriteCh(F, P,  '-');
+  Inc(Result);
   Number := -Number;
-  end;
+  end
+else if WriteExpon then
+  begin
+  WriteCh(F, P,  ' ');
+  Inc(Result);
+  end;  
   
 // Normalize number
-if DecPlaces > 0 then
+if not WriteExpon then
   begin
-  WriteExpon := FALSE;
   IntegExpon := 0;
   if DecPlaces > MaxDecPlaces then DecPlaces := MaxDecPlaces;
   end
 else  
   begin
-  WriteExpon := TRUE;  
   DecPlaces := MaxDecPlaces;
   
   if Number = 0 then 
     IntegExpon := 0 
   else 
     begin
-    Expon := ln(Number) / ln(10);
     IntegExpon := Trunc(Expon);
     Number := Number / exp(IntegExpon * ln(10));
     
@@ -772,8 +790,19 @@ else
 Integ := Trunc(Number);
 Frac  := Number - Integ;
 
-WriteInt(F, P, Integ);  WriteCh(F, P, DecimalSeparator);
+Result := Result + WriteInt(F, P, Integ);
 
+// Write decimal separator  
+WriteCh(F, P, DecimalSeparator);
+Inc(Result);
+
+// Truncate fractional part if needed
+if (MinWidth > 0) and WriteExpon and (Result + DecPlaces + 2 + ExponPlaces > MinWidth) then  // + 2 for "e+" or "e-"
+  begin
+  DecPlaces := MinWidth - Result - 2 - ExponPlaces;
+  if DecPlaces < 1 then DecPlaces := 1;
+  end;
+  
 // Write fractional part
 while DecPlaces > 0 do
   begin
@@ -782,6 +811,7 @@ while DecPlaces > 0 do
   if Digit > 9 then Digit := 9;
   
   WriteCh(F, P,  Char(ShortInt('0') + Digit));
+  Inc(Result);
   
   Frac := Frac - Digit;  
   Dec(DecPlaces);
@@ -799,8 +829,12 @@ if WriteExpon then
     WriteCh(F, P, '-');  
     IntegExpon := -IntegExpon;
     end;
+    
+  // Write leading zeros
+  if IntegExpon < 100 then WriteCh(F, P, '0');
+  if IntegExpon <  10 then WriteCh(F, P, '0');
        
-  WriteInt(F, P, IntegExpon);
+  Result := Result + 2 + ExponPlaces + WriteInt(F, P, IntegExpon);
   end;
  
 end;
@@ -812,7 +846,7 @@ procedure WriteRealF(var F: file; P: PStream; Number: Real; MinWidth, DecPlaces:
 var
   S: string;
 begin
-Str(Number, S, DecPlaces);
+Str(Number, S, MinWidth, DecPlaces);
 WriteStringF(F, P, S, MinWidth, DecPlaces);
 end;
 
@@ -1119,14 +1153,14 @@ end;
 
 
 
-procedure Str(Number: Real; var s: string; DecPlaces: Integer = 0);
+procedure Str(Number: Real; var s: string; MinWidth: Integer = 0; DecPlaces: Integer = 0);
 var
   Stream: TStream;
 begin
 Stream.Data := PChar(@s);
 Stream.Index := 0;
 
-WriteReal(StdOutputFile, @Stream, Number, DecPlaces);
+WriteReal(StdOutputFile, @Stream, Number, MinWidth, DecPlaces);
 s[Stream.Index + 1] := #0;
 end;
 
