@@ -436,6 +436,16 @@ end; // ConvertCharToString
 
 
 
+procedure ConvertStringToPChar(DestType: Integer; var SrcType: Integer);
+begin
+// Try to convert a string (right-hand side) into a pointer to character
+if (Types[DestType].Kind = POINTERTYPE) and (Types[Types[DestType].BaseType].Kind = CHARTYPE) and IsString(SrcType) then    
+  SrcType := DestType;
+end; // ConvertStringToPChar
+
+
+
+
 procedure ConvertToInterface(DestType: Integer; var SrcType: Integer);
 var
   SrcField, DestField: PField;
@@ -1636,7 +1646,10 @@ if Tok.Kind = OPARTOK then                            // Actual parameter list f
         end;        
        
       // Try to convert character to string
-      ConvertCharToString(CurParam^.DataType, ActualParamType, 0);      
+      ConvertCharToString(CurParam^.DataType, ActualParamType, 0);
+
+      // Try to convert string to pointer to character
+      ConvertStringToPChar(CurParam^.DataType, ActualParamType);      
         
       // Try to convert a concrete type to an interface type
       ConvertToInterface(CurParam^.DataType, ActualParamType);
@@ -2752,7 +2765,10 @@ procedure CompileStatement(LoopNesting: Integer);
   ConvertRealToReal(DesignatorType, ExpressionType);
     
   // Try to convert character to string
-  ConvertCharToString(DesignatorType, ExpressionType, 0);    
+  ConvertCharToString(DesignatorType, ExpressionType, 0);
+
+  // Try to convert string to pointer to character
+  ConvertStringToPChar(DesignatorType, ExpressionType);     
     
   // Try to convert a concrete type to an interface type
   ConvertToInterface(DesignatorType, ExpressionType);       

@@ -79,21 +79,20 @@ end;
 
 
 
+
+const
+  ClassName = 'GUI Demo Window Class';
+  WindowText = 'GUI Demo';
+  
  
 var
   wc: WNDCLASSA;
   hInst, hWnd: LongInt;
-  message: MSG;
-  ClassName, WindowText: array [0..255] of Char; 
-
- 
+  message: MSG; 
 
 
 begin
 hInst := GetModuleHandleA(nil);
-
-StrToChars('GUI Demo Window Class', ClassName);
-StrToChars('GUI Demo', WindowText);
 
 with wc do
   begin
@@ -106,14 +105,14 @@ with wc do
   hCursor       := LoadCursorA(0, Pointer(IDC_ARROW));
   hbrBackground := 0;
   lpszMenuName  := nil;
-  lpszClassName := @ClassName[0];
+  lpszClassName := ClassName;
   end;  
 
 RegisterClassA(wc);
 
 hWnd := CreateWindowExA(0,                      // optional styles
-                        @ClassName[0],          // class
-                        @WindowText[0],         // text
+                        ClassName,              // class
+                        WindowText,             // text
                         WS_OVERLAPPEDWINDOW,    // style
                         100,                    // position X
                         100,                    // position Y

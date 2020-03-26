@@ -833,8 +833,9 @@ if WriteExpon then
   // Write leading zeros
   if IntegExpon < 100 then WriteCh(F, P, '0');
   if IntegExpon <  10 then WriteCh(F, P, '0');
-       
-  Result := Result + 2 + ExponPlaces + WriteInt(F, P, IntegExpon);
+  
+  WriteInt(F, P, IntegExpon);     
+  Result := Result + 2 + ExponPlaces; 
   end;
  
 end;

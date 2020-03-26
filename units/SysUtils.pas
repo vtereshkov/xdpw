@@ -23,8 +23,6 @@ function StrToInt(const s: string): Integer;
 function FloatToStr(x: Real): string;
 function FloatToStrF(x: Real; Format: TFloatFormat; Precision, Digits: Integer): string;
 function StrToFloat(const s: string): Real; 
-function StrToPChar(const s: string): PChar;
-function PCharToStr(p: PChar): string;
 function StrToPWideChar(const s: string): PWideChar;
 function PWideCharToStr(p: PWideChar): string; 
 
@@ -96,29 +94,6 @@ end;
 
   
   
-function StrToPChar(const s: string): PChar;
-begin
-Result := @s[1];
-end;
-
-
-
-
-function PCharToStr(p: PChar): string;
-var
-  i: Integer;
-begin
-i := 0;
-repeat
-  Inc(i);
-  Result[i] := p^;
-  p := PChar(Integer(p) + SizeOf(Char));
-until Result[i] = #0;
-end;
-
-
-
-
 function StrToPWideChar(const s: string): PWideChar;
 var
   i: Integer;  
