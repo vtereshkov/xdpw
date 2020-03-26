@@ -1275,16 +1275,18 @@ procedure DiscardStackTop(NumItems: Byte);
     Result := TRUE;
     end
   
-  // Optimization: (sub esp, 4 * NumItems) + (add esp, 4 * NumItems) -> 0  
-  else if (PrevInstrByte(0, 0) = $81) and (PrevInstrByte(0, 1) = $EC) then              // Previous: sub esp, 4 * NumItems
+  // Optimization: (sub esp, Value) + (add esp, 4 * NumItems) -> (add esp, 4 * NumItems - Value)  
+  else if (PrevInstrByte(0, 0) = $81) and (PrevInstrByte(0, 1) = $EC) then              // Previous: sub esp, Value
     begin
-    Value := PrevInstrDWord(0, 2);
+    Value := PrevInstrDWord(0, 2);    
+    RemovePrevInstr(0);                                                                 // Remove: sub esp, Value
 
-    if Value = SizeOf(LongInt) * NumItems then
-      begin
-      RemovePrevInstr(0);                                                               // Remove: sub esp, 4 * NumItems
-      Result := TRUE;
-      end;    
+    if SizeOf(LongInt) * NumItems <> Value then
+      begin      
+      GenNew($81); Gen($C4); GenDWord(SizeOf(LongInt) * NumItems - Value);              // add esp, 4 * NumItems - Value
+      end;
+      
+    Result := TRUE;        
     end
   end;  
 
