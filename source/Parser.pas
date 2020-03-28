@@ -3782,7 +3782,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
   else if Types[ConstType].Kind = ARRAYTYPE then
     begin
     
-    if IsString(ConstType) then                 // Special case: strings
+    if IsString(ConstType) and (Tok.Kind <> OPARTOK) then         // Special case: strings
       begin
       CompileConstExpression(ConstVal, ConstValType);
       ConvertConstCharToString(ConstType, ConstValType, ConstVal);
@@ -3793,7 +3793,7 @@ procedure CompileBlock(BlockIdentIndex: Integer);
         
       DefineStaticString(ConstVal.StrValue, InitializedDataOffset, InitializedDataOffset);
       end
-    else                                        // General rule
+    else                                                          // General rule
       begin
       EatTok(OPARTOK);
       
