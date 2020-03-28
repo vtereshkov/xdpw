@@ -4512,17 +4512,19 @@ ParserState.UnitStatus.Index := NumUnits;
 NextTok;
 
 ParserState.IsUnit := FALSE;
-if Tok.Kind = UNITTOK then
-  ParserState.IsUnit := TRUE
-else
-  CheckTok(PROGRAMTOK);
+if Tok.Kind in [PROGRAMTOK, UNITTOK] then
+  begin
+  ParserState.IsUnit := Tok.Kind = UNITTOK;
   
-NextTok; 
-AssertIdent;
-Units[ParserState.UnitStatus.Index].Name := Tok.Name;
+  NextTok; 
+  AssertIdent;
+  Units[ParserState.UnitStatus.Index].Name := Tok.Name;
 
-NextTok;
-EatTok(SEMICOLONTOK);
+  NextTok;
+  EatTok(SEMICOLONTOK);
+  end
+else
+  Units[ParserState.UnitStatus.Index].Name := 'MAIN';  
 
 ParserState.IsInterfaceSection := FALSE;
 if ParserState.IsUnit then

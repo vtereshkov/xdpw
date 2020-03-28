@@ -53,7 +53,7 @@ XD Pascal is similar to Delphi 6/7 and Free Pascal with the following changes:
 
 #### Formal grammar
 ```
-ProgramOrUnit = ("program" | "unit") Ident ";" 
+ProgramOrUnit = [("program" | "unit") Ident ";"] 
                 ["interface"] [UsesClause] Block "." .
                 
 UsesClause = "uses" Ident {"," Ident} ";" .                
