@@ -561,7 +561,9 @@ end; // CompileConstSetConstructor
 
 procedure CompileConstFactor(var ConstVal: TConst; var ConstValType: Integer);
 var
+  NotOpTok: TToken;
   IdentIndex: Integer;
+  
 begin
 case Tok.Kind of
   IDENTTOK:
@@ -625,8 +627,14 @@ case Tok.Kind of
 
   NOTTOK:
     begin
+    NotOpTok := Tok;
+    NextTok;
     CompileConstFactor(ConstVal, ConstValType);
+    CheckOperator(NotOpTok, ConstValType);        
     ConstVal.OrdValue := not ConstVal.OrdValue;
+    
+    if Types[ConstValType].Kind = BOOLEANTYPE then
+      ConstVal.OrdValue := ConstVal.OrdValue and 1;
     end;
 
 
@@ -687,6 +695,7 @@ while Tok.Kind in MultiplicativeOperators do
                    Error('Constant division by zero')
       end
     else                                               // Integer constants
+      begin
       case OpTok.Kind of             
         MULTOK:  ConstVal.OrdValue := ConstVal.OrdValue * RightConstVal.OrdValue;
         IDIVTOK: if RightConstVal.OrdValue <> 0 then
@@ -701,6 +710,10 @@ while Tok.Kind in MultiplicativeOperators do
         SHRTOK:  ConstVal.OrdValue := ConstVal.OrdValue shr RightConstVal.OrdValue;
         ANDTOK:  ConstVal.OrdValue := ConstVal.OrdValue and RightConstVal.OrdValue;
       end;
+      
+      if Types[ConstValType].Kind = BOOLEANTYPE then
+        ConstVal.OrdValue := ConstVal.OrdValue and 1;
+      end // else  
     end; // else
   end;// while
 
@@ -763,12 +776,17 @@ while Tok.Kind in AdditiveOperators do
         MINUSTOK: ConstVal.RealValue := ConstVal.RealValue - RightConstVal.RealValue;
       end
     else                                                  // Integer constants
+      begin
       case OpTok.Kind of
         PLUSTOK:  ConstVal.OrdValue := ConstVal.OrdValue  +  RightConstVal.OrdValue;
         MINUSTOK: ConstVal.OrdValue := ConstVal.OrdValue  -  RightConstVal.OrdValue;
         ORTOK:    ConstVal.OrdValue := ConstVal.OrdValue  or RightConstVal.OrdValue;
         XORTOK:   ConstVal.OrdValue := ConstVal.OrdValue xor RightConstVal.OrdValue;
       end;
+      
+      if Types[ConstValType].Kind = BOOLEANTYPE then
+        ConstVal.OrdValue := ConstVal.OrdValue and 1;
+      end;  
     end;
 
   end;// while
