@@ -501,6 +501,129 @@ end; // ConvertToInterface
 
 
 
+procedure CompileConstPredefinedFunc(func: TPredefProc; var ConstVal: TConst; var ConstValType: Integer);
+var
+  IdentIndex: Integer;
+
+begin
+NextTok;
+EatTok(OPARTOK);
+
+case func of
+
+  SIZEOFFUNC:
+    begin
+    AssertIdent;
+    IdentIndex := GetIdentUnsafe(Tok.Name);
+    if (IdentIndex <> 0) and (Ident[IdentIndex].Kind = USERTYPE) then   // Type name
+      begin
+      NextTok;
+      ConstVal.OrdValue := TypeSize(Ident[IdentIndex].DataType);
+      end
+    else                                                                // Variable name
+      Error('Type name expected');
+    ConstValType := INTEGERTYPEINDEX;
+    end;
+    
+
+  ROUNDFUNC, TRUNCFUNC:
+    begin
+    CompileConstExpression(ConstVal, ConstValType);
+
+    if not (Types[ConstValType].Kind in IntegerTypes) then
+      begin     
+      GetCompatibleType(ConstValType, REALTYPEINDEX);
+      if func = TRUNCFUNC then
+        ConstVal.OrdValue := Trunc(ConstVal.RealValue)
+      else
+        ConstVal.OrdValue := Round(ConstVal.RealValue);
+      end;
+    ConstValType := INTEGERTYPEINDEX;
+    end;
+    
+
+  ORDFUNC:
+    begin
+    CompileConstExpression(ConstVal, ConstValType);
+    if not (Types[ConstValType].Kind in OrdinalTypes) then
+      Error('Ordinal type expected');
+    ConstValType := INTEGERTYPEINDEX;
+    end;
+    
+
+  CHRFUNC:
+    begin
+    CompileConstExpression(ConstVal, ConstValType);
+    GetCompatibleType(ConstValType, INTEGERTYPEINDEX);
+    ConstValType := CHARTYPEINDEX;
+    end;    
+
+
+  LOWFUNC, HIGHFUNC:
+    begin
+    AssertIdent;
+    IdentIndex := GetIdentUnsafe(Tok.Name);
+    if (IdentIndex <> 0) and (Ident[IdentIndex].Kind = USERTYPE) then   // Type name
+      begin
+      NextTok;
+      ConstValType := Ident[IdentIndex].DataType;
+      end
+    else                                                                // Variable name
+      Error('Type name expected');
+          
+    if (Types[ConstValType].Kind = ARRAYTYPE) and not Types[ConstValType].IsOpenArray then
+      ConstValType := Types[ConstValType].IndexType;
+    if func = HIGHFUNC then  
+      ConstVal.OrdValue := HighBound(ConstValType)
+    else
+      ConstVal.OrdValue := LowBound(ConstValType); 
+    end;
+
+
+  PREDFUNC, SUCCFUNC:
+    begin
+    CompileConstExpression(ConstVal, ConstValType);
+    if not (Types[ConstValType].Kind in OrdinalTypes) then
+      Error('Ordinal type expected');
+    if func = SUCCFUNC then
+      Inc(ConstVal.OrdValue)
+    else
+      Dec(ConstVal.OrdValue);
+    end;
+    
+
+  ABSFUNC, SQRFUNC, SINFUNC, COSFUNC, ARCTANFUNC, EXPFUNC, LNFUNC, SQRTFUNC:
+    begin
+    CompileConstExpression(ConstVal, ConstValType);
+    if (func = ABSFUNC) or (func = SQRFUNC) then                          // Abs and Sqr accept real or integer parameters
+      begin
+      if not ((Types[ConstValType].Kind in NumericTypes) or
+             ((Types[ConstValType].Kind = SUBRANGETYPE) and (Types[Types[ConstValType].BaseType].Kind in NumericTypes))) then
+        Error('Numeric type expected');
+
+      if Types[ConstValType].Kind = REALTYPE then
+        if func = ABSFUNC then
+          ConstVal.RealValue := abs(ConstVal.RealValue)
+        else
+          ConstVal.RealValue := sqr(ConstVal.RealValue)
+      else
+        if func = ABSFUNC then
+          ConstVal.OrdValue := abs(ConstVal.OrdValue)
+        else
+          ConstVal.OrdValue := sqr(ConstVal.OrdValue);
+      end
+    else
+      Error('Function is not allowed in constant expressions');   
+    end;
+    
+end;// case
+
+EatTok(CPARTOK);
+end;// CompileConstPredefinedFunc
+
+
+
+
 procedure CompileConstSetConstructor(var ConstVal: TConst; var ConstValType: Integer);
 var
   ElementVal, ElementVal2: TConst;
@@ -569,19 +692,44 @@ case Tok.Kind of
   IDENTTOK:
     begin
     IdentIndex := GetIdent(Tok.Name);
-    if Ident[IdentIndex].Kind <> CONSTANT then
-      Error('Constant expected but ' + Ident[IdentIndex].Name + ' found');
 
-    ConstValType := Ident[IdentIndex].DataType;
+    case Ident[IdentIndex].Kind of
     
-    case Types[ConstValType].Kind of
-      SETTYPE:   ConstVal.SetValue  := Ident[IdentIndex].ConstVal.SetValue;
-      ARRAYTYPE: ConstVal.StrValue  := Ident[IdentIndex].ConstVal.StrValue; 
-      REALTYPE:  ConstVal.RealValue := Ident[IdentIndex].ConstVal.RealValue;
-      else       ConstVal.OrdValue  := Ident[IdentIndex].ConstVal.OrdValue;
-    end;
-  
-    NextTok;
+      GOTOLABEL:
+        Error('Constant expression expected but label ' + Ident[IdentIndex].Name + ' found');
+    
+      PROC:
+        Error('Constant expression expected but procedure ' + Ident[IdentIndex].Name + ' found');
+        
+      FUNC:
+        if Ident[IdentIndex].PredefProc <> EMPTYPROC then
+          CompileConstPredefinedFunc(Ident[IdentIndex].PredefProc, ConstVal, ConstValType)
+        else
+          Error('Function ' + Ident[IdentIndex].Name + ' is not allowed in constant expressions');
+
+      VARIABLE:
+        Error('Constant expression expected but variable ' + Ident[IdentIndex].Name + ' found');     
+    
+      CONSTANT:
+        begin
+        ConstValType := Ident[IdentIndex].DataType;
+        
+        case Types[ConstValType].Kind of
+          SETTYPE:   ConstVal.SetValue  := Ident[IdentIndex].ConstVal.SetValue;
+          ARRAYTYPE: ConstVal.StrValue  := Ident[IdentIndex].ConstVal.StrValue; 
+          REALTYPE:  ConstVal.RealValue := Ident[IdentIndex].ConstVal.RealValue;
+          else       ConstVal.OrdValue  := Ident[IdentIndex].ConstVal.OrdValue;
+        end;
+        
+        NextTok;
+        end;
+        
+      USERTYPE:
+        Error('Constant expression expected but type ' + Ident[IdentIndex].Name + ' found');
+
+      else
+        Error('Internal fault: Illegal identifier');  
+      end; // case Ident[IdentIndex].Kind           
     end;
 
 
