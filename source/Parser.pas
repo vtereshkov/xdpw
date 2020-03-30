@@ -2483,6 +2483,12 @@ case Tok.Kind of
             
           ValType := Ident[IdentIndex].DataType;
           NextTok;
+          
+          if Types[Ident[IdentIndex].DataType].Kind in StructuredTypes then
+            begin
+            CompileSelectors(ValType);
+            CompileDereferenceOrCall(ValType);
+            end;            
           end;
           
         USERTYPE:                                                                       // Type cast
