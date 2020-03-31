@@ -314,7 +314,7 @@ type
     IsConst: Boolean;
   end;
   
-  TWriteProc = procedure (const Msg: TString);
+  TWriteProc = procedure (ClassInstance: Pointer; const Msg: TString);
   
   
   
@@ -363,7 +363,7 @@ procedure DisposeFields(var DataType: TType);
 function GetTokSpelling(TokKind: TTokenKind): TString;
 function GetTypeSpelling(DataType: Integer): TString;
 function Align(Size, Alignment: Integer): Integer;
-procedure SetWriteProcs(NewNoticeProc, NewWarningProc, NewErrorProc: TWriteProc);
+procedure SetWriteProcs(ClassInstance: Pointer; NewNoticeProc, NewWarningProc, NewErrorProc: TWriteProc);
 procedure Notice(const Msg: TString);
 procedure Warning(const Msg: TString);
 procedure Error(const Msg: TString);
@@ -449,6 +449,7 @@ const
 
 var
   NoticeProc, WarningProc, ErrorProc: TWriteProc;
+  WriteProcsClassInstance: Pointer;
   UnitStatus: TUnitStatus;
   
 
@@ -622,8 +623,10 @@ end;
 
 
 
-procedure SetWriteProcs(NewNoticeProc, NewWarningProc, NewErrorProc: TWriteProc);
+procedure SetWriteProcs(ClassInstance: Pointer; NewNoticeProc, NewWarningProc, NewErrorProc: TWriteProc);
 begin
+WriteProcsClassInstance := ClassInstance;
+
 NoticeProc  := NewNoticeProc;
 WarningProc := NewWarningProc;
 ErrorProc   := NewErrorProc;
@@ -634,7 +637,7 @@ end;
 
 procedure Notice(const Msg: TString);
 begin
-NoticeProc(Msg);
+NoticeProc(WriteProcsClassInstance, Msg);
 end;
 
 
@@ -642,7 +645,7 @@ end;
 
 procedure Warning(const Msg: TString);
 begin
-WarningProc(Msg);
+WarningProc(WriteProcsClassInstance, Msg);
 end;
 
 
@@ -650,7 +653,7 @@ end;
   
 procedure Error(const Msg: TString);
 begin
-ErrorProc(Msg);
+ErrorProc(WriteProcsClassInstance, Msg);
 end;
 
 

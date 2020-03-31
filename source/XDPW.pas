@@ -47,7 +47,7 @@ end;
 
 
 
-procedure NoticeProc(const Msg: TString);
+procedure NoticeProc(ClassInstance: Pointer; const Msg: TString);
 begin
 WriteLn(Msg);  
 end;
@@ -55,7 +55,7 @@ end;
 
 
 
-procedure WarningProc(const Msg: TString);
+procedure WarningProc(ClassInstance: Pointer; const Msg: TString);
 begin
 if NumUnits >= 1 then
   Notice(ScannerFileName + ' (' + IntToStr(ScannerLine) + ') Warning: ' + Msg)
@@ -66,7 +66,7 @@ end;
 
 
 
-procedure ErrorProc(const Msg: TString);
+procedure ErrorProc(ClassInstance: Pointer; const Msg: TString);
 begin
 if NumUnits >= 1 then
   Notice(ScannerFileName + ' (' + IntToStr(ScannerLine) + ') Error: ' + Msg)
@@ -89,7 +89,7 @@ var
 
 
 begin
-SetWriteProcs(@NoticeProc, @WarningProc, @ErrorProc);
+SetWriteProcs(nil, @NoticeProc, @WarningProc, @ErrorProc);
 
 Notice('XD Pascal for Windows ' + VERSION);
 Notice('Copyright (c) 2009-2010, 2019-2020, Vasiliy Tereshkov');
